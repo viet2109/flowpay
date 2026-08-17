@@ -1,0 +1,52 @@
+name: flowpay
+
+services:
+  postgres:
+    image: postgres:16.15-alpine
+    container_name: flowpay-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-flowpay}
+      POSTGRES_USER: ${POSTGRES_USER:-flowpay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flowpay}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - flowpay-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - flowpay-network
+
+  rabbitmq:
+    image: rabbitmq:4.3-management-alpine
+    container_name: flowpay-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-flowpay}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-flowpay}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - flowpay-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - flowpay-network
+
+volumes:
+  flowpay-postgres-data:
+  flowpay-rabbitmq-data:
+
+networks:
+  flowpay-network:
+    driver: bridge

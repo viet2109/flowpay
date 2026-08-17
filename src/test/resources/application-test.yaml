@@ -1,0 +1,22 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+management:
+  health:
+    rabbit:
+      enabled: false
+  opentelemetry:
+    tracing:
+      sampler: always-off
+
+flowpay:
+  security:
+    prometheus-public: false

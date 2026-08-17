@@ -1,0 +1,22 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/flowpay}
+    username: ${DB_USERNAME:flowpay}
+    password: ${DB_PASSWORD:flowpay}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:flowpay}
+    password: ${RABBITMQ_PASSWORD:flowpay}
+
+management:
+  opentelemetry:
+    tracing:
+      sampler: always-off
+
+flowpay:
+  security:
+    prometheus-public: true
