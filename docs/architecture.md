@@ -1,21 +1,50 @@
-# FlowPay — Architecture v1
+# FlowPay — Architecture
 
-## Architectural Style
+## 1. Architectural approach
 
-FlowPay v1 is a modular monolith.
+FlowPay MVP is a modular monolith.
 
-Goals:
-
-- strong module boundaries;
-- simple deployment while the domain evolves;
-- explicit transaction ownership;
-- later extraction of selected services without rewriting domain concepts.
-
-## Source Structure
+Each business module follows a DDD-inspired layered structure:
 
 ```text
-src/main/java/com/flowpay
-├── FlowPayApplication.java
+<module>/
+├── api/
+├── application/
+├── domain/
+└── infrastructure/
+```
+
+Do not create empty packages only to satisfy this diagram. Create packages when implementation needs them.
+
+## 2. Dependency direction
+
+Within a module:
+
+```text
+API
+ |
+ v
+Application
+ |
+ v
+Domain
+
+Infrastructure
+   |
+   +----> Application/Domain ports
+```
+
+Rules:
+
+- Domain must not depend on infrastructure.
+- API must not access persistence repositories directly.
+- Application services orchestrate use cases.
+- Infrastructure implements ports and technical details.
+
+## 3. Top-level packages
+
+```text
+com.flowpay
 ├── common
 ├── infrastructure
 ├── identity
@@ -26,184 +55,409 @@ src/main/java/com/flowpay
 └── webhook
 ```
 
-Typical business module:
+### `common`
+
+Contains genuinely reusable non-business primitives such as:
+
+- API response envelope.
+- Problem Details support.
+- correlation/request identifiers.
+- Money value object when shared.
+- public ID primitives.
+
+`common` is not a dumping ground and should not contain generic business services.
+
+### top-level `infrastructure`
+
+Contains cross-cutting technical capabilities:
+
+- security plumbing.
+- request correlation/filtering.
+- messaging/outbox relay infrastructure.
+- observability.
+- idempotency infrastructure when shared.
+- configuration.
+
+Business rules do not belong here.
+
+## 4. Module boundaries
+
+A module must not:
+
+- import another module's persistence entity.
+- inject another module's Spring Data repository.
+- define cross-module JPA entity associations.
+- return JPA entities from its public API.
+- mutate another module's aggregate directly.
+
+Allowed cross-module communication:
+
+1. Public application API for synchronous business decisions.
+2. Integration events for asynchronous side effects.
+3. IDs for persistence references.
+
+Database foreign keys may still enforce referential integrity because MVP modules share one PostgreSQL database.
+
+## 5. Transaction boundaries
+
+`@Transactional` belongs at application use-case boundaries.
+
+Do not place transaction ownership in controllers or domain objects.
+
+### Registration transaction
+
+Phase 1 registration is one database transaction:
 
 ```text
-payment/
-├── api/
-├── application/
-├── domain/
-└── infrastructure/
+RegistrationService
+   |
+   +--> create User
+   |
+   +--> MerchantOnboardingApi
+          |
+          +--> create Merchant
+          +--> create OWNER membership
+   |
+ COMMIT
 ```
 
-## Layer Responsibilities
+Any failure rolls back User, Merchant, and membership together.
 
-### API
+This is allowed because the modular monolith shares one database, while repository ownership remains inside the appropriate module.
 
-- HTTP endpoints;
-- validation;
-- authentication context extraction;
-- request mapping;
-- response mapping.
+### External provider call
 
-### Application
+Do not keep a database transaction open across an external HTTP call.
 
-- use-case orchestration;
-- transaction boundaries;
-- command/query handling;
-- calls to domain models and ports.
-
-### Domain
-
-- aggregates;
-- value objects;
-- state transitions;
-- business invariants;
-- domain events;
-- repository abstractions where appropriate.
-
-### Infrastructure
-
-- JPA entities/repositories/adapters;
-- provider adapters;
-- RabbitMQ;
-- security implementation;
-- outbox relay;
-- observability;
-- scheduling.
-
-## Transaction Strategy
-
-External provider calls must not run inside an open database transaction.
-
-Payment confirmation conceptually uses:
+Payment confirmation is conceptually:
 
 ```text
-TX1
-  PaymentIntent CREATED -> PROCESSING
-  create PaymentTransaction
-  commit
+TX 1
+- PaymentIntent -> PROCESSING
+- create PaymentTransaction
+COMMIT
 
-NO DB TX
-  call provider
+NO DATABASE TX
+- call provider
 
-TX2
-  finalize PaymentTransaction
-  finalize PaymentIntent
-  append outbox event
-  commit
+TX 2
+- finalize PaymentTransaction
+- finalize PaymentIntent
+- create outbox event
+COMMIT
 ```
 
-For ambiguous provider response:
+## 6. Identity and dashboard authentication
+
+Dashboard users authenticate with JWT access tokens.
+
+### Access token
+
+- JWT.
+- RSA asymmetric signature.
+- default TTL 15 minutes.
+- `sub` = user public ID.
+- claims include active merchant public ID and role for MVP.
+
+Example:
+
+```json
+{
+  "sub": "usr_01K...",
+  "merchant": "mrc_01K...",
+  "role": "OWNER"
+}
+```
+
+Do not place internal IDs or secrets in the token.
+
+### Refresh token
+
+Refresh tokens are opaque random values stored in an HttpOnly cookie.
+
+The database stores only a SHA-256 digest.
+
+Refresh uses rotation:
 
 ```text
-PaymentTransaction -> UNKNOWN
-PaymentIntent      -> PROCESSING
+old refresh token
+      |
+      v
+validate + atomically consume
+      |
+      +--> revoke old record
+      +--> create replacement
+      +--> issue new access token
 ```
 
-## Transactional Outbox
+Concurrent refresh attempts must not create multiple valid replacement chains.
 
-Business modules publish integration events through an abstraction.
+Tests may generate ephemeral RSA key pairs. Production key material is injected using secret configuration and is never committed.
 
-The default implementation inserts `outbox_events` in the same PostgreSQL transaction as the business state change.
+## 7. Merchant integration authentication
 
-An outbox relay publishes to RabbitMQ asynchronously.
+Merchant server-to-server APIs authenticate using:
 
-Business code must not publish directly to RabbitMQ.
+`Authorization: Bearer fp_test_...`
 
-## Event Consumers
+This is distinct from dashboard JWT authentication.
 
-Initial event-driven flows:
+Recommended security organization is path-based security chains/entry points rather than treating JWT and API keys as an undifferentiated credential.
+
+Conceptually:
 
 ```text
-PaymentSucceeded
-├── Ledger consumer
-└── Webhook consumer
-
-RefundSucceeded
-├── Ledger consumer
-└── Webhook consumer
+/auth/**                 public/auth flows
+/merchant/**             dashboard JWT
+/payment-intents/**      merchant API key
+/refunds/**              merchant API key where applicable
 ```
 
-Consumers must be idempotent.
+Exact path rules follow the API contract.
 
-## Persistence Model
+## 8. Principal abstraction
 
-Use PostgreSQL + Flyway.
+Application/business code must not read `SecurityContextHolder` directly throughout the codebase.
 
-Persistence strategy:
+Security infrastructure resolves authenticated identities into explicit principal objects.
+
+Recommended principal types:
+
+### DashboardPrincipal
+
+Contains:
+
+- user public ID
+- active merchant public ID
+- merchant role
+
+### MerchantApiPrincipal
+
+Contains:
+
+- merchant public ID
+- API-key public ID
+
+A small current-principal provider may expose the relevant principal to application code.
+
+Do not force dashboard and API-key authentication into one ambiguous business identity.
+
+## 9. Password and secret hashing
+
+Different secret types use different strategies.
+
+### Human passwords
+
+Use BCrypt via Spring Security `PasswordEncoder`.
+
+Reason: human passwords have relatively low entropy and need a deliberately expensive password hash.
+
+### Generated refresh tokens and API keys
+
+Use cryptographically strong random generation and store SHA-256 digests.
+
+Reason: generated tokens already have high entropy and require efficient deterministic lookup/verification.
+
+Raw generated secrets are not persisted.
+
+## 10. API key architecture
+
+Generation:
 
 ```text
-Internal PK        BIGINT identity
-Public IDs         prefixed ULID-like strings
-Money              BIGINT minor units
-Currency           CHAR(3)
-Timestamps         TIMESTAMPTZ
-Mutable aggregate  optimistic version BIGINT
+SecureRandom
+   |
+   v
+fp_test_<secret>
+   |
+   +--> returned once
+   |
+   +--> prefix stored
+   +--> SHA-256 digest stored
 ```
 
-Cross-module database foreign keys are allowed while all modules share one database.
+Authentication:
 
-Cross-module JPA associations are forbidden.
+```text
+raw key
+  |
+  +--> validate format
+  +--> extract prefix
+  +--> load candidate key
+  +--> calculate SHA-256 digest
+  +--> constant-time digest comparison
+  +--> verify key ACTIVE
+  +--> verify merchant ACTIVE
+  +--> MerchantApiPrincipal
+```
 
-## Domain vs Persistence Objects
+`last_used_at` is operational metadata, not a financial correctness invariant.
 
-For important financial aggregates, prefer separating domain models from JPA entities.
+## 11. Payment provider port
+
+Application/domain code does not know `RestClient`, provider URLs, or provider-specific response codes.
+
+Port concept:
+
+```java
+interface PaymentProviderPort {
+    PaymentProviderResult charge(PaymentProviderRequest request);
+}
+```
+
+Infrastructure adapters implement the port.
+
+Provider-specific results are normalized into FlowPay meanings such as:
+
+- success
+- declined
+- unknown
+- technical failure
+
+## 12. Events and outbox
+
+Business modules do not publish RabbitMQ messages directly.
+
+They publish explicit integration events through an abstraction that persists an outbox row in the same database transaction as the business state change.
+
+Concept:
+
+```text
+Business transaction
+    |
+    +--> update aggregate
+    +--> INSERT outbox event
+    |
+  COMMIT
+
+Outbox relay
+    |
+    v
+RabbitMQ
+```
+
+Integration events are versioned contracts and must not serialize JPA entities.
+
+## 13. Synchronous query versus asynchronous side effect
+
+Use a synchronous module API only when a business operation needs another module's current state to make a decision.
+
+Example:
+
+`Refund -> PaymentQueryApi`
+
+Use events for downstream side effects.
 
 Example:
 
 ```text
-PaymentIntent
-   <-> PaymentIntentPersistenceMapper
-   <-> PaymentIntentEntity
+payment.succeeded.v1
+   |
+   +--> Ledger
+   +--> Webhook
 ```
 
-Do not apply this mechanically to every technical record if it adds no domain value.
+Payment should not synchronously call Ledger and Webhook services inside the payment transaction.
 
-## Security Context
+## 14. Persistence
 
-Do not parse JWT/API-key authentication throughout business services.
+### IDs
 
-Expose small abstractions such as:
+Use:
 
-```text
-CurrentUserProvider
-CurrentMerchantProvider
-```
+- internal `BIGINT` primary keys for database relationships.
+- prefixed ULID-based public IDs at API boundaries.
 
-## Payment Provider Port
+Examples:
 
-Application/domain code depends on a provider abstraction.
+- `usr_...`
+- `mrc_...`
+- `key_...`
+- `pi_...`
+- `ptxn_...`
+- `re_...`
+- `la_...`
+- `ltxn_...`
+- `wep_...`
+- `evt_...`
 
-Infrastructure implements the simulator and any future real adapters.
+### Schema
 
-Provider-specific statuses are normalized before entering core business logic.
+Flyway is the schema owner.
 
-## Observability Direction
+Hibernate uses:
 
-Structured logs should include public identifiers and request correlation where useful:
+`ddl-auto=validate`
 
-```text
-requestId
-merchantId
-paymentId
-paymentTransactionId
-refundId
-eventId
-```
+Never `create`, `update`, or `create-drop` in normal application profiles.
 
-Never log secrets.
+## 15. Mapping
 
-Later phases should add:
+Lombok may reduce boilerplate but must not create uncontrolled domain mutability.
 
-- OpenTelemetry traces;
-- Prometheus metrics;
-- Grafana dashboards.
+Do not use `@Data` on domain aggregates or JPA entities.
 
-## Testing
+Do not generate public setters for protected domain state.
 
-- domain unit tests without Spring;
-- application service tests with mocked ports;
-- PostgreSQL integration tests with Testcontainers;
-- RabbitMQ integration tests with Testcontainers when messaging is involved;
-- ArchUnit module-boundary tests.
+MapStruct is appropriate for repetitive mechanical mapping such as DTO-to-DTO or simple response mapping.
+
+Prefer explicit mapping when:
+
+- rehydrating a rich aggregate.
+- mapping encodes business semantics.
+- hidden generated mapping would make invariants unclear.
+
+MapStruct mappers must not contain business rules.
+
+## 16. Testing architecture
+
+### Domain unit tests
+
+No Spring context.
+
+Examples:
+
+- state transition rules.
+- refund invariants.
+- balanced ledger.
+
+### Application tests
+
+Test orchestration using mocked ports where useful.
+
+### Integration tests
+
+Use real PostgreSQL through Testcontainers.
+
+Do not replace PostgreSQL with H2.
+
+RabbitMQ integration tests use RabbitMQ Testcontainers when messaging is implemented.
+
+### Architecture tests
+
+ArchUnit should enforce critical package dependencies, including:
+
+- domain does not depend on infrastructure.
+- API does not access persistence.
+- modules do not import another module's infrastructure.
+- no forbidden cross-module repository/entity dependencies.
+
+## 17. Logging and observability
+
+Every HTTP request receives/propagates `X-Request-Id`.
+
+Request ID is placed in MDC and returned in the response.
+
+Do not log secrets.
+
+Actuator and Micrometer provide health/metrics foundation.
+
+OpenTelemetry support may be configured for tracing, but business-specific metrics/traces are added when corresponding features exist.
+
+## 18. Dependency policy
+
+Do not add technology only to increase stack size.
+
+Current MVP foundation includes technologies justified by planned MVP features.
+
+Potential later additions such as Redis, Kafka, Resilience4j, Spring Modulith, Spring Batch, ShedLock, QueryDSL, OpenSearch, or WebFlux require an explicit problem/use case before adoption.

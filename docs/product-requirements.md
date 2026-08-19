@@ -1,121 +1,199 @@
-# FlowPay — Product Requirements v1
+# FlowPay — Product Requirements
 
-## Problem Statement
+## 1. Product statement
 
-FlowPay is a payment processing platform that lets merchants integrate a unified API to create, process, track, and refund payments.
+FlowPay is a payment-processing platform for merchants. A merchant integrates one API to create, process, inspect, and refund payments while FlowPay provides reliable state management, transaction safety, event delivery, and a financial ledger.
 
-The system must prevent accidental duplicate financial operations, preserve financial consistency, handle ambiguous or failing provider interactions, and reliably notify merchants of state changes through webhooks.
+The MVP does not process real money. It uses a controllable payment-provider simulator so the system can reproduce success, decline, timeout, retry, and unknown-outcome scenarios.
 
-FlowPay v1 uses a simulated payment provider. It does not process real card or banking data.
+## 2. Portfolio goal
 
-## Portfolio Goals
+FlowPay is intentionally designed to demonstrate backend engineering beyond CRUD:
 
-The project should demonstrate:
+- Java and Spring Boot fundamentals.
+- Transaction boundaries and consistency.
+- Concurrency protection.
+- Idempotent financial operations.
+- Payment state machines.
+- Reliable event delivery.
+- Transactional outbox.
+- RabbitMQ and eventual consistency.
+- Double-entry ledger concepts.
+- Security and secret handling.
+- Observability and production-oriented testing.
 
-- Java/Spring engineering;
-- transaction design;
-- concurrency control;
-- idempotency;
-- modular architecture;
-- event-driven processing;
-- transactional outbox;
-- reliable webhooks;
-- double-entry ledger fundamentals;
-- security practices;
-- testing with real infrastructure;
-- observability and DevOps maturity.
-
-## Actors
+## 3. Actors
 
 ### Merchant Admin
-Uses the FlowPay dashboard to manage merchant settings, API keys, webhooks, payments, refunds, and delivery logs.
+
+A human user who signs in to the FlowPay dashboard and manages:
+
+- Merchant profile.
+- API keys.
+- Webhook endpoints.
+- Payment and refund history.
+- Webhook delivery history.
 
 ### Merchant Backend
-Calls FlowPay integration APIs to create/confirm payments and create refunds.
+
+The merchant's server that authenticates with a FlowPay API key and calls payment/refund APIs.
 
 ### Customer
-Pays the merchant. The customer does not need a FlowPay account in v1.
+
+The person paying the merchant. The MVP does not require a FlowPay customer account.
 
 ### Payment Provider
-External payment processor abstraction. v1 uses `FLOWPAY_SIMULATOR`.
+
+An external payment processor. The MVP initially uses `FLOWPAY_SIMULATOR`.
 
 ### FlowPay Admin
-Operational/support actor. Admin product scope is not part of the initial MVP implementation.
 
-## MVP Capabilities
+Internal operational actor reserved for later versions. An admin console is not required for the MVP.
 
-### Identity and Merchant
+## 4. MVP functional scope
 
-- register merchant owner;
-- login;
-- merchant profile;
-- create/list/revoke API keys.
+### Identity and merchant
+
+- Register a dashboard user and merchant.
+- Create the initial merchant membership as `OWNER`.
+- Login using email/password.
+- JWT access tokens.
+- Opaque rotating refresh tokens.
+- Logout and refresh-token revocation.
+- Merchant profile.
+- Merchant API key creation, listing, revocation, and authentication.
+
+Email verification, password-reset email, Google OAuth, and member invitations are not part of MVP Phase 1.
 
 ### Payment
 
-- create PaymentIntent;
-- confirm PaymentIntent;
-- retrieve payment;
-- list payments;
-- view provider attempts;
-- provider simulator outcomes: success, decline/failure, timeout/unknown.
+- Create `PaymentIntent`.
+- Confirm payment.
+- Retrieve payment.
+- List/filter payments.
+- Track provider attempts through `PaymentTransaction`.
+- Correctly represent provider `SUCCESS`, `DECLINED`, and `UNKNOWN` outcomes.
+
+### Idempotency
+
+Financial commands support `Idempotency-Key`.
+
+The system guarantees:
+
+- Same merchant + operation + key + equivalent request returns the original logical result.
+- Reusing a key with a different request is rejected.
+- Database uniqueness protects against concurrent duplicate requests.
 
 ### Refund
 
-- full refund;
-- partial refund;
-- multiple partial refunds;
-- concurrency-safe refundable amount enforcement.
+- Full refund.
+- Partial refund.
+- Multiple partial refunds.
+- Protection against concurrent over-refund.
+- Refund status and history.
 
 ### Ledger
 
-- double-entry posting for successful payments and refunds;
-- immutable postings;
-- duplicate-posting protection.
+- Double-entry posting.
+- Debit total equals credit total for a ledger transaction.
+- Posted ledger data is append-only.
+- Corrections are represented as reversal postings.
 
-### Webhook
+### Outbox and messaging
 
-- configure endpoint;
-- subscribe to event types;
-- signed delivery;
-- retry with backoff;
-- delivery attempt history;
-- manual retry of dead deliveries.
+- Reliable integration events.
+- Transactional outbox.
+- RabbitMQ transport.
+- Consumers must tolerate at-least-once delivery.
 
-### Reliability
+### Webhooks
 
-- idempotency keys;
-- transactional outbox;
-- RabbitMQ integration;
-- retry/dead-letter handling where appropriate.
+- Merchant webhook endpoint configuration.
+- Event subscriptions.
+- HMAC-SHA256 signature.
+- Retry with backoff.
+- Delivery attempt history.
+- Dead delivery state.
+- Manual retry for dead deliveries.
 
-## Explicitly Out of Scope for Initial MVP
+## 5. Payment provider simulator
 
-- real card data;
-- PCI-DSS implementation;
-- real banking integration;
-- real settlement;
-- KYC;
-- AML;
-- fraud detection;
-- chargebacks/disputes;
-- multi-provider routing;
-- FX conversion;
-- multi-region architecture;
-- microservices decomposition.
+The simulator must eventually support deterministic test scenarios such as:
 
-## Delivery Strategy
+- `SUCCESS`
+- `DECLINED`
+- `TIMEOUT`
+- `UNKNOWN`
 
-FlowPay starts as a modular monolith.
+A timeout is not automatically a payment failure. If the provider outcome cannot be known, the transaction becomes `UNKNOWN` and the payment remains `PROCESSING` until reconciliation/inquiry resolves it.
 
-Suggested implementation phases:
+## 6. MVP roadmap
 
-1. Foundation and project bootstrap.
-2. Identity, Merchant, API keys.
-3. Payment core and provider simulator.
-4. Idempotency.
-5. Refund and concurrency.
-6. Ledger.
-7. Outbox and RabbitMQ.
-8. Webhook delivery.
-9. Observability, CI/CD, load/reliability hardening.
+### Phase 0 — Foundation
+
+Spring Boot foundation, configuration, Docker, Flyway, package boundaries, API/error foundation, correlation IDs, observability, Testcontainers, ArchUnit, and CI.
+
+### Phase 1 — Identity & Merchant
+
+User, merchant, membership, login, JWT, rotating refresh token, merchant dashboard security, API-key management, and API-key authentication.
+
+### Phase 2 — Payment Core
+
+Payment intent, payment transaction, provider port/simulator, confirmation flow, unknown outcomes, and payment query APIs.
+
+### Phase 3 — Idempotency
+
+Idempotency records and replay/conflict semantics for financial commands.
+
+### Phase 4 — Refund & Concurrency
+
+Full/partial refunds, refund reservation, concurrency protection, and integration tests.
+
+### Phase 5 — Ledger
+
+Double-entry ledger accounts, transactions, entries, posting rules, and duplicate-consumer protection.
+
+### Phase 6 — Outbox & RabbitMQ
+
+Transactional outbox, event relay, RabbitMQ, consumer idempotency, and integration events.
+
+### Phase 7 — Webhooks
+
+Endpoint configuration, subscriptions, event creation, signed delivery, retry/backoff, delivery history, and dead delivery handling.
+
+### Phase 8 — Production engineering
+
+Hardening after the functional MVP: richer tracing/metrics, load testing, security hardening, deployment improvements, and operational tooling.
+
+## 7. Explicitly out of scope for MVP
+
+- Real card storage.
+- Real bank/card processing.
+- KYC.
+- Fraud/ML engine.
+- Chargebacks and disputes.
+- Settlement and payouts.
+- Multi-provider smart routing.
+- Subscription billing.
+- Foreign-exchange conversion.
+- Multi-region deployment.
+- Kafka.
+- Elasticsearch/OpenSearch.
+- Redis unless a later requirement justifies it.
+- Microservice decomposition.
+
+## 8. Post-MVP direction
+
+The preferred evolution is:
+
+1. Multi-provider routing.
+2. Fees and merchant balances.
+3. Settlement/payout.
+4. Provider reconciliation.
+5. Recurring billing.
+6. Disputes and chargebacks.
+7. Risk/fraud.
+8. Analytics/search.
+9. Service decomposition when domain and scale justify it.
+
+The MVP architecture must not intentionally block these extensions, but it must not implement them prematurely.

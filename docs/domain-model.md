@@ -1,160 +1,467 @@
-# FlowPay — Domain Model v1
+# FlowPay — Domain Model
 
-## Modules and Aggregate Roots
+## 1. Architectural style
 
-| Module | Aggregate root |
-|---|---|
-| identity | User |
-| merchant | Merchant |
-| merchant | ApiKey |
-| payment | PaymentIntent |
-| payment | PaymentTransaction |
-| refund | Refund |
-| ledger | LedgerAccount |
-| ledger | LedgerTransaction |
-| webhook | WebhookEndpoint |
-| webhook | WebhookEvent |
-| webhook | WebhookDelivery |
+FlowPay begins as a modular monolith with explicit domain/module boundaries.
 
-`LedgerEntry` is owned by `LedgerTransaction` and is not a standalone aggregate root.
+Main modules:
 
-## Identity and Merchant
+- `identity`
+- `merchant`
+- `payment`
+- `refund`
+- `ledger`
+- `webhook`
 
-`User` represents a dashboard identity.
+Shared technical capabilities live under `common` and top-level `infrastructure`.
 
-`Merchant` represents the business account.
+Aggregates reference aggregates in other modules by ID, not by cross-module JPA object relationships.
 
-These are not the same concept.
+## 2. Identity module
 
-A merchant may eventually have multiple users through `MerchantMember` roles such as:
+### User — Aggregate Root
 
-```text
-OWNER
-DEVELOPER
-FINANCE
-VIEWER
-```
+Purpose:
 
-## PaymentIntent
+Represents a human dashboard identity.
 
-Represents the merchant's intent to collect a fixed amount/currency for a merchant order/reference.
+Core fields:
 
-Core state:
+- internal ID
+- public ID (`usr_...`)
+- normalized email
+- password hash
+- first name
+- last name
+- status
+- version
+- timestamps
 
-```text
-merchantId
-orderId
-amount
-currency
-status
-refundedAmount
-reservedRefundAmount
-version
-```
+Status:
 
-The aggregate owns payment state transitions and refundable-amount invariants.
+- `ACTIVE`
+- `LOCKED`
+- `DISABLED`
 
-## PaymentTransaction
+Important behavior:
 
-Represents one provider-processing attempt for a PaymentIntent.
+- lock
+- disable
+- state validation
 
-A PaymentIntent may have multiple attempts.
+Public setters must not allow arbitrary status mutation.
 
-Example:
+### RefreshToken — Identity/Security Aggregate
 
-```text
-PaymentIntent PI-1
-├── attempt 1 -> UNKNOWN
-└── attempt 2 -> SUCCEEDED
-```
+Purpose:
 
-PaymentTransaction has its own lifecycle and is a separate aggregate root.
+Represents one server-side refresh-token session record.
 
-## Refund
+The domain/persistence record contains:
 
-Refund is a separate aggregate root with its own lifecycle:
+- internal ID
+- user internal ID
+- SHA-256 token digest
+- expiry
+- revoked timestamp
+- replacement token reference
+- created/last-used timestamps
+
+The raw token is not part of the persisted aggregate.
+
+Lifecycle:
 
 ```text
-CREATED
-PROCESSING
-SUCCEEDED
-FAILED
+ACTIVE
+  |
+  | refresh/logout/expiry
+  v
+REVOKED / EXPIRED
 ```
 
-Refund stores a reference to `paymentIntentId` but does not own or directly mutate PaymentIntent persistence.
+Rotation creates a new token record and invalidates the old record atomically.
 
-## Ledger
+## 3. Merchant module
 
-`LedgerTransaction` owns a collection of `LedgerEntry` values/entities.
+### Merchant — Aggregate Root
 
-Example payment posting:
+Core fields:
+
+- internal ID
+- public ID (`mrc_...`)
+- name
+- status
+- version
+- timestamps
+
+Status:
+
+- `ACTIVE`
+- `SUSPENDED`
+- `CLOSED`
+
+### MerchantMember — Separate persistence/domain object
+
+Represents membership between a user and merchant.
+
+Fields:
+
+- merchant internal ID
+- user internal ID
+- role
+- created timestamp
+
+Roles:
+
+- `OWNER`
+- `ADMIN`
+- `DEVELOPER`
+- `FINANCE`
+- `VIEWER`
+
+MVP registration creates only `OWNER`.
+
+A Merchant does not hold a JPA `@OneToMany` collection of User entities.
+
+### ApiKey — Aggregate Root
+
+Purpose:
+
+Authenticates merchant backend integration requests.
+
+Fields:
+
+- internal ID
+- public ID (`key_...`)
+- merchant internal ID
+- display name
+- key prefix
+- SHA-256 key digest
+- status
+- last-used timestamp
+- optional expiry
+- revoked timestamp
+- created timestamp
+
+Status:
+
+- `ACTIVE`
+- `REVOKED`
+
+Behavior:
+
+- revoke
+- verify active state
+- record last use
+
+Raw API-key secret exists only at generation time and is not persisted.
+
+## 4. Payment module
+
+### PaymentIntent — Aggregate Root
+
+Represents the merchant's intent to collect a fixed amount in a fixed currency.
+
+Fields:
+
+- internal ID
+- public ID (`pi_...`)
+- merchant internal ID
+- merchant order ID
+- description
+- original Money
+- status
+- refunded amount
+- reserved refund amount
+- version
+- timestamps
+
+Status:
+
+- `CREATED`
+- `PROCESSING`
+- `SUCCEEDED`
+- `FAILED`
+- `PARTIALLY_REFUNDED`
+- `REFUNDED`
+
+Key behavior:
+
+- start processing
+- mark succeeded
+- mark failed
+- reserve refund
+- complete refund
+- release refund
+
+The aggregate owns the invariant:
+
+`refunded + reserved <= original amount`
+
+### PaymentTransaction — Aggregate Root
+
+Represents one interaction/attempt against a payment provider.
+
+Fields:
+
+- internal ID
+- public ID (`ptxn_...`)
+- payment-intent internal ID
+- attempt number
+- provider
+- provider transaction ID
+- status
+- failure code/message
+- started/completed timestamps
+- version
+
+Status:
+
+- `PENDING`
+- `PROCESSING`
+- `SUCCEEDED`
+- `FAILED`
+- `UNKNOWN`
+
+PaymentTransaction is not a child collection inside PaymentIntent.
+
+## 5. Refund module
+
+### Refund — Aggregate Root
+
+Fields:
+
+- internal ID
+- public ID (`re_...`)
+- merchant internal ID
+- payment-intent internal ID
+- Money
+- status
+- reason
+- provider refund ID
+- version
+- timestamps
+
+Status:
+
+- `CREATED`
+- `PROCESSING`
+- `SUCCEEDED`
+- `FAILED`
+
+Refund does not mutate PaymentIntent directly.
+
+It calls a public Payment module API to reserve, complete, or release refund capacity.
+
+## 6. Ledger module
+
+### LedgerAccount — Aggregate Root
+
+Represents an account used by the financial ledger.
+
+Examples:
+
+- system clearing
+- merchant payable
+- FlowPay fee revenue
+- refund clearing
+
+Fields:
+
+- internal ID
+- public ID (`la_...`)
+- account code
+- account type
+- owner type/id
+- currency
+- status
+
+### LedgerTransaction — Aggregate Root
+
+Represents one atomic balanced posting.
+
+Fields:
+
+- internal ID
+- public ID (`ltxn_...`)
+- posting type
+- business reference type/id
+- currency
+- description
+- occurred/created timestamps
+- entries
+
+### LedgerEntry — Child Entity
+
+Belongs to exactly one LedgerTransaction.
+
+Fields:
+
+- internal ID
+- ledger transaction ID
+- ledger account ID
+- entry number
+- direction
+- amount
+
+Direction:
+
+- `DEBIT`
+- `CREDIT`
+
+A LedgerEntry is not an aggregate root and is not independently mutated.
+
+## 7. Webhook module
+
+### WebhookEndpoint — Aggregate Root
+
+Represents merchant webhook configuration.
+
+Fields:
+
+- internal ID
+- public ID (`wep_...`)
+- merchant ID
+- URL
+- encrypted secret
+- status
+- version
+- timestamps
+- subscribed event types
+
+Status:
+
+- `ACTIVE`
+- `DISABLED`
+
+### WebhookEvent — Aggregate Root
+
+Immutable public event payload.
+
+Fields:
+
+- internal ID
+- public ID (`evt_...`)
+- event type
+- resource type/id
+- JSON payload
+- occurred/created timestamps
+
+### WebhookDelivery — Aggregate Root
+
+Represents delivery of one webhook event to one endpoint.
+
+Fields:
+
+- event ID
+- endpoint ID
+- status
+- attempt count
+- next-attempt timestamp
+- delivered timestamp
+- last HTTP status/error
+- version
+- timestamps
+
+Status:
+
+- `PENDING`
+- `DELIVERING`
+- `DELIVERED`
+- `RETRYING`
+- `DEAD`
+
+### WebhookDeliveryAttempt — Child/history record
+
+Records one concrete delivery attempt.
+
+It is append-only diagnostic history.
+
+## 8. Cross-module relationships
+
+Conceptual relationships:
 
 ```text
-LedgerTransaction
-├── DEBIT  CUSTOMER_CLEARING  500000
-└── CREDIT MERCHANT_PAYABLE   500000
+User
+  |
+  v
+MerchantMember ---> Merchant ---> ApiKey
+                        |
+                        v
+                  PaymentIntent
+                    /       \
+                   v         v
+        PaymentTransaction  Refund
+
+Payment/Refund
+      |
+      | integration events
+      +------------+
+      |            |
+      v            v
+   Ledger       Webhook
 ```
 
-`LedgerAccount` is a separate aggregate root.
+Rules:
 
-Ledger should support future posting types such as:
+- Cross-module relation is represented by IDs.
+- No cross-module JPA `@ManyToOne`, `@OneToMany`, or `@OneToOne`.
+- A module must not import another module's persistence entity/repository.
+- Cross-module synchronous reads/commands use an explicit public application API.
+- Cross-module side effects preferably use integration events.
 
-```text
-PAYMENT_CAPTURE
-REFUND
-FEE
-SETTLEMENT
-ADJUSTMENT
-REVERSAL
-```
+## 9. Public module APIs
 
-Only payment/refund are required initially.
+Examples:
 
-## Webhook
+### MerchantOnboardingApi
 
-`WebhookEndpoint` stores merchant configuration and encrypted signing secret.
+Used by registration orchestration.
 
-`WebhookEvent` is immutable business-delivery content.
+Responsibilities:
 
-`WebhookDelivery` tracks delivery lifecycle to one endpoint.
+- create merchant
+- create initial `OWNER` membership
+- return a small onboarding result
 
-Individual HTTP attempts are child records of WebhookDelivery.
+It does not expose MerchantEntity or repository types.
 
-## Cross-Module Communication
+### PaymentQueryApi
 
-### Synchronous query
-Use a small public module API if another module needs data before making a business decision.
+May expose immutable `PaymentSnapshot` for Refund decisions.
 
-Example:
+### PaymentRefundApi
 
-```text
-Refund -> PaymentQueryApi -> PaymentSnapshot
-```
+Owns refund-capacity mutations on PaymentIntent:
 
-### Synchronous command
-A module may expose a narrow public command API when another module must ask the aggregate owner to mutate state while preserving invariants.
+- reserve refund
+- complete refund
+- release refund
 
-Example:
+## 10. Value objects
 
-```text
-Refund -> PaymentRefundApi.reserveRefund(...)
-Refund -> PaymentRefundApi.completeRefund(...)
-Refund -> PaymentRefundApi.releaseRefund(...)
-```
+### Money
 
-### Side effects
-Prefer integration events.
+`Money` contains:
 
-```text
-payment.succeeded -> Ledger
-payment.succeeded -> Webhook
-refund.succeeded  -> Ledger
-refund.succeeded  -> Webhook
-```
+- `long amountMinor`
+- ISO currency
 
-## Reference Rules
+Expected operations:
 
-- aggregates reference other aggregates by ID;
-- no cross-module JPA object relationships;
-- no external module receives another module's JPA entity;
-- internal database IDs may be used internally but are never exposed through public HTTP APIs.
+- add
+- subtract
+- compare
+- verify same currency
+
+Money-related business code should prefer this value object over passing unrelated primitive amount/currency values.
+
+## 11. Domain versus persistence
+
+Rich financial aggregates such as PaymentIntent and LedgerTransaction should remain independent of persistence concerns.
+
+Persistence mapping must not bypass domain invariants when creating a new aggregate.
+
+Rehydration from trusted persisted state may use explicit rehydration factories.
+
+MapStruct is appropriate for mechanical DTO mapping, but mapping that encodes domain reconstruction rules should remain explicit when clarity would otherwise be lost.
