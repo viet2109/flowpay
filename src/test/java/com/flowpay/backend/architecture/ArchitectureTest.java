@@ -63,6 +63,12 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule merchantMustNotDependOnIdentityInfrastructure = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.merchant..")
+            .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.identity.infrastructure..")
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule topLevelPackagesMustBeFreeOfCycles = slices()
             .matching("com.flowpay.backend.(*)..")
             .should().beFreeOfCycles()
