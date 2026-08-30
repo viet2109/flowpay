@@ -69,6 +69,12 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule paymentMustNotDependOnMerchantInfrastructure = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.payment..")
+            .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.merchant.infrastructure..")
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule applicationCodeMustNotAccessSecurityContextDirectly = noClasses()
             .that().resideInAPackage("..application..")
             .should().dependOnClassesThat().haveFullyQualifiedName(
