@@ -11,11 +11,11 @@ public final class Merchant {
 
     private final Long id;
     private final String publicId;
-    private final String name;
+    private String name;
     private final MerchantStatus status;
     private final long version;
     private final Instant createdAt;
-    private final Instant updatedAt;
+    private Instant updatedAt;
 
     private Merchant(
             Long id,
@@ -67,6 +67,15 @@ public final class Merchant {
             throw new IllegalArgumentException("id must be positive");
         }
         return new Merchant(id, publicId, name, status, version, createdAt, updatedAt);
+    }
+
+    public void updateName(String name, Instant updatedAt) {
+        Instant changeTime = Objects.requireNonNull(updatedAt, "updatedAt must not be null");
+        if (changeTime.isBefore(this.updatedAt)) {
+            throw new IllegalArgumentException("updatedAt must not be before the current updatedAt");
+        }
+        this.name = validateName(name);
+        this.updatedAt = changeTime;
     }
 
     private static String validatePublicId(String publicId) {

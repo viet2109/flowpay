@@ -51,4 +51,27 @@ class MerchantTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("publicId must start with mrc_ and contain an identifier");
     }
+
+    @Test
+    void shouldUpdateMerchantNameThroughDomainBehavior() {
+        Merchant merchant = Merchant.create("mrc_01K2P1T03TEST", "ABC Store", CREATED_AT);
+        Instant updatedAt = CREATED_AT.plusSeconds(60);
+
+        merchant.updateName(" ABC Technology Store ", updatedAt);
+
+        assertThat(merchant.name()).isEqualTo("ABC Technology Store");
+        assertThat(merchant.updatedAt()).isEqualTo(updatedAt);
+    }
+
+    @Test
+    void shouldRejectInvalidMerchantNameUpdate() {
+        Merchant merchant = Merchant.create("mrc_01K2P1T03TEST", "ABC Store", CREATED_AT);
+
+        assertThatThrownBy(() -> merchant.updateName("   ", CREATED_AT.plusSeconds(60)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("name must not be blank");
+        assertThatThrownBy(() -> merchant.updateName("Valid name", CREATED_AT.minusSeconds(1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("updatedAt must not be before the current updatedAt");
+    }
 }
