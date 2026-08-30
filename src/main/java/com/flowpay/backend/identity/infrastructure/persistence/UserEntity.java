@@ -10,11 +10,20 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
 
 import java.time.Instant;
 
 @Entity(name = "IdentityUserEntity")
 @Table(name = "users")
+@Getter(AccessLevel.PACKAGE)
+@Accessors(fluent = true)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PACKAGE)
 class UserEntity {
 
     @Id
@@ -50,70 +59,4 @@ class UserEntity {
     @Column(nullable = false)
     private long version;
 
-    protected UserEntity() {
-    }
-
-    UserEntity(
-            Long id,
-            String publicId,
-            String email,
-            String passwordHash,
-            String firstName,
-            String lastName,
-            UserStatus status,
-            Instant createdAt,
-            Instant updatedAt,
-            long version
-    ) {
-        this.id = id;
-        this.publicId = publicId;
-        this.email = email;
-        this.passwordHash = passwordHash;
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.status = status;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.version = version;
-    }
-
-    Long id() {
-        return id;
-    }
-
-    String publicId() {
-        return publicId;
-    }
-
-    String email() {
-        return email;
-    }
-
-    String passwordHash() {
-        return passwordHash;
-    }
-
-    String firstName() {
-        return firstName;
-    }
-
-    String lastName() {
-        return lastName;
-    }
-
-    UserStatus status() {
-        return status;
-    }
-
-    Instant createdAt() {
-        return createdAt;
-    }
-
-    Instant updatedAt() {
-        return updatedAt;
-    }
-
-    long version() {
-        return version;
-    }
 }

@@ -4,6 +4,7 @@ import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.common.error.ProblemDetailsFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,15 +20,11 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 
 @Component
+@RequiredArgsConstructor
 public final class SecurityProblemHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
 
     private final ProblemDetailsFactory problems;
     private final ObjectMapper objectMapper;
-
-    public SecurityProblemHandler(ProblemDetailsFactory problems, ObjectMapper objectMapper) {
-        this.problems = problems;
-        this.objectMapper = objectMapper;
-    }
 
     @Override
     public void commence(

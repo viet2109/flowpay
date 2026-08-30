@@ -10,11 +10,20 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
 
 import java.time.Instant;
 
 @Entity(name = "MerchantEntity")
 @Table(name = "merchants")
+@Getter(AccessLevel.PACKAGE)
+@Accessors(fluent = true)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PACKAGE)
 class MerchantEntity {
 
     @Id
@@ -41,52 +50,4 @@ class MerchantEntity {
     @Column(nullable = false)
     private long version;
 
-    protected MerchantEntity() {
-    }
-
-    MerchantEntity(
-            Long id,
-            String publicId,
-            String name,
-            MerchantStatus status,
-            Instant createdAt,
-            Instant updatedAt,
-            long version
-    ) {
-        this.id = id;
-        this.publicId = publicId;
-        this.name = name;
-        this.status = status;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.version = version;
-    }
-
-    Long id() {
-        return id;
-    }
-
-    String publicId() {
-        return publicId;
-    }
-
-    String name() {
-        return name;
-    }
-
-    MerchantStatus status() {
-        return status;
-    }
-
-    Instant createdAt() {
-        return createdAt;
-    }
-
-    Instant updatedAt() {
-        return updatedAt;
-    }
-
-    long version() {
-        return version;
-    }
 }

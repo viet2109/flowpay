@@ -2,18 +2,16 @@ package com.flowpay.backend.identity.infrastructure.persistence;
 
 import com.flowpay.backend.identity.application.RefreshTokenRepository;
 import com.flowpay.backend.identity.domain.RefreshToken;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
 @Repository
+@RequiredArgsConstructor
 public class JpaRefreshTokenRepositoryAdapter implements RefreshTokenRepository {
 
     private final SpringDataRefreshTokenRepository repository;
-
-    public JpaRefreshTokenRepositoryAdapter(SpringDataRefreshTokenRepository repository) {
-        this.repository = repository;
-    }
 
     @Override
     public RefreshToken save(RefreshToken token) {

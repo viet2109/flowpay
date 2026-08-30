@@ -6,6 +6,7 @@ import com.flowpay.backend.identity.domain.Email;
 import com.flowpay.backend.identity.domain.PasswordHash;
 import com.flowpay.backend.identity.domain.User;
 import com.flowpay.backend.merchant.application.MerchantOnboardingApi;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 
 @Service
+@RequiredArgsConstructor
 public class RegistrationService implements RegistrationUseCase {
 
     private static final String DUPLICATE_EMAIL_DETAIL = "A user with this email already exists.";
@@ -22,18 +24,6 @@ public class RegistrationService implements RegistrationUseCase {
     private final PasswordHasher passwordHasher;
     private final UserPublicIdGenerator publicIdGenerator;
     private final MerchantOnboardingApi merchantOnboardingApi;
-
-    public RegistrationService(
-            UserRepository userRepository,
-            PasswordHasher passwordHasher,
-            UserPublicIdGenerator publicIdGenerator,
-            MerchantOnboardingApi merchantOnboardingApi
-    ) {
-        this.userRepository = userRepository;
-        this.passwordHasher = passwordHasher;
-        this.publicIdGenerator = publicIdGenerator;
-        this.merchantOnboardingApi = merchantOnboardingApi;
-    }
 
     @Override
     @Transactional

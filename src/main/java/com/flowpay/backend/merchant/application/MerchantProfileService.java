@@ -3,6 +3,7 @@ package com.flowpay.backend.merchant.application;
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.merchant.domain.Merchant;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,15 +11,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 
 @Service
+@RequiredArgsConstructor
 public class MerchantProfileService implements MerchantProfileUseCase {
 
     private final MerchantRepository merchantRepository;
     private final Clock clock;
-
-    public MerchantProfileService(MerchantRepository merchantRepository, Clock clock) {
-        this.merchantRepository = merchantRepository;
-        this.clock = clock;
-    }
 
     @Override
     @Transactional(readOnly = true)

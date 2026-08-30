@@ -7,11 +7,13 @@ import com.flowpay.backend.identity.domain.PasswordHash;
 import com.flowpay.backend.identity.domain.User;
 import com.flowpay.backend.identity.domain.UserStatus;
 import com.flowpay.backend.merchant.application.MerchantMembershipApi;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class PasswordAuthenticationService implements PasswordAuthenticationUseCase {
 
     private static final String INVALID_CREDENTIALS_DETAIL = "The email or password is incorrect.";
@@ -22,16 +24,6 @@ public class PasswordAuthenticationService implements PasswordAuthenticationUseC
     private final UserRepository userRepository;
     private final PasswordVerifier passwordVerifier;
     private final MerchantMembershipApi merchantMembershipApi;
-
-    public PasswordAuthenticationService(
-            UserRepository userRepository,
-            PasswordVerifier passwordVerifier,
-            MerchantMembershipApi merchantMembershipApi
-    ) {
-        this.userRepository = userRepository;
-        this.passwordVerifier = passwordVerifier;
-        this.merchantMembershipApi = merchantMembershipApi;
-    }
 
     @Override
     @Transactional(readOnly = true)

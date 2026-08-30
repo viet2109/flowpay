@@ -6,11 +6,20 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
 
 import java.time.Instant;
 
 @Entity(name = "RefreshTokenEntity")
 @Table(name = "refresh_tokens")
+@Getter(AccessLevel.PACKAGE)
+@Accessors(fluent = true)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PACKAGE)
 class RefreshTokenEntity {
 
     @Id
@@ -38,58 +47,4 @@ class RefreshTokenEntity {
     @Column(name = "replaced_by_id")
     private Long replacedById;
 
-    protected RefreshTokenEntity() {
-    }
-
-    RefreshTokenEntity(
-            Long id,
-            long userId,
-            String tokenHash,
-            Instant expiresAt,
-            Instant revokedAt,
-            Instant createdAt,
-            Instant lastUsedAt,
-            Long replacedById
-    ) {
-        this.id = id;
-        this.userId = userId;
-        this.tokenHash = tokenHash;
-        this.expiresAt = expiresAt;
-        this.revokedAt = revokedAt;
-        this.createdAt = createdAt;
-        this.lastUsedAt = lastUsedAt;
-        this.replacedById = replacedById;
-    }
-
-    Long id() {
-        return id;
-    }
-
-    long userId() {
-        return userId;
-    }
-
-    String tokenHash() {
-        return tokenHash;
-    }
-
-    Instant expiresAt() {
-        return expiresAt;
-    }
-
-    Instant revokedAt() {
-        return revokedAt;
-    }
-
-    Instant createdAt() {
-        return createdAt;
-    }
-
-    Instant lastUsedAt() {
-        return lastUsedAt;
-    }
-
-    Long replacedById() {
-        return replacedById;
-    }
 }

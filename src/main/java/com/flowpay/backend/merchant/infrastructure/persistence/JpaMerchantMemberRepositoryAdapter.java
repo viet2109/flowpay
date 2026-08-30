@@ -2,18 +2,16 @@ package com.flowpay.backend.merchant.infrastructure.persistence;
 
 import com.flowpay.backend.merchant.application.MerchantMemberRepository;
 import com.flowpay.backend.merchant.domain.MerchantMember;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
 @Repository
+@RequiredArgsConstructor
 public class JpaMerchantMemberRepositoryAdapter implements MerchantMemberRepository {
 
     private final SpringDataMerchantMemberRepository repository;
-
-    public JpaMerchantMemberRepositoryAdapter(SpringDataMerchantMemberRepository repository) {
-        this.repository = repository;
-    }
 
     @Override
     public MerchantMember add(MerchantMember member) {

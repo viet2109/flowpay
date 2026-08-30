@@ -3,18 +3,16 @@ package com.flowpay.backend.identity.infrastructure.persistence;
 import com.flowpay.backend.identity.application.UserRepository;
 import com.flowpay.backend.identity.domain.Email;
 import com.flowpay.backend.identity.domain.User;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
 @Repository
+@RequiredArgsConstructor
 public class JpaUserRepositoryAdapter implements UserRepository {
 
     private final SpringDataUserRepository repository;
-
-    public JpaUserRepositoryAdapter(SpringDataUserRepository repository) {
-        this.repository = repository;
-    }
 
     @Override
     public User save(User user) {

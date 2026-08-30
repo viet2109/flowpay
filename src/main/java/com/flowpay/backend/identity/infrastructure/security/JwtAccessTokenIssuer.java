@@ -4,6 +4,7 @@ import com.flowpay.backend.identity.application.AccessTokenIssuer;
 import com.flowpay.backend.identity.application.AuthenticatedIdentity;
 import com.flowpay.backend.identity.application.IssuedAccessToken;
 import com.flowpay.backend.infrastructure.security.JwtSecurityProperties;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -15,17 +16,12 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Component
+@RequiredArgsConstructor
 public class JwtAccessTokenIssuer implements AccessTokenIssuer {
 
     private final JwtEncoder encoder;
     private final JwtSecurityProperties properties;
     private final Clock clock;
-
-    public JwtAccessTokenIssuer(JwtEncoder encoder, JwtSecurityProperties properties, Clock clock) {
-        this.encoder = encoder;
-        this.properties = properties;
-        this.clock = clock;
-    }
 
     @Override
     public IssuedAccessToken issue(AuthenticatedIdentity identity) {

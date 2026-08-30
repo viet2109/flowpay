@@ -1,6 +1,7 @@
 package com.flowpay.backend.identity.api;
 
 import com.flowpay.backend.identity.application.IssuedRefreshToken;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
@@ -8,6 +9,7 @@ import java.time.Clock;
 import java.time.Duration;
 
 @Component
+@RequiredArgsConstructor
 public class RefreshCookieFactory {
 
     static final String COOKIE_NAME = "flowpay_refresh";
@@ -15,11 +17,6 @@ public class RefreshCookieFactory {
 
     private final RefreshCookieProperties properties;
     private final Clock clock;
-
-    public RefreshCookieFactory(RefreshCookieProperties properties, Clock clock) {
-        this.properties = properties;
-        this.clock = clock;
-    }
 
     ResponseCookie issue(IssuedRefreshToken token) {
         Duration maxAge = Duration.between(clock.instant(), token.expiresAt());
