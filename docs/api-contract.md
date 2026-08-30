@@ -454,6 +454,12 @@ Retention target for MVP:
 
 Merchant API-key authentication required.
 
+Phase availability:
+
+- Phase 2 exposes only the retrieve, list, and transaction-attempt endpoints.
+- Create and confirm below are the target contracts for Phase 3 and remain
+  non-public until idempotency is implemented and verified.
+
 ### Create
 
 ```http

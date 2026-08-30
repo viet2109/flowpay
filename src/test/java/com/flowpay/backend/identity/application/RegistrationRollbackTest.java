@@ -1,18 +1,15 @@
 package com.flowpay.backend.identity.application;
 
+import com.flowpay.backend.testing.PostgresIntegrationTest;
 import com.flowpay.backend.identity.domain.Email;
 import com.flowpay.backend.merchant.application.MerchantOnboardingApi;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -21,12 +18,7 @@ import static org.mockito.BDDMockito.given;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Testcontainers(disabledWithoutDocker = true)
-class RegistrationRollbackTest {
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16.15-alpine");
+class RegistrationRollbackTest extends PostgresIntegrationTest {
 
     @MockitoBean
     private MerchantOnboardingApi onboardingApi;

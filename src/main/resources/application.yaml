@@ -36,6 +36,10 @@ logging:
     console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] [requestId=%X{requestId:-}] %logger{36} - %msg%n"
 
 flowpay:
+  payment:
+    provider: ${PAYMENT_PROVIDER:simulator}
+    simulator:
+      default-outcome: ${PAYMENT_SIMULATOR_DEFAULT_OUTCOME:SUCCESS}
   security:
     prometheus-public: false
     jwt:

@@ -90,7 +90,7 @@ Status: completed.
 
 ## Phase 1 — Identity & Merchant
 
-Status: ready for implementation.
+Status: completed and frozen.
 
 Detailed task specification:
 
@@ -137,21 +137,28 @@ Do not start Phase 2 until P1-T13 and P1-T14 pass.
 
 ## Phase 2 — Payment Core
 
-Planned tasks:
+Status: `DONE/FROZEN`.
 
-- P2-T01 Payment domain model/state machine.
-- P2-T02 Payment persistence migration/adapter.
-- P2-T03 Create PaymentIntent.
-- P2-T04 Retrieve PaymentIntent.
-- P2-T05 List/filter payments.
-- P2-T06 PaymentProviderPort.
-- P2-T07 Provider simulator.
-- P2-T08 Prepare confirmation transaction.
-- P2-T09 Provider call outside DB transaction.
-- P2-T10 Complete confirmation.
-- P2-T11 Unknown-provider outcome.
-- P2-T12 Payment transaction history.
-- P2-T13 Integration tests/quality gate.
+Completed tasks:
+
+- P2-T01 Phase 1 compatibility and Merchant contract.
+- P2-T02 Payment database migration.
+- P2-T03 Money and Payment shared types.
+- P2-T04 PaymentIntent aggregate.
+- P2-T05 PaymentTransaction aggregate.
+- P2-T06 Payment persistence adapters.
+- P2-T07 Merchant ownership integration.
+- P2-T08 Create PaymentIntent use case.
+- P2-T09 Payment query and read APIs.
+- P2-T10 PaymentProviderPort and simulator.
+- P2-T11 Prepare confirmation transaction (TX1).
+- P2-T12 Finalize confirmation transaction (TX2).
+- P2-T13 Confirm Payment orchestration with the provider call outside a database transaction.
+- P2-T14 Integration, security, and concurrency tests.
+- P2-T15 Quality gate and documentation.
+
+See `phase-2-payment-core.md` for dependencies, acceptance criteria, and the
+required implementation order.
 
 ## Phase 3 — Idempotency
 

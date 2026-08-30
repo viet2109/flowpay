@@ -63,9 +63,21 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule restControllersMustNotDependOnRepositories = noClasses()
+            .that().areAnnotatedWith(RestController.class)
+            .should().dependOnClassesThat().haveSimpleNameEndingWith("Repository")
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule merchantMustNotDependOnIdentityInfrastructure = noClasses()
             .that().resideInAPackage("com.flowpay.backend.merchant..")
             .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.identity.infrastructure..")
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule paymentMustNotDependOnMerchantInfrastructure = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.payment..")
+            .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.merchant.infrastructure..")
             .allowEmptyShould(true);
 
     @ArchTest

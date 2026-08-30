@@ -10,13 +10,13 @@ import com.flowpay.backend.identity.application.LoginResult;
 import com.flowpay.backend.identity.application.RegistrationCommand;
 import com.flowpay.backend.identity.application.RegistrationResult;
 import com.flowpay.backend.identity.application.RegistrationUseCase;
+import com.flowpay.backend.testing.PostgresIntegrationTest;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
@@ -33,9 +33,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.Instant;
 import java.util.List;
@@ -59,17 +56,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Testcontainers(disabledWithoutDocker = true)
 @Import(AuthSessionApiTest.MerchantSecurityProbe.class)
-class AuthSessionApiTest {
+class AuthSessionApiTest extends PostgresIntegrationTest {
 
     private static final String EMAIL = "viet@example.com";
     private static final String PASSWORD = "StrongPassword123!";
     private static final Pattern REFRESH_COOKIE = Pattern.compile("flowpay_refresh=([^;]+)");
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16.15-alpine");
 
     @Autowired
     private MockMvc mockMvc;

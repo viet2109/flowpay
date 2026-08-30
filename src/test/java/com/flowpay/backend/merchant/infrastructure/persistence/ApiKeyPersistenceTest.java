@@ -6,16 +6,13 @@ import com.flowpay.backend.merchant.application.ApiKeySecretCodec;
 import com.flowpay.backend.merchant.application.GeneratedApiKeySecret;
 import com.flowpay.backend.merchant.domain.ApiKey;
 import com.flowpay.backend.merchant.domain.ApiKeyStatus;
+import com.flowpay.backend.testing.PostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -25,14 +22,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Testcontainers(disabledWithoutDocker = true)
-class ApiKeyPersistenceTest {
+class ApiKeyPersistenceTest extends PostgresIntegrationTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-08-30T03:00:00Z");
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16.15-alpine");
 
     @Autowired
     private ApiKeyRepository apiKeyRepository;

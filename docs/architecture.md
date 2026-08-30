@@ -143,9 +143,13 @@ NO DATABASE TX
 TX 2
 - finalize PaymentTransaction
 - finalize PaymentIntent
-- create outbox event
+- create outbox event (Phase 6 onward)
 COMMIT
 ```
+
+At the Phase 2 freeze, TX 2 contains only PaymentTransaction and PaymentIntent
+finalization. Transactional outbox persistence and event publication remain
+explicitly deferred to Phase 6.
 
 ## 6. Identity and dashboard authentication
 

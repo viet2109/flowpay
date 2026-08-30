@@ -7,17 +7,14 @@ import com.flowpay.backend.merchant.domain.Merchant;
 import com.flowpay.backend.merchant.domain.MerchantMember;
 import com.flowpay.backend.merchant.domain.MerchantRole;
 import com.flowpay.backend.merchant.domain.MerchantStatus;
+import com.flowpay.backend.testing.PostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -27,14 +24,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Testcontainers(disabledWithoutDocker = true)
-class MerchantPersistenceTest {
+class MerchantPersistenceTest extends PostgresIntegrationTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-08-19T04:00:00Z");
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16.15-alpine");
 
     @Autowired
     private MerchantOnboardingApi onboardingApi;
