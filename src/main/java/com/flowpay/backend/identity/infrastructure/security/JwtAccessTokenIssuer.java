@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.UUID;
 
 @Component
 public class JwtAccessTokenIssuer implements AccessTokenIssuer {
@@ -34,6 +35,7 @@ public class JwtAccessTokenIssuer implements AccessTokenIssuer {
                 .issuer(properties.issuer())
                 .issuedAt(issuedAt)
                 .expiresAt(expiresAt)
+                .id(UUID.randomUUID().toString())
                 .subject(identity.userPublicId())
                 .claim("merchant", identity.merchantPublicId())
                 .claim("role", identity.role().name())

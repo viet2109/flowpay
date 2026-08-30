@@ -68,6 +68,7 @@ class JwtAccessTokenIssuerTest {
         assertThat(decoded.getIssuer().toString()).isEqualTo("https://flowpay.dev");
         assertThat(decoded.getClaimAsString("merchant")).isEqualTo("mrc_01KPUBLIC");
         assertThat(decoded.getClaimAsString("role")).isEqualTo("OWNER");
+        assertThat(decoded.getId()).isNotBlank();
         assertThat(decoded.getIssuedAt()).isEqualTo(NOW);
         assertThat(decoded.getExpiresAt()).isEqualTo(NOW.plusSeconds(900));
         assertThat(issued.expiresInSeconds()).isEqualTo(900);

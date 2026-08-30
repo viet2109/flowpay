@@ -42,3 +42,7 @@ flowpay:
       issuer: https://flowpay.dev
       access-token-ttl: 15m
       generate-ephemeral-key-pair: false
+    refresh-token:
+      ttl: 7d
+    refresh-cookie:
+      cookie-secure: true

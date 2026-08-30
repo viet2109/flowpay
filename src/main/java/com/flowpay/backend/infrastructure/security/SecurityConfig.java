@@ -3,6 +3,7 @@ package com.flowpay.backend.infrastructure.security;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -13,9 +14,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 import java.time.Clock;
+import java.time.Duration;
 
 @Configuration
-@EnableConfigurationProperties({FlowPaySecurityProperties.class, JwtSecurityProperties.class})
+@EnableConfigurationProperties({
+        FlowPaySecurityProperties.class,
+        JwtSecurityProperties.class,
+        RefreshTokenProperties.class
+})
 public class SecurityConfig {
 
     @Bean
@@ -33,6 +39,8 @@ public class SecurityConfig {
                     }
                     authorize.requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll();
                     authorize.requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll();
+                    authorize.requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll();
+                    authorize.requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").permitAll();
                     authorize.anyRequest().denyAll();
                 });
 
@@ -47,5 +55,11 @@ public class SecurityConfig {
     @Bean
     Clock clock() {
         return Clock.systemUTC();
+    }
+
+    @Bean
+    @Qualifier("refreshTokenTtl")
+    Duration refreshTokenTtl(RefreshTokenProperties properties) {
+        return properties.ttl();
     }
 }

@@ -22,3 +22,5 @@ flowpay:
     prometheus-public: true
     jwt:
       generate-ephemeral-key-pair: true
+    refresh-cookie:
+      cookie-secure: false

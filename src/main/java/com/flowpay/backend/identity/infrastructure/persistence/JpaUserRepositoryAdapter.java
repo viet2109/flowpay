@@ -23,6 +23,11 @@ public class JpaUserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public Optional<User> findById(long id) {
+        return repository.findById(id).map(UserPersistenceMapper::toDomain);
+    }
+
+    @Override
     public Optional<User> findByPublicId(String publicId) {
         return repository.findByPublicId(publicId).map(UserPersistenceMapper::toDomain);
     }

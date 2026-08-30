@@ -7,6 +7,9 @@ public enum ErrorCode {
     INVALID_CREDENTIALS("Invalid credentials", "invalid-credentials"),
     USER_LOCKED("User locked", "user-locked"),
     USER_DISABLED("User disabled", "user-disabled"),
+    REFRESH_TOKEN_INVALID("Refresh token invalid", "refresh-token-invalid"),
+    REFRESH_TOKEN_EXPIRED("Refresh token expired", "refresh-token-expired"),
+    REFRESH_TOKEN_REVOKED("Refresh token revoked", "refresh-token-revoked"),
     MERCHANT_NOT_FOUND("Merchant not found", "merchant-not-found"),
     RESOURCE_NOT_FOUND("Resource not found", "resource-not-found"),
     INTERNAL_ERROR("Internal server error", "internal-error");
