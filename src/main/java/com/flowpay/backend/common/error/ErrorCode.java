@@ -18,6 +18,7 @@ public enum ErrorCode {
     API_KEY_REVOKED("API key revoked", "api-key-revoked"),
     INVALID_API_KEY("Invalid API key", "invalid-api-key"),
     PAYMENT_NOT_FOUND("Payment not found", "payment-not-found"),
+    PAYMENT_INVALID_STATE("Payment invalid state", "payment-invalid-state"),
     RESOURCE_NOT_FOUND("Resource not found", "resource-not-found"),
     INTERNAL_ERROR("Internal server error", "internal-error");
 
