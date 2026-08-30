@@ -7,6 +7,8 @@ import java.util.Optional;
 
 interface PaymentTransactionJpaRepository extends JpaRepository<PaymentTransactionEntity, Long> {
 
+    Optional<PaymentTransactionEntity> findByPublicId(String publicId);
+
     List<PaymentTransactionEntity> findAllByPaymentIntentIdOrderByAttemptNoAsc(long paymentIntentId);
 
     Optional<PaymentTransactionEntity> findFirstByPaymentIntentIdOrderByAttemptNoDesc(

@@ -10,6 +10,8 @@ interface PaymentIntentJpaRepository extends
         JpaRepository<PaymentIntentEntity, Long>,
         JpaSpecificationExecutor<PaymentIntentEntity> {
 
+    Optional<PaymentIntentEntity> findByPublicId(String publicId);
+
     Optional<PaymentIntentEntity> findByPublicIdAndMerchantId(String publicId, long merchantId);
 
     List<PaymentIntentEntity> findAllByMerchantIdOrderByCreatedAtDescIdDesc(long merchantId);

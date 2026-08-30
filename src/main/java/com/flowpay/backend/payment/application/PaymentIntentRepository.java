@@ -9,6 +9,8 @@ public interface PaymentIntentRepository {
 
     PaymentIntent save(PaymentIntent paymentIntent);
 
+    Optional<PaymentIntent> findByPublicId(String publicId);
+
     Optional<PaymentIntent> findByPublicIdAndMerchantId(String publicId, long merchantId);
 
     PaymentIntentPage search(PaymentIntentSearchCriteria criteria);

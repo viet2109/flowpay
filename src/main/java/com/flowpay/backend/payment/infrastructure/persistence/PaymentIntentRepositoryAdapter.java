@@ -31,6 +31,12 @@ public class PaymentIntentRepositoryAdapter implements PaymentIntentRepository {
     }
 
     @Override
+    public Optional<PaymentIntent> findByPublicId(String publicId) {
+        return repository.findByPublicId(publicId)
+                .map(PaymentIntentPersistenceMapper::toDomain);
+    }
+
+    @Override
     public Optional<PaymentIntent> findByPublicIdAndMerchantId(String publicId, long merchantId) {
         return repository.findByPublicIdAndMerchantId(publicId, merchantId)
                 .map(PaymentIntentPersistenceMapper::toDomain);

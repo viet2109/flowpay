@@ -23,6 +23,12 @@ public class PaymentTransactionRepositoryAdapter implements PaymentTransactionRe
     }
 
     @Override
+    public Optional<PaymentTransaction> findByPublicId(String publicId) {
+        return repository.findByPublicId(publicId)
+                .map(PaymentTransactionPersistenceMapper::toDomain);
+    }
+
+    @Override
     public List<PaymentTransaction> findByPaymentIntentId(long paymentIntentId) {
         return repository.findAllByPaymentIntentIdOrderByAttemptNoAsc(paymentIntentId).stream()
                 .map(PaymentTransactionPersistenceMapper::toDomain)
