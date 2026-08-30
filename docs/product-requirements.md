@@ -139,6 +139,8 @@ User, merchant, membership, login, JWT, rotating refresh token, merchant dashboa
 
 ### Phase 2 — Payment Core
 
+Status: `DONE/FROZEN` as of 2026-08-30.
+
 Payment intent, payment transaction, provider port/simulator, confirmation flow, unknown outcomes, and payment query APIs.
 
 ### Phase 3 — Idempotency

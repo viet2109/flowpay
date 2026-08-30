@@ -90,7 +90,7 @@ Status: completed.
 
 ## Phase 1 — Identity & Merchant
 
-Status: ready for implementation.
+Status: completed and frozen.
 
 Detailed task specification:
 
@@ -137,7 +137,9 @@ Do not start Phase 2 until P1-T13 and P1-T14 pass.
 
 ## Phase 2 — Payment Core
 
-Planned tasks:
+Status: `DONE/FROZEN`.
+
+Completed tasks:
 
 - P2-T01 Phase 1 compatibility and Merchant contract.
 - P2-T02 Payment database migration.
