@@ -426,6 +426,21 @@ Responsibilities:
 
 It does not expose MerchantEntity or repository types.
 
+### MerchantAccessApi
+
+Used by authenticated integration modules, beginning with Payment, to resolve the
+current merchant without importing Merchant persistence types.
+
+Responsibilities:
+
+- resolve by merchant public ID
+- require the merchant to be `ACTIVE`
+- return an immutable `ActiveMerchantSnapshot` containing only the internal ID
+  needed for ownership persistence and the merchant public ID
+
+The internal ID is an in-process module contract value. It must not be exposed
+through HTTP responses.
+
 ### PaymentQueryApi
 
 May expose immutable `PaymentSnapshot` for Refund decisions.

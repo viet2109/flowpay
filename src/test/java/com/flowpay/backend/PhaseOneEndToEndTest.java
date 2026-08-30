@@ -1,5 +1,7 @@
 package com.flowpay.backend;
 
+import com.flowpay.backend.merchant.application.ActiveMerchantSnapshot;
+import com.flowpay.backend.merchant.application.MerchantAccessApi;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,6 +63,9 @@ class PhaseOneEndToEndTest {
     private JwtDecoder jwtDecoder;
 
     @Autowired
+    private MerchantAccessApi merchantAccessApi;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
@@ -79,6 +84,7 @@ class PhaseOneEndToEndTest {
 
         assertThat(registration.normalizedEmail()).isEqualTo("owner@flowpay.dev");
         assertRegistrationPersistence(registration);
+        assertMerchantAccessContract(registration);
         assertDashboardJwt(login.accessToken(), registration);
         assertRefreshTokenIsHashed(login.refreshToken());
 
@@ -312,6 +318,19 @@ class PhaseOneEndToEndTest {
         assertThat(jwt.getClaimAsString("merchant")).isEqualTo(registration.merchantPublicId());
         assertThat(jwt.getClaimAsString("role")).isEqualTo("OWNER");
         assertThat(jwt.getClaims()).doesNotContainKeys("userId", "merchantId", "internalId");
+    }
+
+    private void assertMerchantAccessContract(Registration registration) {
+        ActiveMerchantSnapshot snapshot = merchantAccessApi.requireActiveMerchant(registration.merchantPublicId());
+        Long expectedInternalId = jdbcTemplate.queryForObject(
+                "SELECT id FROM merchants WHERE public_id = ?",
+                Long.class,
+                registration.merchantPublicId()
+        );
+        assertThat(snapshot).isEqualTo(new ActiveMerchantSnapshot(
+                expectedInternalId,
+                registration.merchantPublicId()
+        ));
     }
 
     private void assertRefreshTokenIsHashed(String rawRefreshToken) {
