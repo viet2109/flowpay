@@ -23,6 +23,16 @@ public class GlobalExceptionHandler {
 
     private final ProblemDetailsFactory problems;
 
+    @ExceptionHandler(ApiException.class)
+    ProblemDetail handleApiException(ApiException exception, HttpServletRequest request) {
+        return problems.create(
+                exception.status(),
+                exception.code(),
+                exception.getMessage(),
+                requestUri(request)
+        );
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail handleMethodArgumentNotValid(MethodArgumentNotValidException exception, HttpServletRequest request) {
         List<FieldViolation> errors = exception.getBindingResult().getFieldErrors().stream()

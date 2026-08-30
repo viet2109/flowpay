@@ -1,225 +1,258 @@
 # FlowPay — Implementation Roadmap
 
-## Guiding Rule
+## Working rule
 
-Do not implement every module at once.
+A Phase is a roadmap unit.
 
-Each phase should leave the repository runnable, tested, and demonstrable.
+A Task is the unit assigned to a coding agent.
+
+Do not normally ask an agent to implement an entire business phase in one prompt. Complete, test, review, and commit tasks sequentially.
 
 ## Phase 0 — Foundation
 
-Goal: create a clean, testable Spring Boot repository without business implementation drift.
+Status: completed.
 
-Tasks:
+### P0-T01 — Bootstrap project
 
-- bootstrap Spring Boot application;
-- Java 21+;
-- Maven or Gradle (choose once, document, do not switch casually);
-- PostgreSQL Docker Compose;
-- RabbitMQ Docker Compose;
-- Flyway;
-- common API response/error model;
-- request ID/correlation support;
-- base security configuration skeleton;
-- Testcontainers base setup;
-- ArchUnit dependency tests;
-- module/package skeleton;
-- CI pipeline running compile + tests.
+- Java 21.
+- Spring Boot 4.1.0.
+- Maven.
+- `com.flowpay` base package.
+- dependency foundation.
+- Maven Wrapper.
 
-Definition of done:
+### P0-T02 — Application configuration
 
-- application starts locally;
-- PostgreSQL health is verified;
-- Flyway runs successfully;
-- architecture tests pass;
-- integration test can start PostgreSQL Testcontainer.
+- common/dev/prod/test profiles.
+- environment-driven secrets.
+- JPA `ddl-auto=validate`.
 
-## Phase 1 — Identity + Merchant
+### P0-T03 — Docker infrastructure
 
-Tasks:
+- PostgreSQL.
+- RabbitMQ.
+- health checks.
+- `.env.example`.
 
-- users;
-- merchants;
-- merchant_members;
-- register;
-- login;
-- JWT access token;
-- refresh-token strategy;
-- current-user/current-merchant abstractions;
-- merchant profile;
-- API key create/list/revoke;
-- secure API-key authentication.
+### P0-T04 — Flyway foundation
 
-Important tests:
+- Flyway enabled.
+- foundation migration.
+- migration naming rules.
 
-- API key raw secret is not persisted;
-- revoked API key cannot authenticate;
-- merchant context is derived from authenticated principal;
-- merchant A cannot access merchant B resources.
+### P0-T05 — Module/package skeleton
+
+- common.
+- infrastructure.
+- identity.
+- merchant.
+- payment.
+- refund.
+- ledger.
+- webhook.
+- dependency boundaries.
+
+### P0-T06 — Common API/error foundation
+
+- ApiResponse.
+- PageMeta.
+- Problem Details.
+- ErrorCode.
+- validation errors.
+- global exception handler.
+
+### P0-T07 — Request correlation/logging
+
+- `X-Request-Id`.
+- MDC.
+- secret-safe logging.
+
+### P0-T08 — Observability foundation
+
+- Actuator.
+- health/readiness/liveness.
+- Prometheus.
+- OpenTelemetry foundation.
+
+### P0-T09 — Testing and architecture enforcement
+
+- PostgreSQL Testcontainers.
+- RabbitMQ Testcontainers foundation.
+- ArchUnit.
+- no H2.
+
+### P0-T10 — CI/quality gate
+
+- Maven Wrapper.
+- GitHub Actions.
+- `clean verify`.
+- README/local development.
+
+## Phase 1 — Identity & Merchant
+
+Status: ready for implementation.
+
+Detailed task specification:
+
+`phase-1-identity-merchant.md`
+
+Task sequence:
+
+```text
+P1-T01 Database migration
+   |
+   +--> P1-T02 Identity domain/persistence
+   |
+   +--> P1-T03 Merchant domain/persistence
+             |
+             v
+        P1-T04 Registration/onboarding
+             |
+        P1-T05 Password authentication/login
+             |
+        P1-T06 JWT access token
+             |
+        P1-T07 Refresh-token lifecycle
+             |
+        P1-T08 Dashboard security/principal
+             |
+        P1-T09 Merchant profile
+
+P1-T10 API-key domain/persistence
+   |
+P1-T11 API-key management
+   |
+P1-T12 API-key authentication
+
+P1-T01..T12
+      |
+      v
+P1-T13 Integration/security tests
+      |
+      v
+P1-T14 Quality gate/docs
+```
+
+Do not start Phase 2 until P1-T13 and P1-T14 pass.
 
 ## Phase 2 — Payment Core
 
-Tasks:
+Planned tasks:
 
-- `Money` value object;
-- PaymentIntent aggregate;
-- PaymentTransaction aggregate;
-- Flyway payment schema;
-- create PaymentIntent;
-- list/get PaymentIntent;
-- payment state-machine tests;
-- provider port;
-- simulator provider;
-- confirm payment split into pre-call/post-call transactions;
-- success/decline/timeout outcomes.
-
-Important tests:
-
-- succeeded payment cannot be confirmed again;
-- provider decline returns business failure state, not HTTP server error;
-- timeout produces PaymentTransaction `UNKNOWN` and PaymentIntent `PROCESSING`;
-- provider call is not executed inside the persistence transaction boundary.
+- P2-T01 Payment domain model/state machine.
+- P2-T02 Payment persistence migration/adapter.
+- P2-T03 Create PaymentIntent.
+- P2-T04 Retrieve PaymentIntent.
+- P2-T05 List/filter payments.
+- P2-T06 PaymentProviderPort.
+- P2-T07 Provider simulator.
+- P2-T08 Prepare confirmation transaction.
+- P2-T09 Provider call outside DB transaction.
+- P2-T10 Complete confirmation.
+- P2-T11 Unknown-provider outcome.
+- P2-T12 Payment transaction history.
+- P2-T13 Integration tests/quality gate.
 
 ## Phase 3 — Idempotency
 
-Tasks:
+Planned tasks:
 
-- idempotency_records migration;
-- canonical request hashing;
-- create-payment idempotency;
-- confirm-payment idempotency;
-- replay support;
-- in-progress conflict handling;
-- expiration cleanup strategy.
+- idempotency migration/domain.
+- request canonicalization/fingerprint.
+- create-payment integration.
+- confirm-payment integration.
+- replay behavior.
+- conflict behavior.
+- concurrent duplicate test.
+- retention/cleanup policy.
+- integration tests.
 
-Important tests:
+## Phase 4 — Refund & Concurrency
 
-- same key + same request creates one resource;
-- same key + different request returns 409;
-- concurrent duplicate inserts are protected by unique constraint.
+Planned tasks:
 
-## Phase 4 — Refund + Concurrency
-
-Tasks:
-
-- Refund aggregate;
-- refund schema;
-- Payment public refund command API;
-- reserve refund amount;
-- optimistic locking on PaymentIntent;
-- process refund through simulator/provider abstraction;
-- complete/release reservation;
-- full and partial refund APIs.
-
-Important tests:
-
-- cannot refund failed/processing payment;
-- cannot refund above available amount;
-- two concurrent refunds cannot exceed payment amount;
-- failed refund releases reservation;
-- successful refund moves reserved -> refunded amount correctly.
+- refund migration/domain.
+- payment refund-capacity public API.
+- refund reservation.
+- provider refund simulation.
+- complete/release reservation.
+- full refund.
+- partial/multiple refund.
+- concurrent over-refund tests.
+- integration tests.
 
 ## Phase 5 — Ledger
 
-Tasks:
+Planned tasks:
 
-- ledger accounts;
-- LedgerTransaction aggregate;
-- LedgerEntry child model;
-- balanced-posting invariant;
-- payment success posting;
-- refund success posting;
-- duplicate posting protection;
-- reversal model/tests.
+- ledger schema.
+- Money/account model.
+- LedgerTransaction aggregate.
+- balance invariant.
+- payment capture posting.
+- refund posting.
+- reversal support.
+- duplicate-event protection.
+- integration tests.
 
-Important tests:
+## Phase 6 — Outbox & RabbitMQ
 
-- unbalanced posting cannot be created;
-- duplicate event/reference cannot create duplicate posting;
-- completed ledger entries are not mutable through public APIs.
+Planned tasks:
 
-## Phase 6 — Transactional Outbox + RabbitMQ
-
-Tasks:
-
-- outbox schema;
-- IntegrationEvent abstraction;
-- outbox publisher implementation;
-- outbox relay;
-- RabbitMQ topology;
-- publisher confirms/error handling where appropriate;
-- retry/dead-letter strategy;
-- event-consumer idempotency.
-
-Important tests:
-
-- payment state and outbox event commit atomically;
-- failed business transaction leaves no outbox event;
-- duplicate consumer delivery does not duplicate ledger posting.
+- outbox schema.
+- integration-event abstraction.
+- payment/refund event mapping.
+- outbox writer.
+- relay worker.
+- RabbitMQ topology.
+- consumer deduplication.
+- retry/error handling.
+- integration tests.
 
 ## Phase 7 — Webhooks
 
-Tasks:
+Planned tasks:
 
-- endpoint configuration;
-- encrypted webhook signing secret;
-- event subscription table;
-- webhook event creation from integration events;
-- delivery scheduler/worker;
-- HMAC signature;
-- retries/backoff;
-- delivery attempt history;
-- dead state;
-- manual retry;
-- dashboard read APIs.
-
-Important tests:
-
-- signature verification fixture;
-- duplicate integration event does not create duplicate logical delivery;
-- timeout/500 triggers retry;
-- 2xx marks delivered;
-- disabled endpoint receives no new delivery.
+- endpoint/subscription schema.
+- endpoint CRUD.
+- secret generation/encryption.
+- webhook event materialization.
+- delivery queue/state.
+- HMAC signing.
+- HTTP delivery adapter.
+- retry/backoff.
+- delivery-attempt history.
+- dead state/manual retry.
+- dashboard delivery APIs.
+- integration tests.
 
 ## Phase 8 — Production Engineering
 
-Tasks:
+Post-functional-MVP hardening:
 
-- structured logging;
-- OpenTelemetry tracing;
-- Prometheus metrics;
-- Grafana dashboards;
-- health/readiness endpoints;
-- rate limiting;
-- Resilience4j around provider calls where useful;
-- secrets configuration;
-- Docker images;
-- CI/CD;
-- load tests;
-- failure-injection scenarios;
-- README architecture diagrams and demo scenarios.
+- richer domain metrics.
+- tracing propagation.
+- dashboards.
+- load tests.
+- security review.
+- dependency/security scanning.
+- production Docker image.
+- deployment.
+- backup/recovery documentation.
+- operational runbook.
 
-## First Coding-Agent Task
+## Agent task template
 
-Recommended first task after importing these documents into the repository:
+Every coding-agent task should contain:
 
-```text
-Bootstrap the FlowPay backend foundation only.
+1. Documents to read.
+2. Exact task ID/scope.
+3. Requirements.
+4. Explicit non-goals.
+5. Architecture constraints.
+6. Tests required.
+7. Definition of Done.
+8. Final report requirements.
+9. `Do not continue to the next task.`
 
-Read AGENTS.md and all docs first.
-
-Create a Java 21+ Spring Boot modular-monolith skeleton with:
-- package roots for common, infrastructure, identity, merchant, payment, refund, ledger, webhook;
-- PostgreSQL and RabbitMQ Docker Compose;
-- Flyway configuration;
-- initial application profiles;
-- Testcontainers PostgreSQL smoke test;
-- ArchUnit rules enforcing the documented module constraints;
-- common API response and RFC 9457 error skeleton;
-- request correlation ID infrastructure;
-- CI workflow that compiles and runs tests.
-
-Do not create business entities, payment services, refund logic, ledger logic, or public endpoints beyond infrastructure health/bootstrap needs.
-Do not change the documented database/API/domain design.
-Report all files changed and tests executed.
-```
+A coding agent must not silently alter public APIs, schema, state machines, dependencies, locking strategy, or module boundaries when the task does not explicitly authorize that change.

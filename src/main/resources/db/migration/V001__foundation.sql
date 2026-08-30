@@ -1,0 +1,3 @@
+-- FlowPay foundation migration.
+-- Business tables intentionally start in later phases.
+-- Keeping this migration lets CI verify Flyway wiring from Phase 0 onward.

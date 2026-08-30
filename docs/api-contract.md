@@ -1,28 +1,24 @@
 # FlowPay — API Contract v1
 
-## General
-
 Base path:
 
-```text
-/api/v1
-```
+`/api/v1`
 
-All public resource identifiers use public prefixed IDs.
+Public APIs expose public resource IDs only. Internal database IDs are never returned.
 
-Internal database IDs are never returned.
+## 1. Success envelope
 
-## Success Envelope
-
-Single object:
+Single resource:
 
 ```json
 {
-  "data": {}
+  "data": {
+    "...": "..."
+  }
 }
 ```
 
-Paged response:
+Collection:
 
 ```json
 {
@@ -30,44 +26,52 @@ Paged response:
   "meta": {
     "page": 0,
     "size": 20,
-    "totalElements": 0,
-    "totalPages": 0,
-    "hasNext": false,
+    "totalElements": 125,
+    "totalPages": 7,
+    "hasNext": true,
     "hasPrevious": false
   }
 }
 ```
 
-Default paging:
+Default pagination:
 
-```text
-page = 0
-size = 20
-sort = createdAt,DESC
-max size = 100
-```
+- page = 0
+- size = 20
+- maximum size = 100
+- default sort = createdAt descending
 
-## Error Model
+## 2. Problem Details
 
-Use RFC 9457 Problem Details (`application/problem+json`) with extensions:
+Errors use:
+
+`Content-Type: application/problem+json`
+
+Example:
 
 ```json
 {
-  "type": "https://flowpay.dev/problems/example",
-  "title": "Example problem",
+  "type": "https://flowpay.dev/problems/idempotency-key-reused",
+  "title": "Idempotency key reused",
   "status": 409,
-  "detail": "Human-readable detail",
-  "instance": "/api/v1/...",
-  "code": "STABLE_MACHINE_CODE",
+  "detail": "The idempotency key was already used with a different request.",
+  "instance": "/api/v1/payment-intents",
+  "code": "IDEMPOTENCY_KEY_REUSED",
   "requestId": "req_01K..."
 }
 ```
 
-Validation errors may include:
+Validation:
 
 ```json
 {
+  "type": "https://flowpay.dev/problems/validation-error",
+  "title": "Validation failed",
+  "status": 400,
+  "detail": "Request validation failed.",
+  "instance": "/api/v1/payment-intents",
   "code": "VALIDATION_ERROR",
+  "requestId": "req_01K...",
   "errors": [
     {
       "field": "amount",
@@ -78,64 +82,82 @@ Validation errors may include:
 }
 ```
 
-Client logic should rely on `code`, not localized text.
+Client behavior should depend on stable `code`, not human-readable `detail`.
 
-## Request Correlation
+## 3. Request correlation
 
-Response includes:
+Request header:
 
-```text
-X-Request-Id: req_...
-```
+`X-Request-Id`
 
-## Authentication
+If a valid request ID is supplied, FlowPay may propagate it. Otherwise FlowPay generates one.
+
+Response always includes:
+
+`X-Request-Id`
+
+Example format:
+
+`req_01K...`
+
+## 4. Authentication models
 
 ### Dashboard APIs
 
-```text
-Authorization: Bearer <JWT>
+Use:
+
+`Authorization: Bearer <JWT>`
+
+### Merchant integration APIs
+
+Use:
+
+`Authorization: Bearer fp_test_<secret>`
+
+Merchant identity is derived from authentication context.
+
+Clients do not send `merchantId` to select ownership.
+
+## 5. Dashboard access token
+
+JWT policy:
+
+- RSA asymmetric signing.
+- default TTL = 15 minutes.
+- subject = user public ID.
+- claims include active merchant public ID and role in MVP.
+
+Example claims:
+
+```json
+{
+  "sub": "usr_01K...",
+  "merchant": "mrc_01K...",
+  "role": "OWNER"
+}
 ```
 
-### Merchant Integration APIs
+## 6. Refresh token
+
+Refresh token policy:
+
+- opaque cryptographically random token.
+- default TTL = 7 days.
+- rotating.
+- stored in HttpOnly cookie.
+- raw token is not returned in JSON.
+
+Cookie:
 
 ```text
-Authorization: Bearer fp_test_<secret>
+Name     flowpay_refresh
+HttpOnly true
+SameSite Lax
+Path     /api/v1/auth
+Secure   true in production
 ```
 
-`merchantId` is derived from authentication and must not be accepted from request bodies for merchant-scoped integration operations.
-
-## Idempotency
-
-Header:
-
-```text
-Idempotency-Key: <client key>
-```
-
-Maximum length: 255 characters.
-
-Required for:
-
-- `POST /payment-intents`
-- `POST /payment-intents/{id}/confirm`
-- `POST /payment-intents/{id}/refunds`
-
-Retention target: 24 hours.
-
-Same request replay may return:
-
-```text
-Idempotency-Replayed: true
-```
-
-Conflicts:
-
-```text
-IDEMPOTENCY_KEY_REUSED
-IDEMPOTENCY_REQUEST_IN_PROGRESS
-```
-
-## Auth Endpoints
+## 7. Auth endpoints
 
 ### Register
 
@@ -155,9 +177,46 @@ Request:
 }
 ```
 
-Response: `201 Created`.
+Rules:
 
-v1 does not require email verification.
+- email trimmed/lowercased.
+- valid email.
+- password minimum 8 characters.
+- merchant name required.
+
+Success:
+
+```http
+201 Created
+```
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "usr_01K...",
+      "email": "viet@example.com",
+      "firstName": "Viet",
+      "lastName": "Nguyen"
+    },
+    "merchant": {
+      "id": "mrc_01K...",
+      "name": "ABC Store",
+      "status": "ACTIVE"
+    }
+  }
+}
+```
+
+Duplicate email:
+
+```http
+409 Conflict
+```
+
+`USER_EMAIL_ALREADY_EXISTS`
+
+Registration does not perform email verification in MVP Phase 1.
 
 ### Login
 
@@ -174,43 +233,233 @@ Request:
 }
 ```
 
-Access token is returned in the response body.
+Success:
 
-Refresh token should use an HttpOnly Secure cookie.
-
-## Merchant Endpoints
-
-```text
-GET    /api/v1/merchant
-PATCH  /api/v1/merchant
-
-POST   /api/v1/merchant/api-keys
-GET    /api/v1/merchant/api-keys
-DELETE /api/v1/merchant/api-keys/{id}
-
-POST   /api/v1/merchant/webhook-endpoints
-GET    /api/v1/merchant/webhook-endpoints
-PATCH  /api/v1/merchant/webhook-endpoints/{id}
-DELETE /api/v1/merchant/webhook-endpoints/{id}
-POST   /api/v1/merchant/webhook-endpoints/{id}/rotate-secret
-
-GET    /api/v1/merchant/webhook-deliveries
-GET    /api/v1/merchant/webhook-deliveries/{id}
-POST   /api/v1/merchant/webhook-deliveries/{id}/retry
+```http
+200 OK
+Set-Cookie: flowpay_refresh=<opaque>; HttpOnly; ...
 ```
 
-API key raw secret is shown once on creation.
+```json
+{
+  "data": {
+    "accessToken": "eyJ...",
+    "expiresIn": 900,
+    "user": {
+      "id": "usr_01K...",
+      "email": "viet@example.com"
+    }
+  }
+}
+```
 
-Deleting/revoking API keys and webhook endpoints is a soft business state transition, not physical deletion.
+Unknown email and wrong password both return:
 
-## Payment Endpoints
+```http
+401 Unauthorized
+```
 
-### Create PaymentIntent
+`INVALID_CREDENTIALS`
+
+### Refresh
+
+```http
+POST /api/v1/auth/refresh
+Cookie: flowpay_refresh=<opaque>
+```
+
+Success:
+
+- consumes/rotates the current refresh token.
+- sets a replacement cookie.
+- returns a new access token.
+
+```json
+{
+  "data": {
+    "accessToken": "eyJ...",
+    "expiresIn": 900
+  }
+}
+```
+
+Errors include:
+
+- `REFRESH_TOKEN_INVALID`
+- `REFRESH_TOKEN_EXPIRED`
+- `REFRESH_TOKEN_REVOKED`
+
+### Logout
+
+```http
+POST /api/v1/auth/logout
+Cookie: flowpay_refresh=<opaque>
+```
+
+Success:
+
+```http
+204 No Content
+```
+
+Server revokes the token when present and clears the cookie.
+
+## 8. Merchant profile
+
+Dashboard JWT required.
+
+### Get
+
+```http
+GET /api/v1/merchant
+```
+
+```json
+{
+  "data": {
+    "id": "mrc_01K...",
+    "name": "ABC Store",
+    "status": "ACTIVE",
+    "createdAt": "2026-08-18T03:00:00Z"
+  }
+}
+```
+
+### Update
+
+```http
+PATCH /api/v1/merchant
+```
+
+Request:
+
+```json
+{
+  "name": "ABC Technology Store"
+}
+```
+
+Client cannot modify merchant status through this generic profile endpoint.
+
+## 9. API key management
+
+Dashboard JWT required.
+
+### Create
+
+```http
+POST /api/v1/merchant/api-keys
+```
+
+```json
+{
+  "name": "Development backend"
+}
+```
+
+Success:
+
+```http
+201 Created
+```
+
+```json
+{
+  "data": {
+    "id": "key_01K...",
+    "name": "Development backend",
+    "key": "fp_test_A7x...",
+    "prefix": "fp_test_A7x",
+    "status": "ACTIVE",
+    "createdAt": "2026-08-18T03:00:00Z"
+  }
+}
+```
+
+The `key` field appears only in this create response.
+
+### List
+
+```http
+GET /api/v1/merchant/api-keys
+```
+
+Response never exposes raw key or key hash.
+
+### Revoke
+
+```http
+DELETE /api/v1/merchant/api-keys/{keyId}
+```
+
+Success:
+
+```http
+204 No Content
+```
+
+This performs:
+
+`ACTIVE -> REVOKED`
+
+The row is not deleted.
+
+Cross-merchant resource access behaves as not found.
+
+## 10. Idempotency
+
+Header:
+
+`Idempotency-Key: <client-generated-key>`
+
+Maximum length:
+
+`255`
+
+Required for:
+
+- create PaymentIntent.
+- confirm PaymentIntent.
+- create Refund.
+
+Scope:
+
+`merchant + operation + key`
+
+Equivalent replay returns the previous logical result and may include:
+
+`Idempotency-Replayed: true`
+
+Same key with different request:
+
+```http
+409 Conflict
+```
+
+`IDEMPOTENCY_KEY_REUSED`
+
+A duplicate request while the original is still processing may return:
+
+```http
+409 Conflict
+```
+
+`IDEMPOTENCY_REQUEST_IN_PROGRESS`
+
+Retention target for MVP:
+
+`24 hours`
+
+## 11. PaymentIntent
+
+Merchant API-key authentication required.
+
+### Create
 
 ```http
 POST /api/v1/payment-intents
 Authorization: Bearer fp_test_...
-Idempotency-Key: order-123-create
+Idempotency-Key: order-2026-001-create
 ```
 
 Request:
@@ -219,99 +468,117 @@ Request:
 {
   "amount": 500000,
   "currency": "VND",
-  "orderId": "ORDER-123",
-  "description": "Payment for ORDER-123"
+  "orderId": "ORDER-2026-001",
+  "description": "Payment for ORDER-2026-001"
 }
 ```
 
-`amount` is expressed in minor units.
+`amount` is in currency minor units.
 
-Response: `201 Created` and a `Location` header.
+Success:
 
-Initial status: `CREATED`.
+```http
+201 Created
+Location: /api/v1/payment-intents/pi_01K...
+```
 
-### Confirm Payment
+```json
+{
+  "data": {
+    "id": "pi_01K...",
+    "orderId": "ORDER-2026-001",
+    "amount": 500000,
+    "currency": "VND",
+    "status": "CREATED",
+    "refundedAmount": 0,
+    "refundableAmount": 0,
+    "description": "Payment for ORDER-2026-001",
+    "createdAt": "2026-08-18T03:00:00Z"
+  }
+}
+```
+
+### Confirm
 
 ```http
 POST /api/v1/payment-intents/{paymentId}/confirm
-Idempotency-Key: order-123-confirm
+Authorization: Bearer fp_test_...
+Idempotency-Key: order-2026-001-confirm
 ```
 
-No body is required in v1.
+No request body is required in MVP.
 
 Provider success:
 
-```text
-HTTP 200
-PaymentIntent = SUCCEEDED
+```http
+200 OK
 ```
+
+Payment status `SUCCEEDED`.
 
 Provider decline:
 
-```text
-HTTP 200
-PaymentIntent = FAILED
+```http
+200 OK
 ```
 
-A declined payment is a business result, not an HTTP transport/server failure.
+Payment status `FAILED` with transaction failure code.
 
-Ambiguous provider timeout:
+Provider unknown/timeout:
 
-```text
-HTTP 202
-PaymentIntent = PROCESSING
-latest PaymentTransaction = UNKNOWN
+```http
+202 Accepted
 ```
 
-Invalid state transition:
+Payment status `PROCESSING`.
 
-```text
-HTTP 409
-PAYMENT_INVALID_STATE
+Latest transaction status `UNKNOWN`.
+
+Invalid payment state:
+
+```http
+409 Conflict
 ```
 
-### Retrieve Payment
+`PAYMENT_INVALID_STATE`
+
+### Retrieve
 
 ```http
 GET /api/v1/payment-intents/{paymentId}
 ```
 
-Response may include latest provider transaction summary and derived `refundableAmount`.
-
-Cross-merchant access returns `404 PAYMENT_NOT_FOUND`.
-
-### List Payments
+### List
 
 ```http
 GET /api/v1/payment-intents
 ```
 
-Supported v1 filters:
+Supported filters:
 
-```text
-page
-size
-status
-orderId
-createdFrom
-createdTo
-```
+- `status`
+- `orderId`
+- `createdFrom`
+- `createdTo`
+- `page`
+- `size`
 
-### Payment Transactions
+### Transaction attempts
 
 ```http
 GET /api/v1/payment-intents/{paymentId}/transactions
 ```
 
-Returns provider attempts ordered by attempt number/time.
+## 12. Refund
 
-## Refund Endpoints
+Merchant API-key authentication required.
 
-### Create Refund
+### Create refund
 
 ```http
 POST /api/v1/payment-intents/{paymentId}/refunds
-Idempotency-Key: refund-order-123-item-a
+Authorization: Bearer fp_test_...
+Idempotency-Key: refund-order-001-item-a
 ```
 
 Request:
@@ -323,49 +590,111 @@ Request:
 }
 ```
 
-Currency is inherited from the payment and is not supplied by the caller.
+Currency is derived from the payment.
 
-Response: `201 Created` for a created refund resource.
-
-If requested amount exceeds currently refundable amount:
-
-```text
-HTTP 409
-REFUND_AMOUNT_EXCEEDS_AVAILABLE
-```
-
-### List Payment Refunds
+Success:
 
 ```http
-GET /api/v1/payment-intents/{paymentId}/refunds
+201 Created
 ```
 
-### Retrieve Refund
+```json
+{
+  "data": {
+    "id": "re_01K...",
+    "paymentId": "pi_01K...",
+    "amount": 200000,
+    "currency": "VND",
+    "status": "SUCCEEDED",
+    "reason": "CUSTOMER_REQUEST",
+    "createdAt": "2026-08-18T03:00:00Z"
+  }
+}
+```
+
+Exceeds refundable amount:
+
+```http
+409 Conflict
+```
+
+`REFUND_AMOUNT_EXCEEDS_AVAILABLE`
+
+### Retrieve refund
 
 ```http
 GET /api/v1/refunds/{refundId}
 ```
 
-## Webhook Event Types v1
+### List refunds for payment
 
-```text
-payment.processing
-payment.succeeded
-payment.failed
-refund.processing
-refund.succeeded
-refund.failed
+```http
+GET /api/v1/payment-intents/{paymentId}/refunds
 ```
 
-## Webhook Payload
+## 13. Webhook endpoint management
 
-Example:
+Dashboard JWT required.
+
+### Create endpoint
+
+```http
+POST /api/v1/merchant/webhook-endpoints
+```
+
+```json
+{
+  "url": "https://example.com/api/webhooks/flowpay",
+  "events": [
+    "payment.succeeded",
+    "payment.failed",
+    "refund.succeeded"
+  ]
+}
+```
+
+Create response returns the webhook secret once.
+
+### Update
+
+```http
+PATCH /api/v1/merchant/webhook-endpoints/{endpointId}
+```
+
+### Disable
+
+```http
+DELETE /api/v1/merchant/webhook-endpoints/{endpointId}
+```
+
+Returns `204` and changes status to `DISABLED`.
+
+### Rotate secret
+
+```http
+POST /api/v1/merchant/webhook-endpoints/{endpointId}/rotate-secret
+```
+
+Returns the new raw secret once.
+
+## 14. Webhook delivery
+
+Webhook request example:
+
+```http
+POST https://merchant.example/webhooks/flowpay
+Content-Type: application/json
+FlowPay-Signature: t=1786849200,v1=<signature>
+FlowPay-Event-Id: evt_01K...
+```
+
+Payload:
 
 ```json
 {
   "id": "evt_01K...",
   "type": "payment.succeeded",
-  "createdAt": "2026-08-16T03:00:00Z",
+  "createdAt": "2026-08-18T03:00:00Z",
   "data": {
     "payment": {
       "id": "pi_01K...",
@@ -378,60 +707,117 @@ Example:
 }
 ```
 
-Headers:
+Signed input:
 
-```text
-FlowPay-Signature: t=<timestamp>,v1=<signature>
-FlowPay-Event-Id: evt_...
+`timestamp + "." + rawRequestBody`
+
+Algorithm:
+
+`HMAC-SHA256`
+
+Default timestamp tolerance:
+
+`5 minutes`
+
+### Delivery history
+
+```http
+GET /api/v1/merchant/webhook-deliveries
+GET /api/v1/merchant/webhook-deliveries/{deliveryId}
 ```
 
-Signature algorithm:
+### Manual retry
 
-```text
-HMAC-SHA256(secret, timestamp + "." + rawBody)
+```http
+POST /api/v1/merchant/webhook-deliveries/{deliveryId}/retry
 ```
 
-## HTTP Status Policy
+Intended for dead/failed deliveries.
 
-| Scenario | HTTP status |
+Success:
+
+```http
+202 Accepted
+```
+
+## 15. Event types v1
+
+- `payment.processing`
+- `payment.succeeded`
+- `payment.failed`
+- `refund.processing`
+- `refund.succeeded`
+- `refund.failed`
+
+## 16. HTTP status policy
+
+| Situation | Status |
 |---|---:|
-| resource created | 201 |
-| query/update success | 200 |
-| accepted/ambiguous async processing | 202 |
-| revoke/disable success | 204 |
-| malformed/validation request | 400 |
-| missing/invalid auth | 401 |
-| authenticated but forbidden | 403 |
-| resource not found / cross-merchant | 404 |
-| business/idempotency/concurrency conflict | 409 |
-| unsupported media type | 415 |
-| rate limited | 429 |
-| unexpected error | 500 |
-| upstream unavailable and operation cannot be accepted | 503 |
+| Resource created | 201 |
+| Successful query/command | 200 |
+| Accepted/pending async outcome | 202 |
+| Revoke/disable/logout success | 204 |
+| Validation/invalid JSON | 400 |
+| Missing/invalid authentication | 401 |
+| Authenticated but forbidden | 403 |
+| Not found / cross-merchant | 404 |
+| State, concurrency, idempotency conflict | 409 |
+| Unsupported media type | 415 |
+| Rate limit | 429 |
+| Unexpected error | 500 |
+| Unavailable dependency when operation cannot be accepted | 503 |
 
-## Stable Error Codes v1
+## 17. Error codes
 
-```text
-AUTHENTICATION_REQUIRED
-INVALID_API_KEY
-API_KEY_REVOKED
+Foundation:
 
-PAYMENT_NOT_FOUND
-PAYMENT_INVALID_STATE
-PAYMENT_ALREADY_SUCCEEDED
+- `VALIDATION_ERROR`
+- `AUTHENTICATION_REQUIRED`
+- `INTERNAL_ERROR`
 
-REFUND_NOT_FOUND
-REFUND_INVALID_PAYMENT_STATE
-REFUND_AMOUNT_EXCEEDS_AVAILABLE
+Identity:
 
-IDEMPOTENCY_KEY_REQUIRED
-IDEMPOTENCY_KEY_REUSED
-IDEMPOTENCY_REQUEST_IN_PROGRESS
+- `USER_EMAIL_ALREADY_EXISTS`
+- `INVALID_CREDENTIALS`
+- `USER_LOCKED`
+- `USER_DISABLED`
+- `REFRESH_TOKEN_INVALID`
+- `REFRESH_TOKEN_EXPIRED`
+- `REFRESH_TOKEN_REVOKED`
 
-WEBHOOK_ENDPOINT_NOT_FOUND
-WEBHOOK_INVALID_STATE
+Merchant/API key:
 
-VALIDATION_ERROR
-RATE_LIMIT_EXCEEDED
-INTERNAL_ERROR
-```
+- `MERCHANT_NOT_FOUND`
+- `MERCHANT_SUSPENDED`
+- `API_KEY_NOT_FOUND`
+- `API_KEY_REVOKED`
+- `INVALID_API_KEY`
+
+Payment:
+
+- `PAYMENT_NOT_FOUND`
+- `PAYMENT_INVALID_STATE`
+- `PAYMENT_ALREADY_SUCCEEDED`
+
+Refund:
+
+- `REFUND_NOT_FOUND`
+- `REFUND_INVALID_PAYMENT_STATE`
+- `REFUND_AMOUNT_EXCEEDS_AVAILABLE`
+
+Idempotency:
+
+- `IDEMPOTENCY_KEY_REQUIRED`
+- `IDEMPOTENCY_KEY_REUSED`
+- `IDEMPOTENCY_REQUEST_IN_PROGRESS`
+
+Webhook:
+
+- `WEBHOOK_ENDPOINT_NOT_FOUND`
+- `WEBHOOK_INVALID_STATE`
+
+Rate limiting:
+
+- `RATE_LIMIT_EXCEEDED`
+
+Implementation exceptions, SQL names, Hibernate messages, stack traces, and internal IDs must not leak through this contract.
