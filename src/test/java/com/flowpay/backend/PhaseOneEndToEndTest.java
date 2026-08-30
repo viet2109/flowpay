@@ -2,6 +2,7 @@ package com.flowpay.backend;
 
 import com.flowpay.backend.merchant.application.ActiveMerchantSnapshot;
 import com.flowpay.backend.merchant.application.MerchantAccessApi;
+import com.flowpay.backend.testing.PostgresIntegrationTest;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -20,9 +20,6 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -41,17 +38,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Testcontainers(disabledWithoutDocker = true)
 @ExtendWith(OutputCaptureExtension.class)
-class PhaseOneEndToEndTest {
+class PhaseOneEndToEndTest extends PostgresIntegrationTest {
 
     private static final String PASSWORD = "StrongPassword123!";
     private static final String PAYMENT_PATH = "/api/v1/payment-intents";
     private static final Pattern REFRESH_COOKIE = Pattern.compile("flowpay_refresh=([^;]+)");
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16.15-alpine");
 
     @Autowired
     private MockMvc mockMvc;

@@ -7,17 +7,14 @@ import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
 import com.flowpay.backend.payment.domain.PaymentTransactionStatus;
+import com.flowpay.backend.testing.PostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -30,14 +27,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Testcontainers(disabledWithoutDocker = true)
-class PaymentPersistenceTest {
+class PaymentPersistenceTest extends PostgresIntegrationTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-08-30T08:00:00Z");
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16.15-alpine");
 
     @Autowired
     private PaymentIntentRepository paymentIntentRepository;

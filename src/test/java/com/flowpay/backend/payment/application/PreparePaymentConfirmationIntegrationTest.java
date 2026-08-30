@@ -8,16 +8,15 @@ import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
 import com.flowpay.backend.payment.domain.PaymentTransactionStatus;
+import com.flowpay.backend.testing.PostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -29,21 +28,17 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Testcontainers(disabledWithoutDocker = true)
-class PreparePaymentConfirmationIntegrationTest {
+class PreparePaymentConfirmationIntegrationTest extends PostgresIntegrationTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-08-29T08:00:00Z");
     private static final MerchantApiPrincipal PRINCIPAL = new MerchantApiPrincipal(
             "mrc_prepare_integration",
             "key_prepare_integration"
     );
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16.15-alpine");
 
     @Autowired
     private PreparePaymentConfirmationService service;
@@ -141,6 +136,32 @@ class PreparePaymentConfirmationIntegrationTest {
                 Integer.class,
                 payment.internalId()
         )).isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = PaymentStatus.class,
+            names = {"PROCESSING", "SUCCEEDED", "FAILED"}
+    )
+    void shouldRejectPaymentsThatAreNotCreated(PaymentStatus status) {
+        PaymentIntent payment = insertCreatedPayment(
+                "pi_prepare_invalid_" + status.name().toLowerCase()
+        );
+        payment.startProcessing(CREATED_AT.plusSeconds(1));
+        if (status == PaymentStatus.SUCCEEDED) {
+            payment.markSucceeded(CREATED_AT.plusSeconds(2));
+        } else if (status == PaymentStatus.FAILED) {
+            payment.markFailed(CREATED_AT.plusSeconds(2));
+        }
+        paymentIntentRepository.save(payment);
+
+        assertThatThrownBy(() -> service.prepare(command(payment.publicId())))
+                .isInstanceOfSatisfying(ApiException.class, exception ->
+                        assertThat(exception.code()).isEqualTo(ErrorCode.PAYMENT_INVALID_STATE)
+                );
+
+        assertThat(paymentTransactionRepository.findByPaymentIntentId(payment.internalId()))
+                .isEmpty();
     }
 
     private PreparationOutcome prepareConcurrently(

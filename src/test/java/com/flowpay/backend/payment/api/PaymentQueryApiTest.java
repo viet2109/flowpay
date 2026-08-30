@@ -12,20 +12,17 @@ import com.flowpay.backend.payment.application.PaymentTransactionRepository;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
+import com.flowpay.backend.testing.PostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.Instant;
 
@@ -39,14 +36,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Testcontainers(disabledWithoutDocker = true)
-class PaymentQueryApiTest {
+class PaymentQueryApiTest extends PostgresIntegrationTest {
 
     private static final Instant BASE_TIME = Instant.parse("2026-08-29T10:00:00Z");
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16.15-alpine");
 
     @Autowired
     private MockMvc mockMvc;
@@ -103,7 +95,10 @@ class PaymentQueryApiTest {
                 .andExpect(content().string(not(containsString("internalId"))))
                 .andExpect(content().string(not(containsString("merchantId"))))
                 .andExpect(content().string(not(containsString("\"version\""))))
-                .andExpect(content().string(not(containsString("refundReservedAmount"))));
+                .andExpect(content().string(not(containsString("refundReservedAmount"))))
+                .andExpect(content().string(not(containsString(owner.rawKey()))))
+                .andExpect(content().string(not(containsString(owner.keyHash()))))
+                .andExpect(content().string(not(containsString("providerPayload"))));
     }
 
     @Test
@@ -262,7 +257,7 @@ class PaymentQueryApiTest {
                 null,
                 BASE_TIME
         ));
-        return new StoredKey(merchant.id(), secret.rawKey());
+        return new StoredKey(merchant.id(), secret.rawKey(), secret.digest());
     }
 
     private PaymentIntent savePayment(
@@ -295,6 +290,6 @@ class PaymentQueryApiTest {
         return "Bearer " + rawKey;
     }
 
-    private record StoredKey(long merchantId, String rawKey) {
+    private record StoredKey(long merchantId, String rawKey, String keyHash) {
     }
 }

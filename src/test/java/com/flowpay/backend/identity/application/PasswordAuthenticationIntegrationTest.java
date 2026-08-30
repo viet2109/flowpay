@@ -1,29 +1,21 @@
 package com.flowpay.backend.identity.application;
 
+import com.flowpay.backend.testing.PostgresIntegrationTest;
 import com.flowpay.backend.merchant.domain.MerchantRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Testcontainers(disabledWithoutDocker = true)
-class PasswordAuthenticationIntegrationTest {
+class PasswordAuthenticationIntegrationTest extends PostgresIntegrationTest {
 
     private static final String RAW_PASSWORD = "StrongPassword123!";
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16.15-alpine");
 
     @Autowired
     private RegistrationUseCase registrationUseCase;
