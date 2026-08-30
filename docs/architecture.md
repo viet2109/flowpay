@@ -50,6 +50,7 @@ com.flowpay
 ├── identity
 ├── merchant
 ├── payment
+├── idempotency
 ├── refund
 ├── ledger
 └── webhook
@@ -75,7 +76,6 @@ Contains cross-cutting technical capabilities:
 - request correlation/filtering.
 - messaging/outbox relay infrastructure.
 - observability.
-- idempotency infrastructure when shared.
 - configuration.
 
 Business rules do not belong here.
@@ -150,6 +150,67 @@ COMMIT
 At the Phase 2 freeze, TX 2 contains only PaymentTransaction and PaymentIntent
 finalization. Transactional outbox persistence and event publication remain
 explicitly deferred to Phase 6.
+
+### Idempotent payment commands
+
+Idempotency is a dedicated business module. It owns its domain model,
+repository port, persistence adapter, acquisition decisions, response snapshots,
+retention, and cleanup. It does not belong in `common`, top-level
+`infrastructure`, or Payment infrastructure.
+
+Payment may call only Idempotency public/application contracts. Idempotency must
+not access Payment entities, repositories, or infrastructure. The database may
+still enforce `idempotency_records.merchant_id -> merchants.id` because the
+modular monolith shares one PostgreSQL database.
+
+Create PaymentIntent has no external call, so its idempotent orchestration is
+atomic:
+
+```text
+ONE DATABASE TX
+- acquire PROCESSING Idempotency record
+- create PaymentIntent
+- persist the original public response snapshot
+- complete Idempotency record
+COMMIT
+```
+
+Confirm Payment preserves the Phase 2 provider boundary:
+
+```text
+Payment ownership/state preflight (no Idempotency row yet)
+
+Idempotency reservation TX
+- acquire PROCESSING record
+COMMIT
+
+Payment TX 1
+- PaymentIntent -> PROCESSING
+- create PaymentTransaction
+COMMIT
+
+NO DATABASE TX
+- call provider
+
+Payment TX 2
+- finalize PaymentTransaction
+- finalize PaymentIntent
+COMMIT
+
+Idempotency completion TX
+- persist the original public response snapshot
+- mark COMPLETED
+COMMIT
+```
+
+The Payment preflight prevents cross-merchant or already-invalid requests from
+creating an Idempotency reservation. Payment TX 1 must still revalidate ownership
+and state to protect against races.
+
+A PROCESSING Confirm reservation may be removed only when the execution owner
+can prove that Payment TX 1 failed and the provider was never invoked. From the
+point provider invocation begins, an unexpected failure is uncertain: retain the
+PROCESSING record and forbid automatic retry or release.
 
 ## 6. Identity and dashboard authentication
 
