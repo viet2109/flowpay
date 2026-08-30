@@ -32,13 +32,19 @@ public final class SecurityProblemHandler implements AuthenticationEntryPoint, A
             HttpServletResponse response,
             AuthenticationException exception
     ) throws IOException {
+        ErrorCode code = ErrorCode.AUTHENTICATION_REQUIRED;
+        String detail = "A valid access token is required.";
+        if (exception instanceof CodedAuthenticationException codedException) {
+            code = codedException.code();
+            detail = codedException.getMessage();
+        }
         response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
         write(
                 response,
                 problems.create(
                         HttpStatus.UNAUTHORIZED,
-                        ErrorCode.AUTHENTICATION_REQUIRED,
-                        "A valid access token is required.",
+                        code,
+                        detail,
                         URI.create(request.getRequestURI())
                 )
         );

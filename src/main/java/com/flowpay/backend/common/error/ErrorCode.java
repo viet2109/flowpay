@@ -13,7 +13,10 @@ public enum ErrorCode {
     REFRESH_TOKEN_EXPIRED("Refresh token expired", "refresh-token-expired"),
     REFRESH_TOKEN_REVOKED("Refresh token revoked", "refresh-token-revoked"),
     MERCHANT_NOT_FOUND("Merchant not found", "merchant-not-found"),
+    MERCHANT_SUSPENDED("Merchant suspended", "merchant-suspended"),
     API_KEY_NOT_FOUND("API key not found", "api-key-not-found"),
+    API_KEY_REVOKED("API key revoked", "api-key-revoked"),
+    INVALID_API_KEY("Invalid API key", "invalid-api-key"),
     RESOURCE_NOT_FOUND("Resource not found", "resource-not-found"),
     INTERNAL_ERROR("Internal server error", "internal-error");
 
