@@ -89,6 +89,12 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule idempotencyMustNotDependOnPayment = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.idempotency..")
+            .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.payment..")
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule paymentCoreMustNotDependOnIdempotencyInfrastructure = noClasses()
             .that().resideInAnyPackage(
                     "com.flowpay.backend.payment.api..",
