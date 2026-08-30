@@ -8,5 +8,7 @@ public interface MerchantRepository {
 
     Merchant save(Merchant merchant);
 
+    Optional<Merchant> findById(long id);
+
     Optional<Merchant> findByPublicId(String publicId);
 }

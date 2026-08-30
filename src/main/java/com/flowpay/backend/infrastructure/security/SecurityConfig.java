@@ -28,6 +28,7 @@ public class SecurityConfig {
                         authorize.requestMatchers("/actuator/prometheus").permitAll();
                     }
                     authorize.requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll();
+                    authorize.requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll();
                     authorize.anyRequest().denyAll();
                 });
 

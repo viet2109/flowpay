@@ -8,4 +8,6 @@ interface SpringDataMerchantMemberRepository
         extends JpaRepository<MerchantMemberEntity, MerchantMemberEntity.MemberId> {
 
     Optional<MerchantMemberEntity> findByIdMerchantIdAndIdUserId(long merchantId, long userId);
+
+    Optional<MerchantMemberEntity> findFirstByIdUserIdOrderByCreatedAtAscIdMerchantIdAsc(long userId);
 }

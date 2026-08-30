@@ -27,6 +27,12 @@ public class JpaMerchantMemberRepositoryAdapter implements MerchantMemberReposit
                 .map(JpaMerchantMemberRepositoryAdapter::toDomain);
     }
 
+    @Override
+    public Optional<MerchantMember> findFirstByUserId(long userId) {
+        return repository.findFirstByIdUserIdOrderByCreatedAtAscIdMerchantIdAsc(userId)
+                .map(JpaMerchantMemberRepositoryAdapter::toDomain);
+    }
+
     private static MerchantMemberEntity toEntity(MerchantMember member) {
         return new MerchantMemberEntity(
                 member.merchantId(),

@@ -70,10 +70,15 @@ class MerchantPersistenceTest {
         MerchantMember owner = memberRepository
                 .findByMerchantIdAndUserId(merchant.id(), userId)
                 .orElseThrow();
+        MerchantMember loginMembership = memberRepository.findFirstByUserId(userId).orElseThrow();
+        Merchant merchantById = merchantRepository.findById(merchant.id()).orElseThrow();
 
         assertThat(merchant.status()).isEqualTo(MerchantStatus.ACTIVE);
+        assertThat(merchantById.publicId()).isEqualTo(merchant.publicId());
         assertThat(owner.role()).isEqualTo(MerchantRole.OWNER);
         assertThat(owner.userId()).isEqualTo(userId);
+        assertThat(loginMembership.merchantId()).isEqualTo(merchant.id());
+        assertThat(loginMembership.role()).isEqualTo(MerchantRole.OWNER);
     }
 
     @Test

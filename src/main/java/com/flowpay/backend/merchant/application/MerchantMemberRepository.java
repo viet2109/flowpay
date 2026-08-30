@@ -9,4 +9,6 @@ public interface MerchantMemberRepository {
     MerchantMember add(MerchantMember member);
 
     Optional<MerchantMember> findByMerchantIdAndUserId(long merchantId, long userId);
+
+    Optional<MerchantMember> findFirstByUserId(long userId);
 }

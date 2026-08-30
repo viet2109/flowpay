@@ -22,6 +22,11 @@ public class JpaMerchantRepositoryAdapter implements MerchantRepository {
     }
 
     @Override
+    public Optional<Merchant> findById(long id) {
+        return repository.findById(id).map(JpaMerchantRepositoryAdapter::toDomain);
+    }
+
+    @Override
     public Optional<Merchant> findByPublicId(String publicId) {
         return repository.findByPublicId(publicId).map(JpaMerchantRepositoryAdapter::toDomain);
     }
