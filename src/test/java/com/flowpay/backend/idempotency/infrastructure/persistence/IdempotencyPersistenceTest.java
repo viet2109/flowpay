@@ -2,6 +2,8 @@ package com.flowpay.backend.idempotency.infrastructure.persistence;
 
 import com.flowpay.backend.idempotency.domain.IdempotencyRecord;
 import com.flowpay.backend.idempotency.domain.IdempotencyRepository;
+import com.flowpay.backend.idempotency.domain.IdempotencyKey;
+import com.flowpay.backend.idempotency.domain.IdempotencyOperation;
 import com.flowpay.backend.idempotency.domain.IdempotencyStatus;
 import com.flowpay.backend.testing.PostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,20 +61,20 @@ class IdempotencyPersistenceTest extends PostgresIntegrationTest {
 
         IdempotencyRecord saved = idempotencyRepository.save(newProcessingRecord(
                 merchantId,
-                "PAYMENT_INTENT_CREATE",
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
                 "checkout-processing"
         ));
         IdempotencyRecord reloaded = idempotencyRepository.findByScope(
                 merchantId,
-                "PAYMENT_INTENT_CREATE",
-                "checkout-processing"
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
+                IdempotencyKey.of("checkout-processing")
         ).orElseThrow();
 
         assertThat(saved.internalId()).isPositive();
         assertThat(reloaded.internalId()).isEqualTo(saved.internalId());
         assertThat(reloaded.merchantId()).isEqualTo(merchantId);
-        assertThat(reloaded.operation()).isEqualTo("PAYMENT_INTENT_CREATE");
-        assertThat(reloaded.idempotencyKey()).isEqualTo("checkout-processing");
+        assertThat(reloaded.operation()).isEqualTo(IdempotencyOperation.PAYMENT_INTENT_CREATE);
+        assertThat(reloaded.idempotencyKey().value()).isEqualTo("checkout-processing");
         assertThat(reloaded.requestHash()).isEqualTo(REQUEST_HASH);
         assertThat(reloaded.status()).isEqualTo(IdempotencyStatus.PROCESSING);
         assertThat(reloaded.isProcessing()).isTrue();
@@ -88,7 +90,7 @@ class IdempotencyPersistenceTest extends PostgresIntegrationTest {
         long merchantId = insertMerchant("mrc_idempotency_completed");
         IdempotencyRecord saved = idempotencyRepository.save(newProcessingRecord(
                 merchantId,
-                "PAYMENT_INTENT_CREATE",
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
                 "checkout-completed"
         ));
         Instant completedAt = CREATED_AT.plusSeconds(12);
@@ -105,8 +107,8 @@ class IdempotencyPersistenceTest extends PostgresIntegrationTest {
         IdempotencyRecord updated = idempotencyRepository.save(saved);
         IdempotencyRecord reloaded = idempotencyRepository.findByScope(
                 merchantId,
-                "PAYMENT_INTENT_CREATE",
-                "checkout-completed"
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
+                IdempotencyKey.of("checkout-completed")
         ).orElseThrow();
 
         assertThat(updated.internalId()).isEqualTo(saved.internalId());
@@ -136,42 +138,42 @@ class IdempotencyPersistenceTest extends PostgresIntegrationTest {
         long otherMerchantId = insertMerchant("mrc_idempotency_scope_other");
         IdempotencyRecord createRecord = idempotencyRepository.save(newProcessingRecord(
                 merchantId,
-                "PAYMENT_INTENT_CREATE",
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
                 "Shared-Key"
         ));
         IdempotencyRecord confirmRecord = idempotencyRepository.save(newProcessingRecord(
                 merchantId,
-                "PAYMENT_INTENT_CONFIRM",
+                IdempotencyOperation.PAYMENT_INTENT_CONFIRM,
                 "Shared-Key"
         ));
         IdempotencyRecord otherMerchantRecord = idempotencyRepository.save(newProcessingRecord(
                 otherMerchantId,
-                "PAYMENT_INTENT_CREATE",
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
                 "Shared-Key"
         ));
 
         assertThat(idempotencyRepository.findByScope(
                 merchantId,
-                "PAYMENT_INTENT_CREATE",
-                "Shared-Key"
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
+                IdempotencyKey.of("Shared-Key")
         )).get().extracting(IdempotencyRecord::internalId)
                 .isEqualTo(createRecord.internalId());
         assertThat(idempotencyRepository.findByScope(
                 merchantId,
-                "PAYMENT_INTENT_CONFIRM",
-                "Shared-Key"
+                IdempotencyOperation.PAYMENT_INTENT_CONFIRM,
+                IdempotencyKey.of("Shared-Key")
         )).get().extracting(IdempotencyRecord::internalId)
                 .isEqualTo(confirmRecord.internalId());
         assertThat(idempotencyRepository.findByScope(
                 otherMerchantId,
-                "PAYMENT_INTENT_CREATE",
-                "Shared-Key"
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
+                IdempotencyKey.of("Shared-Key")
         )).get().extracting(IdempotencyRecord::internalId)
                 .isEqualTo(otherMerchantRecord.internalId());
         assertThat(idempotencyRepository.findByScope(
                 merchantId,
-                "PAYMENT_INTENT_CREATE",
-                "shared-key"
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
+                IdempotencyKey.of("shared-key")
         )).isEmpty();
     }
 
@@ -188,13 +190,13 @@ class IdempotencyPersistenceTest extends PostgresIntegrationTest {
 
     private IdempotencyRecord newProcessingRecord(
             long merchantId,
-            String operation,
+            IdempotencyOperation operation,
             String idempotencyKey
     ) {
         return IdempotencyRecord.start(
                 merchantId,
                 operation,
-                idempotencyKey,
+                IdempotencyKey.of(idempotencyKey),
                 REQUEST_HASH,
                 CREATED_AT,
                 INITIAL_EXPIRY

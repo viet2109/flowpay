@@ -6,13 +6,12 @@ import java.util.regex.Pattern;
 
 public final class IdempotencyRecord {
 
-    private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 255;
     private static final Pattern REQUEST_HASH_PATTERN = Pattern.compile("[0-9a-f]{64}");
 
     private final Long internalId;
     private final long merchantId;
-    private final String operation;
-    private final String idempotencyKey;
+    private final IdempotencyOperation operation;
+    private final IdempotencyKey idempotencyKey;
     private final String requestHash;
     private IdempotencyStatus status;
     private String resourceType;
@@ -26,8 +25,8 @@ public final class IdempotencyRecord {
     private IdempotencyRecord(
             Long internalId,
             long merchantId,
-            String operation,
-            String idempotencyKey,
+            IdempotencyOperation operation,
+            IdempotencyKey idempotencyKey,
             String requestHash,
             IdempotencyStatus status,
             String resourceType,
@@ -40,8 +39,11 @@ public final class IdempotencyRecord {
     ) {
         this.internalId = validateInternalId(internalId);
         this.merchantId = validateMerchantId(merchantId);
-        this.operation = requireText(operation, "operation");
-        this.idempotencyKey = validateIdempotencyKey(idempotencyKey);
+        this.operation = Objects.requireNonNull(operation, "operation must not be null");
+        this.idempotencyKey = Objects.requireNonNull(
+                idempotencyKey,
+                "idempotencyKey must not be null"
+        );
         this.requestHash = validateRequestHash(requestHash);
         this.status = Objects.requireNonNull(status, "status must not be null");
         this.resourceType = optionalText(resourceType, "resourceType");
@@ -56,8 +58,8 @@ public final class IdempotencyRecord {
 
     public static IdempotencyRecord start(
             long merchantId,
-            String operation,
-            String idempotencyKey,
+            IdempotencyOperation operation,
+            IdempotencyKey idempotencyKey,
             String requestHash,
             Instant createdAt,
             Instant expiresAt
@@ -82,8 +84,8 @@ public final class IdempotencyRecord {
     public static IdempotencyRecord rehydrate(
             long internalId,
             long merchantId,
-            String operation,
-            String idempotencyKey,
+            IdempotencyOperation operation,
+            IdempotencyKey idempotencyKey,
             String requestHash,
             IdempotencyStatus status,
             String resourceType,
@@ -215,16 +217,6 @@ public final class IdempotencyRecord {
         return merchantId;
     }
 
-    private static String validateIdempotencyKey(String idempotencyKey) {
-        String value = requireText(idempotencyKey, "idempotencyKey");
-        if (value.length() > IDEMPOTENCY_KEY_MAX_LENGTH) {
-            throw new IllegalArgumentException(
-                    "idempotencyKey must not exceed " + IDEMPOTENCY_KEY_MAX_LENGTH + " characters"
-            );
-        }
-        return value;
-    }
-
     private static String validateRequestHash(String requestHash) {
         Objects.requireNonNull(requestHash, "requestHash must not be null");
         if (!REQUEST_HASH_PATTERN.matcher(requestHash).matches()) {
@@ -269,11 +261,11 @@ public final class IdempotencyRecord {
         return merchantId;
     }
 
-    public String operation() {
+    public IdempotencyOperation operation() {
         return operation;
     }
 
-    public String idempotencyKey() {
+    public IdempotencyKey idempotencyKey() {
         return idempotencyKey;
     }
 

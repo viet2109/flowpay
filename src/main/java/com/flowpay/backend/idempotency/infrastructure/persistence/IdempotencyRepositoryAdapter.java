@@ -2,6 +2,8 @@ package com.flowpay.backend.idempotency.infrastructure.persistence;
 
 import com.flowpay.backend.idempotency.domain.IdempotencyRecord;
 import com.flowpay.backend.idempotency.domain.IdempotencyRepository;
+import com.flowpay.backend.idempotency.domain.IdempotencyKey;
+import com.flowpay.backend.idempotency.domain.IdempotencyOperation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -24,13 +26,13 @@ public class IdempotencyRepositoryAdapter implements IdempotencyRepository {
     @Override
     public Optional<IdempotencyRecord> findByScope(
             long merchantId,
-            String operation,
-            String idempotencyKey
+            IdempotencyOperation operation,
+            IdempotencyKey idempotencyKey
     ) {
         return repository.findByMerchantIdAndOperationAndIdempotencyKey(
                 merchantId,
                 operation,
-                idempotencyKey
+                idempotencyKey.value()
         ).map(IdempotencyPersistenceMapper::toDomain);
     }
 }

@@ -1,6 +1,7 @@
 package com.flowpay.backend.idempotency.infrastructure.persistence;
 
 import com.flowpay.backend.idempotency.domain.IdempotencyRecord;
+import com.flowpay.backend.idempotency.domain.IdempotencyKey;
 
 final class IdempotencyPersistenceMapper {
 
@@ -12,7 +13,7 @@ final class IdempotencyPersistenceMapper {
                 record.internalId(),
                 record.merchantId(),
                 record.operation(),
-                record.idempotencyKey(),
+                record.idempotencyKey().value(),
                 record.requestHash(),
                 record.status(),
                 record.resourceType(),
@@ -30,7 +31,7 @@ final class IdempotencyPersistenceMapper {
                 entity.id(),
                 entity.merchantId(),
                 entity.operation(),
-                entity.idempotencyKey(),
+                IdempotencyKey.of(entity.idempotencyKey()),
                 entity.requestHash(),
                 entity.status(),
                 entity.resourceType(),

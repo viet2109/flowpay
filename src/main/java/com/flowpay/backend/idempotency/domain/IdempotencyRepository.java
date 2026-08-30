@@ -8,7 +8,7 @@ public interface IdempotencyRepository {
 
     Optional<IdempotencyRecord> findByScope(
             long merchantId,
-            String operation,
-            String idempotencyKey
+            IdempotencyOperation operation,
+            IdempotencyKey idempotencyKey
     );
 }

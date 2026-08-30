@@ -19,8 +19,8 @@ class IdempotencyRecordTest {
 
         assertThat(record.internalId()).isNull();
         assertThat(record.merchantId()).isEqualTo(41L);
-        assertThat(record.operation()).isEqualTo("PAYMENT_INTENT_CREATE");
-        assertThat(record.idempotencyKey()).isEqualTo("checkout-1001");
+        assertThat(record.operation()).isEqualTo(IdempotencyOperation.PAYMENT_INTENT_CREATE);
+        assertThat(record.idempotencyKey().value()).isEqualTo("checkout-1001");
         assertThat(record.requestHash()).isEqualTo(REQUEST_HASH);
         assertThat(record.status()).isEqualTo(IdempotencyStatus.PROCESSING);
         assertThat(record.isProcessing()).isTrue();
@@ -104,8 +104,8 @@ class IdempotencyRecordTest {
         assertThatThrownBy(() -> IdempotencyRecord.rehydrate(
                 7L,
                 41L,
-                "PAYMENT_INTENT_CREATE",
-                "checkout-1001",
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
+                IdempotencyKey.of("checkout-1001"),
                 REQUEST_HASH,
                 IdempotencyStatus.COMPLETED,
                 "PAYMENT_INTENT",
@@ -121,8 +121,8 @@ class IdempotencyRecordTest {
         assertThatThrownBy(() -> IdempotencyRecord.rehydrate(
                 7L,
                 41L,
-                "PAYMENT_INTENT_CREATE",
-                "checkout-1001",
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
+                IdempotencyKey.of("checkout-1001"),
                 REQUEST_HASH,
                 IdempotencyStatus.PROCESSING,
                 null,
@@ -140,8 +140,8 @@ class IdempotencyRecordTest {
     void shouldRejectInvalidHashAndTimestampOrder() {
         assertThatThrownBy(() -> IdempotencyRecord.start(
                 41L,
-                "PAYMENT_INTENT_CREATE",
-                "checkout-1001",
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
+                IdempotencyKey.of("checkout-1001"),
                 "ABC",
                 CREATED_AT,
                 INITIAL_EXPIRY
@@ -150,8 +150,8 @@ class IdempotencyRecordTest {
 
         assertThatThrownBy(() -> IdempotencyRecord.start(
                 41L,
-                "PAYMENT_INTENT_CREATE",
-                "checkout-1001",
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
+                IdempotencyKey.of("checkout-1001"),
                 REQUEST_HASH,
                 CREATED_AT,
                 CREATED_AT.minusNanos(1)
@@ -162,8 +162,8 @@ class IdempotencyRecordTest {
     private static IdempotencyRecord newProcessingRecord() {
         return IdempotencyRecord.start(
                 41L,
-                "PAYMENT_INTENT_CREATE",
-                "checkout-1001",
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
+                IdempotencyKey.of("checkout-1001"),
                 REQUEST_HASH,
                 CREATED_AT,
                 INITIAL_EXPIRY

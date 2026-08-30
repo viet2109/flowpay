@@ -1,5 +1,6 @@
 package com.flowpay.backend.idempotency.infrastructure.persistence;
 
+import com.flowpay.backend.idempotency.domain.IdempotencyOperation;
 import com.flowpay.backend.idempotency.domain.IdempotencyStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -34,8 +35,9 @@ class IdempotencyRecordEntity {
     @Column(name = "merchant_id", nullable = false)
     private long merchantId;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String operation;
+    private IdempotencyOperation operation;
 
     @Column(name = "idempotency_key", nullable = false, length = 255)
     private String idempotencyKey;
