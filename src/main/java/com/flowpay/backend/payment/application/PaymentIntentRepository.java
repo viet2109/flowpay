@@ -11,5 +11,7 @@ public interface PaymentIntentRepository {
 
     Optional<PaymentIntent> findByPublicIdAndMerchantId(String publicId, long merchantId);
 
+    PaymentIntentPage search(PaymentIntentSearchCriteria criteria);
+
     List<PaymentIntent> searchByMerchant(long merchantId);
 }

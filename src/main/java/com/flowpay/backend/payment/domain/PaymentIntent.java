@@ -249,6 +249,13 @@ public final class PaymentIntent {
         return refundReservedAmount;
     }
 
+    public Money refundableAmount() {
+        if (status != PaymentStatus.SUCCEEDED && status != PaymentStatus.PARTIALLY_REFUNDED) {
+            return new Money(0L, amount.currency());
+        }
+        return amount.subtract(refundedAmount).subtract(refundReservedAmount);
+    }
+
     public long version() {
         return version;
     }

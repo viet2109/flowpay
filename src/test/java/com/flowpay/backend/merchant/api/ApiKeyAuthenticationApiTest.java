@@ -63,19 +63,22 @@ class ApiKeyAuthenticationApiTest {
     @BeforeEach
     void cleanData() {
         jdbcTemplate.update("""
-                TRUNCATE TABLE refresh_tokens, merchant_api_keys, merchant_members,
-                    merchants, users RESTART IDENTITY CASCADE
+                TRUNCATE TABLE payment_transactions, payment_intents, refresh_tokens,
+                    merchant_api_keys, merchant_members, merchants, users
+                    RESTART IDENTITY CASCADE
                 """);
     }
 
     @Test
-    void shouldAuthenticateValidKeyWithoutCreatingAFakePaymentEndpoint() throws Exception {
+    void shouldAuthenticateValidKeyForPaymentEndpoint() throws Exception {
         StoredKey stored = createStoredKey();
 
         mockMvc.perform(get(PAYMENT_PATH).header(HttpHeaders.AUTHORIZATION, bearer(stored.rawKey())))
-                .andExpect(status().isNotFound())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.data.length()").value(0))
+                .andExpect(jsonPath("$.meta.page").value(0))
+                .andExpect(jsonPath("$.meta.size").value(20));
 
         assertThat(apiKeyRepository.findByPublicId(stored.apiKeyPublicId()).orElseThrow().lastUsedAt())
                 .isNotNull();

@@ -10,6 +10,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.net.URI;
@@ -66,6 +67,22 @@ public class GlobalExceptionHandler {
                 ErrorCode.MALFORMED_REQUEST,
                 "The request body could not be parsed.",
                 requestUri(request)
+        );
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ProblemDetail handleTypeMismatch(
+            MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request
+    ) {
+        return problems.validation(
+                "Request validation failed.",
+                requestUri(request),
+                List.of(new FieldViolation(
+                        exception.getName(),
+                        "TYPE_MISMATCH",
+                        "The value has an invalid format."
+                ))
         );
     }
 

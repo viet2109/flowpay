@@ -33,6 +33,7 @@ class PaymentIntentTest {
         assertThat(payment.status()).isEqualTo(PaymentStatus.CREATED);
         assertThat(payment.refundedAmount()).isEqualTo(Money.of(0L, "VND"));
         assertThat(payment.refundReservedAmount()).isEqualTo(Money.of(0L, "VND"));
+        assertThat(payment.refundableAmount()).isEqualTo(Money.of(0L, "VND"));
         assertThat(payment.version()).isZero();
         assertThat(payment.createdAt()).isEqualTo(CREATED_AT);
         assertThat(payment.updatedAt()).isEqualTo(CREATED_AT);
@@ -72,6 +73,7 @@ class PaymentIntentTest {
         payment.markSucceeded(changedAt);
 
         assertThat(payment.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(payment.refundableAmount()).isEqualTo(AMOUNT);
         assertThat(payment.updatedAt()).isEqualTo(changedAt);
     }
 
@@ -217,6 +219,7 @@ class PaymentIntentTest {
         assertThat(payment.status()).isEqualTo(PaymentStatus.PARTIALLY_REFUNDED);
         assertThat(payment.refundedAmount()).isEqualTo(Money.of(100_000L, "VND"));
         assertThat(payment.refundReservedAmount()).isEqualTo(Money.of(50_000L, "VND"));
+        assertThat(payment.refundableAmount()).isEqualTo(Money.of(350_000L, "VND"));
         assertThat(payment.version()).isEqualTo(7L);
     }
 

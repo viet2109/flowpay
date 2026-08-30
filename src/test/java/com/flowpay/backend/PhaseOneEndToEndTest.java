@@ -287,8 +287,10 @@ class PhaseOneEndToEndTest {
 
     private void assertIntegrationAuthenticationSucceeds(String rawApiKey) throws Exception {
         mockMvc.perform(get(PAYMENT_PATH).header(HttpHeaders.AUTHORIZATION, bearer(rawApiKey)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0))
+                .andExpect(jsonPath("$.meta.page").value(0))
+                .andExpect(jsonPath("$.meta.size").value(20));
     }
 
     private void assertRegistrationPersistence(Registration registration) {
