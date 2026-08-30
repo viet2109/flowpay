@@ -1,7 +1,9 @@
 package com.flowpay.backend.identity.api;
 
+import com.flowpay.backend.common.api.ApiResponse;
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
+import com.flowpay.backend.common.security.DashboardPrincipal;
 import com.flowpay.backend.identity.application.AuthSessionUseCase;
 import com.flowpay.backend.identity.application.LoginCommand;
 import com.flowpay.backend.identity.application.LoginResult;
@@ -16,18 +18,26 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -39,6 +49,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -49,6 +60,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Testcontainers(disabledWithoutDocker = true)
+@Import(AuthSessionApiTest.MerchantSecurityProbe.class)
 class AuthSessionApiTest {
 
     private static final String EMAIL = "viet@example.com";
@@ -70,6 +82,9 @@ class AuthSessionApiTest {
 
     @Autowired
     private JwtDecoder jwtDecoder;
+
+    @Autowired
+    private JwtEncoder jwtEncoder;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -269,6 +284,73 @@ class AuthSessionApiTest {
         )).isEqualTo(1);
     }
 
+    @Test
+    void shouldReturnAuthenticationProblemForProtectedEndpointWithoutToken() throws Exception {
+        mockMvc.perform(get("/api/v1/merchant/security-probe")
+                        .header("X-Request-Id", "req_missing_jwt"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"))
+                .andExpect(jsonPath("$.type").value("https://flowpay.dev/problems/authentication-required"))
+                .andExpect(jsonPath("$.title").value("Authentication required"))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.instance").value("/api/v1/merchant/security-probe"))
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"))
+                .andExpect(jsonPath("$.requestId").value("req_missing_jwt"));
+    }
+
+    @Test
+    void shouldExposeDashboardPrincipalForValidAccessToken() throws Exception {
+        RegistrationResult registration = register();
+        MvcResult login = login(PASSWORD).andExpect(status().isOk()).andReturn();
+
+        mockMvc.perform(get("/api/v1/merchant/security-probe")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + extractAccessToken(login)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.userPublicId").value(registration.user().publicId()))
+                .andExpect(jsonPath("$.data.merchantPublicId").value(registration.merchant().publicId()))
+                .andExpect(jsonPath("$.data.role").value("OWNER"));
+    }
+
+    @Test
+    void shouldRejectMalformedAndExpiredAccessTokensWithProblemDetails() throws Exception {
+        mockMvc.perform(get("/api/v1/merchant/security-probe")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer malformed-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+
+        RegistrationResult registration = register();
+        mockMvc.perform(get("/api/v1/merchant/security-probe")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + expiredAccessToken(registration)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+
+        mockMvc.perform(get("/api/v1/merchant/security-probe")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessTokenWithoutMerchantClaim(registration)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test
+    void shouldReturnForbiddenProblemForAuthenticatedDeniedRequest() throws Exception {
+        register();
+        MvcResult login = login(PASSWORD).andExpect(status().isOk()).andReturn();
+
+        mockMvc.perform(get("/api/v1/not-allowed")
+                        .header("X-Request-Id", "req_forbidden")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + extractAccessToken(login)))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("https://flowpay.dev/problems/access-denied"))
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+                .andExpect(jsonPath("$.requestId").value("req_forbidden"));
+    }
+
     private RefreshAttempt refreshConcurrently(
             String rawToken,
             CountDownLatch ready,
@@ -317,6 +399,36 @@ class AuthSessionApiTest {
         return matcher.group(1);
     }
 
+    private static String extractAccessToken(MvcResult result) throws Exception {
+        return result.getResponse().getContentAsString()
+                .replaceAll(".*\\\"accessToken\\\":\\\"([^\\\"]+)\\\".*", "$1");
+    }
+
+    private String expiredAccessToken(RegistrationResult registration) {
+        Instant now = Instant.now();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer("https://flowpay.dev")
+                .issuedAt(now.minusSeconds(120))
+                .expiresAt(now.minusSeconds(60))
+                .subject(registration.user().publicId())
+                .claim("merchant", registration.merchant().publicId())
+                .claim("role", "OWNER")
+                .build();
+        return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+    }
+
+    private String accessTokenWithoutMerchantClaim(RegistrationResult registration) {
+        Instant now = Instant.now();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer("https://flowpay.dev")
+                .issuedAt(now)
+                .expiresAt(now.plusSeconds(900))
+                .subject(registration.user().publicId())
+                .claim("role", "OWNER")
+                .build();
+        return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+    }
+
     private void setUserStatus(String publicId, String status) {
         jdbcTemplate.update("UPDATE users SET status = ? WHERE public_id = ?", status, publicId);
     }
@@ -326,5 +438,16 @@ class AuthSessionApiTest {
     }
 
     private record RefreshAttempt(boolean success, ErrorCode errorCode) {
+    }
+
+    @RestController
+    static class MerchantSecurityProbe {
+
+        @GetMapping("/api/v1/merchant/security-probe")
+        ApiResponse<DashboardPrincipal> currentPrincipal(
+                @AuthenticationPrincipal DashboardPrincipal principal
+        ) {
+            return ApiResponse.of(principal);
+        }
     }
 }

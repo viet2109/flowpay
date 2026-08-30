@@ -3,6 +3,8 @@ package com.flowpay.backend.common.error;
 public enum ErrorCode {
     VALIDATION_ERROR("Validation failed", "validation-error"),
     MALFORMED_REQUEST("Malformed request", "malformed-request"),
+    AUTHENTICATION_REQUIRED("Authentication required", "authentication-required"),
+    ACCESS_DENIED("Access denied", "access-denied"),
     USER_EMAIL_ALREADY_EXISTS("User email already exists", "user-email-already-exists"),
     INVALID_CREDENTIALS("Invalid credentials", "invalid-credentials"),
     USER_LOCKED("User locked", "user-locked"),

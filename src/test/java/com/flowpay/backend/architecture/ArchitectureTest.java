@@ -69,6 +69,14 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule applicationCodeMustNotAccessSecurityContextDirectly = noClasses()
+            .that().resideInAPackage("..application..")
+            .should().dependOnClassesThat().haveFullyQualifiedName(
+                    "org.springframework.security.core.context.SecurityContextHolder"
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule topLevelPackagesMustBeFreeOfCycles = slices()
             .matching("com.flowpay.backend.(*)..")
             .should().beFreeOfCycles()
