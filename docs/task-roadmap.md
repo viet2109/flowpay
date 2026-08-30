@@ -167,10 +167,10 @@ Status: `IN PROGRESS`.
 Completed tasks:
 
 - P3-T01 Phase 2 exit gate and Idempotency architecture freeze.
+- P3-T02 Idempotency database migration.
 
 Remaining tasks:
 
-- P3-T02 Idempotency database migration.
 - P3-T03 Idempotency domain and persistence.
 - P3-T04 Operation scope, key validation, and request fingerprinting.
 - P3-T05 Concurrent Idempotency acquisition engine.

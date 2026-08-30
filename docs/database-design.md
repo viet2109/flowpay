@@ -291,10 +291,10 @@ when provider semantics guarantee uniqueness.
 
 ```text
 id                     BIGINT PK
-merchant_id            BIGINT NOT NULL
+merchant_id            BIGINT NOT NULL FK -> merchants.id
 operation              VARCHAR NOT NULL
-idempotency_key        VARCHAR NOT NULL
-request_hash           VARCHAR NOT NULL
+idempotency_key        VARCHAR(255) NOT NULL
+request_hash           CHAR(64) NOT NULL
 status                 VARCHAR NOT NULL
 resource_type          VARCHAR NULL
 resource_public_id     VARCHAR NULL
@@ -311,6 +311,17 @@ Status:
 - `COMPLETED`
 - `FAILED`
 
+Phase 3 actively uses only `PROCESSING` and `COMPLETED`. `FAILED` is reserved for
+future explicitly approved recovery semantics and must not be produced by Phase
+3 application code.
+
+Phase 3 operations:
+
+- `PAYMENT_INTENT_CREATE`
+- `PAYMENT_INTENT_CONFIRM`
+
+`request_hash` stores exactly 64 lowercase hexadecimal SHA-256 characters.
+
 Core uniqueness:
 
 ```sql
@@ -318,6 +329,16 @@ UNIQUE(merchant_id, operation, idempotency_key)
 ```
 
 This database constraint is the final protection against concurrent duplicates.
+
+Cleanup index:
+
+```sql
+INDEX(status, expires_at)
+```
+
+The merchant foreign key does not use `ON DELETE CASCADE`. Expired cleanup is
+limited to bounded batches of `COMPLETED` records; `PROCESSING` records are not
+deleted by retention cleanup.
 
 ## 5. Refunds
 
