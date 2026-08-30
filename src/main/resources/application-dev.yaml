@@ -20,3 +20,5 @@ management:
 flowpay:
   security:
     prometheus-public: true
+    jwt:
+      generate-ephemeral-key-pair: true
