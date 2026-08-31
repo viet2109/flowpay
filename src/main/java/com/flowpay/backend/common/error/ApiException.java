@@ -4,7 +4,7 @@ import org.springframework.http.HttpStatus;
 
 import java.util.Objects;
 
-public final class ApiException extends RuntimeException {
+public class ApiException extends RuntimeException {
 
     private final HttpStatus status;
     private final ErrorCode code;

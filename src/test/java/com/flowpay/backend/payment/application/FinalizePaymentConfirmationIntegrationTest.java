@@ -92,7 +92,11 @@ class FinalizePaymentConfirmationIntegrationTest extends PostgresIntegrationTest
                 payment.publicId(),
                 expectedPaymentStatus,
                 transaction.publicId(),
-                expectedTransactionStatus
+                expectedTransactionStatus,
+                transaction.provider(),
+                transaction.providerTransactionId(),
+                transaction.failureCode(),
+                transaction.failureMessage()
         ));
     }
 

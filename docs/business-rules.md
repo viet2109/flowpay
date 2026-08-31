@@ -311,6 +311,28 @@ Reusing the same scoped idempotency key with a different request fingerprint ret
 
 Correctness must rely on a database uniqueness constraint, not a vulnerable `exists -> insert` check.
 
+### BR-IDEM-006 — In-progress duplicate
+
+A concurrent equivalent request that finds the scoped key still processing must
+not execute the financial operation again and returns:
+
+`409 IDEMPOTENCY_REQUEST_IN_PROGRESS`
+
+### BR-IDEM-007 — Completed response replay
+
+A completed replay returns the stored original logical HTTP status and public
+response body. Create-payment replay also preserves `Location`; all completed
+replays return `Idempotency-Replayed: true`.
+
+Replay must not rebuild its semantics from current aggregate state or invoke the
+payment provider again.
+
+### BR-IDEM-008 — Retention and cleanup
+
+The default replay retention is 24 hours and is configurable. Cleanup deletes
+only expired `COMPLETED` records in bounded batches; it must not blindly delete
+`PROCESSING` records.
+
 ## 8. Refund
 
 ### BR-REF-001 — Refundable payment state

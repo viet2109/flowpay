@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("test")
-class FlowPayApplicationIT extends PostgresIntegrationTest {
+class FlowPayApplicationIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     JdbcTemplate jdbcTemplate;
@@ -19,12 +19,12 @@ class FlowPayApplicationIT extends PostgresIntegrationTest {
     @Test
     void shouldStartWithRealPostgresAndApplyFlywayMigrations() {
         Integer databaseResult = jdbcTemplate.queryForObject("select 1", Integer.class);
-        Integer migrationCount = jdbcTemplate.queryForObject(
-                "select count(*) from flyway_schema_history where version = '001' and success = true",
+        Integer latestMigrationCount = jdbcTemplate.queryForObject(
+                "select count(*) from flyway_schema_history where version = '006' and success = true",
                 Integer.class
         );
 
         assertThat(databaseResult).isEqualTo(1);
-        assertThat(migrationCount).isEqualTo(1);
+        assertThat(latestMigrationCount).isEqualTo(1);
     }
 }

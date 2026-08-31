@@ -17,6 +17,12 @@ public enum ErrorCode {
     API_KEY_NOT_FOUND("API key not found", "api-key-not-found"),
     API_KEY_REVOKED("API key revoked", "api-key-revoked"),
     INVALID_API_KEY("Invalid API key", "invalid-api-key"),
+    IDEMPOTENCY_KEY_REQUIRED("Idempotency key required", "idempotency-key-required"),
+    IDEMPOTENCY_KEY_REUSED("Idempotency key reused", "idempotency-key-reused"),
+    IDEMPOTENCY_REQUEST_IN_PROGRESS(
+            "Idempotency request in progress",
+            "idempotency-request-in-progress"
+    ),
     PAYMENT_NOT_FOUND("Payment not found", "payment-not-found"),
     PAYMENT_INVALID_STATE("Payment invalid state", "payment-invalid-state"),
     RESOURCE_NOT_FOUND("Resource not found", "resource-not-found"),

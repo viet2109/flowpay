@@ -416,6 +416,9 @@ Maximum length:
 
 `255`
 
+The header is required and must not be blank. Keys are case-sensitive and are
+scoped without trimming or case normalization.
+
 Required for:
 
 - create PaymentIntent.
@@ -426,7 +429,8 @@ Scope:
 
 `merchant + operation + key`
 
-Equivalent replay returns the previous logical result and may include:
+Every completed equivalent replay returns the stored previous logical result
+and includes:
 
 `Idempotency-Replayed: true`
 
@@ -456,9 +460,8 @@ Merchant API-key authentication required.
 
 Phase availability:
 
-- Phase 2 exposes only the retrieve, list, and transaction-attempt endpoints.
-- Create and confirm below are the target contracts for Phase 3 and remain
-  non-public until idempotency is implemented and verified.
+- Phase 3 exposes create and confirm with mandatory idempotency protection,
+  along with the Phase 2 retrieve, list, and transaction-attempt endpoints.
 
 ### Create
 
@@ -504,6 +507,10 @@ Location: /api/v1/payment-intents/pi_01K...
 }
 ```
 
+A completed Create replay returns the same `201` status, public response body,
+and `Location` value as the original response, adds
+`Idempotency-Replayed: true`, and creates no second PaymentIntent.
+
 ### Confirm
 
 ```http
@@ -539,6 +546,36 @@ Provider unknown/timeout:
 Payment status `PROCESSING`.
 
 Latest transaction status `UNKNOWN`.
+
+The original result and every completed replay use the same logical response
+snapshot. The standard `data` envelope contains:
+
+```json
+{
+  "data": {
+    "paymentId": "pi_01K...",
+    "paymentStatus": "SUCCEEDED",
+    "transactionId": "ptxn_01K...",
+    "transactionStatus": "SUCCEEDED",
+    "provider": "SIMULATOR",
+    "providerTransactionId": "sim_01K...",
+    "failureCode": null,
+    "failureMessage": null
+  }
+}
+```
+
+The persisted snapshot contains only these public normalized fields. It does not
+contain internal IDs, entities, or raw provider payloads. A replay uses the
+stored snapshot and original HTTP status without rebuilding either from current
+Payment state.
+
+A completed replay returns the exact stored logical response with the original
+HTTP status and:
+
+```http
+Idempotency-Replayed: true
+```
 
 Invalid payment state:
 

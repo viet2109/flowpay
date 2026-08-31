@@ -51,7 +51,11 @@ public class FinalizePaymentConfirmationService {
                     savedPayment.publicId(),
                     savedPayment.status(),
                     savedTransaction.publicId(),
-                    savedTransaction.status()
+                    savedTransaction.status(),
+                    savedTransaction.provider(),
+                    savedTransaction.providerTransactionId(),
+                    savedTransaction.failureCode(),
+                    savedTransaction.failureMessage()
             );
         } catch (OptimisticLockingFailureException | DataIntegrityViolationException exception) {
             throw invalidState();

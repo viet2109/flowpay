@@ -163,6 +163,7 @@ class ConfirmPaymentServiceTest {
     }
 
     private static FinalizedPaymentConfirmation finalized(ProviderOutcome outcome) {
+        PaymentProviderResult providerResult = providerResult(outcome);
         PaymentStatus paymentStatus = switch (outcome) {
             case SUCCESS -> PaymentStatus.SUCCEEDED;
             case DECLINED, TECHNICAL_FAILURE -> PaymentStatus.FAILED;
@@ -177,7 +178,11 @@ class ConfirmPaymentServiceTest {
                 "pi_confirm",
                 paymentStatus,
                 "ptxn_confirm",
-                transactionStatus
+                transactionStatus,
+                providerResult.provider(),
+                providerResult.providerTransactionId(),
+                providerResult.failureCode(),
+                providerResult.failureMessage()
         );
     }
 }

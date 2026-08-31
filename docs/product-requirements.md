@@ -44,7 +44,7 @@ The person paying the merchant. The MVP does not require a FlowPay customer acco
 
 ### Payment Provider
 
-An external payment processor. The MVP initially uses `FLOWPAY_SIMULATOR`.
+An external payment processor. The MVP initially uses `SIMULATOR`.
 
 ### FlowPay Admin
 
@@ -76,13 +76,15 @@ Email verification, password-reset email, Google OAuth, and member invitations a
 
 ### Idempotency
 
-Financial commands support `Idempotency-Key`.
+Create and confirm Payment commands require `Idempotency-Key`.
 
 The system guarantees:
 
 - Same merchant + operation + key + equivalent request returns the original logical result.
 - Reusing a key with a different request is rejected.
 - Database uniqueness protects against concurrent duplicate requests.
+- A completed replay preserves the original public response status and body.
+- Concurrent confirmation never invokes the provider more than once for the same scoped request.
 
 ### Refund
 
@@ -144,6 +146,8 @@ Status: `DONE/FROZEN` as of 2026-08-30.
 Payment intent, payment transaction, provider port/simulator, confirmation flow, unknown outcomes, and payment query APIs.
 
 ### Phase 3 — Idempotency
+
+Status: `DONE/FROZEN` as of 2026-08-31.
 
 Idempotency records and replay/conflict semantics for financial commands.
 

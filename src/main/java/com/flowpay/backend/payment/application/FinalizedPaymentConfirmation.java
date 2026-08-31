@@ -7,6 +7,10 @@ public record FinalizedPaymentConfirmation(
         String paymentPublicId,
         PaymentStatus paymentStatus,
         String transactionPublicId,
-        PaymentTransactionStatus transactionStatus
+        PaymentTransactionStatus transactionStatus,
+        String provider,
+        String providerTransactionId,
+        String failureCode,
+        String failureMessage
 ) {
 }

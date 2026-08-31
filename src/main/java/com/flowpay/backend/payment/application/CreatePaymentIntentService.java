@@ -21,6 +21,18 @@ public class CreatePaymentIntentService {
     @Transactional
     public CreatePaymentIntentResult create(CreatePaymentIntentCommand command) {
         ActiveMerchantSnapshot merchant = merchantResolver.resolve(command.merchantContext());
+        return createForResolvedMerchant(command, merchant);
+    }
+
+    CreatePaymentIntentResult createForResolvedMerchant(
+            CreatePaymentIntentCommand command,
+            ActiveMerchantSnapshot merchant
+    ) {
+        if (!merchant.publicId().equals(command.merchantContext().merchantPublicId())) {
+            throw new IllegalArgumentException(
+                    "resolved merchant must match the authenticated merchant"
+            );
+        }
         Money amount = requirePositiveAmount(command.amountMinor(), command.currency());
         PaymentIntent paymentIntent = PaymentIntent.create(
                 publicIdGenerator.nextId(),
@@ -50,6 +62,7 @@ public class CreatePaymentIntentService {
                 paymentIntent.status(),
                 paymentIntent.refundedAmount().amountMinor(),
                 paymentIntent.refundReservedAmount().amountMinor(),
+                paymentIntent.refundableAmount().amountMinor(),
                 paymentIntent.description(),
                 paymentIntent.createdAt()
         );

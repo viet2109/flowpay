@@ -91,7 +91,11 @@ class FinalizePaymentConfirmationServiceTest {
                 "pi_finalize",
                 expectedPaymentStatus,
                 "ptxn_finalize",
-                expectedTransactionStatus
+                expectedTransactionStatus,
+                providerResult.provider(),
+                providerResult.providerTransactionId(),
+                providerResult.failureCode(),
+                providerResult.failureMessage()
         ));
     }
 

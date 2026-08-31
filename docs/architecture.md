@@ -50,6 +50,7 @@ com.flowpay
 ├── identity
 ├── merchant
 ├── payment
+├── idempotency
 ├── refund
 ├── ledger
 └── webhook
@@ -75,7 +76,6 @@ Contains cross-cutting technical capabilities:
 - request correlation/filtering.
 - messaging/outbox relay infrastructure.
 - observability.
-- idempotency infrastructure when shared.
 - configuration.
 
 Business rules do not belong here.
@@ -150,6 +150,88 @@ COMMIT
 At the Phase 2 freeze, TX 2 contains only PaymentTransaction and PaymentIntent
 finalization. Transactional outbox persistence and event publication remain
 explicitly deferred to Phase 6.
+
+### Idempotent payment commands
+
+Idempotency is a dedicated business module. It owns its domain model,
+repository port, persistence adapter, acquisition decisions, response snapshots,
+retention, and cleanup. It does not belong in `common`, top-level
+`infrastructure`, or Payment infrastructure.
+
+Payment may call only Idempotency public/application contracts. Idempotency must
+not access Payment entities, repositories, or infrastructure. The database may
+still enforce `idempotency_records.merchant_id -> merchants.id` because the
+modular monolith shares one PostgreSQL database.
+
+Create PaymentIntent has no external call, so its idempotent orchestration is
+atomic:
+
+```text
+ONE DATABASE TX
+- acquire PROCESSING Idempotency record
+- create PaymentIntent
+- persist the original public response snapshot
+- complete Idempotency record
+COMMIT
+```
+
+Confirm Payment preserves the Phase 2 provider boundary:
+
+```text
+Payment ownership/state preflight (no Idempotency row yet)
+
+Idempotency reservation TX
+- acquire PROCESSING record
+COMMIT
+
+Payment TX 1
+- PaymentIntent -> PROCESSING
+- create PaymentTransaction
+COMMIT
+
+NO DATABASE TX
+- call provider
+
+Payment TX 2
+- finalize PaymentTransaction
+- finalize PaymentIntent
+COMMIT
+
+Idempotency completion TX
+- persist the original public response snapshot
+- mark COMPLETED
+COMMIT
+```
+
+The Payment preflight prevents cross-merchant or already-invalid requests from
+creating an Idempotency reservation. Payment TX 1 must still revalidate ownership
+and state to protect against races.
+
+A PROCESSING Confirm reservation may be removed only when the execution owner
+can prove that Payment TX 1 failed and the provider was never invoked. From the
+point provider invocation begins, an unexpected failure is uncertain: retain the
+PROCESSING record and forbid automatic retry or release.
+
+After Payment TX 2, the completion transaction stores a stable public snapshot
+containing payment and transaction public IDs/statuses plus normalized provider,
+provider transaction ID, failure code, and failure message. `SUCCEEDED`,
+`DECLINED`, and `TECHNICAL_FAILURE` preserve HTTP status 200; `UNKNOWN` preserves
+202. Replay decodes this stored snapshot and never reconstructs it from current
+Payment state or a raw provider response.
+
+The public create and confirm adapters both require merchant API-key
+authentication and an `Idempotency-Key`. Confirm is exposed only through
+`POST /api/v1/payment-intents/{paymentId}/confirm`; its controller maps the
+authenticated principal, path ID, and parsed key into the idempotent application
+command and never accesses Payment or Idempotency repositories directly.
+
+Idempotency retention defaults to 24 hours and is configurable. A new
+PROCESSING record expires relative to creation time; successful completion
+resets expiration relative to completion time so the full replay window is
+preserved. Cleanup runs on a configurable schedule and deletes only expired
+COMPLETED records through bounded PostgreSQL batches. Each run also has a
+configured batch limit, and PROCESSING records remain untouched even when their
+provisional expiration is in the past.
 
 ## 6. Identity and dashboard authentication
 
@@ -435,6 +517,11 @@ Use real PostgreSQL through Testcontainers.
 
 Do not replace PostgreSQL with H2.
 
+Phase 3 has a consolidated Spring Boot and MockMvc end-to-end suite backed by
+PostgreSQL Testcontainers and Flyway. It uses real threads and latches to verify
+Create/Confirm concurrency, merchant and operation scopes, stable replay
+snapshots, and exactly-once provider execution across all normalized outcomes.
+
 RabbitMQ integration tests use RabbitMQ Testcontainers when messaging is implemented.
 
 ### Architecture tests
@@ -453,6 +540,13 @@ Every HTTP request receives/propagates `X-Request-Id`.
 Request ID is placed in MDC and returned in the response.
 
 Do not log secrets.
+
+Known authentication and Idempotency failures must not log supplied credentials,
+Idempotency keys, request hashes, or internal identifiers. The unexpected HTTP
+error fallback emits only a generic failure marker; it must not log exception
+messages or stack traces that can contain SQL constraint names, persistence
+details, or request values. Correlation remains available through the request ID
+already carried in MDC.
 
 Actuator and Micrometer provide health/metrics foundation.
 

@@ -5,6 +5,10 @@ target/
 !**/src/test/**/target/
 *.log
 
+# Local planning/reference documents
+docs/README.md
+docs/phase-*.md
+
 ### STS ###
 .apt_generated
 .classpath

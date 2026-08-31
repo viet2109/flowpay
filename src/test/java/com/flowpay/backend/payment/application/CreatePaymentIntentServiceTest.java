@@ -93,6 +93,7 @@ class CreatePaymentIntentServiceTest {
                 PaymentStatus.CREATED,
                 0L,
                 0L,
+                0L,
                 "Payment for ORDER-1001",
                 NOW
         ));

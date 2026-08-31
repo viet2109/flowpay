@@ -9,6 +9,7 @@ Main modules:
 - `identity`
 - `merchant`
 - `payment`
+- `idempotency`
 - `refund`
 - `ledger`
 - `webhook`
@@ -225,7 +226,51 @@ Status:
 
 PaymentTransaction is not a child collection inside PaymentIntent.
 
-## 5. Refund module
+## 5. Idempotency module
+
+### IdempotencyRecord — Aggregate Root
+
+Represents ownership and the replay snapshot for one scoped financial command.
+
+Core fields:
+
+- internal ID
+- merchant internal ID
+- operation
+- case-sensitive idempotency key
+- semantic request hash
+- status
+- optional resource type and public ID pair
+- original HTTP status and public response payload
+- created, completed, and expiry timestamps
+
+Phase 3 operations:
+
+- `PAYMENT_INTENT_CREATE`
+- `PAYMENT_INTENT_CONFIRM`
+
+Active status lifecycle:
+
+```text
+PROCESSING -> COMPLETED
+```
+
+The persistence schema reserves `FAILED` for future explicitly approved
+recovery semantics, but the Phase 3 domain does not produce it.
+
+Key behavior:
+
+- start a new scoped execution
+- reserve an optional public resource identity
+- complete exactly once with the original response snapshot
+- reject completion that does not match the reserved resource
+- expose replay data only after completion
+
+The aggregate belongs to the Idempotency module. It references Merchant by
+internal ID and a business resource only by type and public ID; it has no
+cross-module JPA association and does not depend on Payment persistence.
+
+## 6. Refund module
 
 ### Refund — Aggregate Root
 
@@ -253,7 +298,7 @@ Refund does not mutate PaymentIntent directly.
 
 It calls a public Payment module API to reserve, complete, or release refund capacity.
 
-## 6. Ledger module
+## 7. Ledger module
 
 ### LedgerAccount — Aggregate Root
 
@@ -311,7 +356,7 @@ Direction:
 
 A LedgerEntry is not an aggregate root and is not independently mutated.
 
-## 7. Webhook module
+## 8. Webhook module
 
 ### WebhookEndpoint — Aggregate Root
 
@@ -377,7 +422,7 @@ Records one concrete delivery attempt.
 
 It is append-only diagnostic history.
 
-## 8. Cross-module relationships
+## 9. Cross-module relationships
 
 Conceptual relationships:
 
@@ -386,7 +431,8 @@ User
   |
   v
 MerchantMember ---> Merchant ---> ApiKey
-                        |
+                        | \
+                        |  +----> IdempotencyRecord
                         v
                   PaymentIntent
                     /       \
@@ -410,7 +456,7 @@ Rules:
 - Cross-module synchronous reads/commands use an explicit public application API.
 - Cross-module side effects preferably use integration events.
 
-## 9. Public module APIs
+## 10. Public module APIs
 
 Examples:
 
@@ -453,7 +499,14 @@ Owns refund-capacity mutations on PaymentIntent:
 - complete refund
 - release refund
 
-## 10. Value objects
+### Idempotency application contracts
+
+Used by Payment write orchestration to acquire a scoped execution, complete and
+replay a stored public response, or safely release a Confirm reservation before
+provider invocation. Decisions are explicit (`NEW`, `REPLAY`, `IN_PROGRESS`,
+`KEY_REUSED`) and do not expose Idempotency persistence entities.
+
+## 11. Value objects
 
 ### Money
 
@@ -471,7 +524,7 @@ Expected operations:
 
 Money-related business code should prefer this value object over passing unrelated primitive amount/currency values.
 
-## 11. Domain versus persistence
+## 12. Domain versus persistence
 
 Rich financial aggregates such as PaymentIntent and LedgerTransaction should remain independent of persistence concerns.
 

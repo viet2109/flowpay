@@ -162,17 +162,27 @@ required implementation order.
 
 ## Phase 3 — Idempotency
 
-Planned tasks:
+Status: `DONE/FROZEN`.
 
-- idempotency migration/domain.
-- request canonicalization/fingerprint.
-- create-payment integration.
-- confirm-payment integration.
-- replay behavior.
-- conflict behavior.
-- concurrent duplicate test.
-- retention/cleanup policy.
-- integration tests.
+Completed tasks:
+
+- P3-T01 Phase 2 exit gate and Idempotency architecture freeze.
+- P3-T02 Idempotency database migration.
+- P3-T03 Idempotency domain and persistence.
+- P3-T04 Operation scope, key validation, and request fingerprinting.
+- P3-T05 Concurrent Idempotency acquisition engine.
+- P3-T06 Atomic idempotent create-payment flow.
+- P3-T07 Public create-payment API and replay.
+- P3-T08 Confirm Idempotency reservation.
+- P3-T09 Confirm completion and response snapshot.
+- P3-T10 Public confirm-payment API.
+- P3-T11 Expiration and cleanup.
+- P3-T12 Architecture, security, and error-mapping tests.
+- P3-T13 End-to-end concurrency and replay tests.
+- P3-T14 Quality gate and documentation freeze.
+
+See `phase-3-idempotency.md` for frozen decisions, dependencies, acceptance
+criteria, and the mandatory implementation order.
 
 ## Phase 4 — Refund & Concurrency
 

@@ -16,6 +16,7 @@ class ArchitectureTest {
             "com.flowpay.backend.identity..",
             "com.flowpay.backend.merchant..",
             "com.flowpay.backend.payment..",
+            "com.flowpay.backend.idempotency..",
             "com.flowpay.backend.refund..",
             "com.flowpay.backend.ledger..",
             "com.flowpay.backend.webhook.."
@@ -25,6 +26,7 @@ class ArchitectureTest {
             "com.flowpay.backend.identity.infrastructure..",
             "com.flowpay.backend.merchant.infrastructure..",
             "com.flowpay.backend.payment.infrastructure..",
+            "com.flowpay.backend.idempotency.infrastructure..",
             "com.flowpay.backend.refund.infrastructure..",
             "com.flowpay.backend.ledger.infrastructure..",
             "com.flowpay.backend.webhook.infrastructure.."
@@ -78,6 +80,46 @@ class ArchitectureTest {
     static final ArchRule paymentMustNotDependOnMerchantInfrastructure = noClasses()
             .that().resideInAPackage("com.flowpay.backend.payment..")
             .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.merchant.infrastructure..")
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule idempotencyMustNotDependOnPaymentInfrastructure = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.idempotency..")
+            .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.payment.infrastructure..")
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule idempotencyMustNotDependOnPayment = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.idempotency..")
+            .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.payment..")
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule paymentCoreMustNotDependOnIdempotencyInfrastructure = noClasses()
+            .that().resideInAnyPackage(
+                    "com.flowpay.backend.payment.api..",
+                    "com.flowpay.backend.payment.application..",
+                    "com.flowpay.backend.payment.domain.."
+            )
+            .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.idempotency.infrastructure..")
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule idempotencyJpaEntitiesMustRemainPackagePrivate = classes()
+            .that().resideInAPackage(
+                    "com.flowpay.backend.idempotency.infrastructure.persistence.."
+            )
+            .and().haveSimpleNameEndingWith("Entity")
+            .should().notBePublic()
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule idempotencyJpaRepositoriesMustRemainPackagePrivate = classes()
+            .that().resideInAPackage(
+                    "com.flowpay.backend.idempotency.infrastructure.persistence.."
+            )
+            .and().haveSimpleNameEndingWith("JpaRepository")
+            .should().notBePublic()
             .allowEmptyShould(true);
 
     @ArchTest
