@@ -43,4 +43,22 @@ final class IdempotencyPersistenceMapper {
                 entity.expiresAt()
         );
     }
+
+    static IdempotencyRecord withInternalId(IdempotencyRecord record, long internalId) {
+        return IdempotencyRecord.rehydrate(
+                internalId,
+                record.merchantId(),
+                record.operation(),
+                record.idempotencyKey(),
+                record.requestHash(),
+                record.status(),
+                record.resourceType(),
+                record.resourcePublicId(),
+                record.httpStatus(),
+                record.responsePayload(),
+                record.createdAt(),
+                record.completedAt(),
+                record.expiresAt()
+        );
+    }
 }

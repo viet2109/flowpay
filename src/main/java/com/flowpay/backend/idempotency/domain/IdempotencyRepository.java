@@ -6,6 +6,8 @@ public interface IdempotencyRepository {
 
     IdempotencyRecord save(IdempotencyRecord record);
 
+    Optional<IdempotencyRecord> tryInsert(IdempotencyRecord record);
+
     Optional<IdempotencyRecord> findByScope(
             long merchantId,
             IdempotencyOperation operation,
