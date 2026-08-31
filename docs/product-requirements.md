@@ -153,6 +153,8 @@ Idempotency records and replay/conflict semantics for financial commands.
 
 ### Phase 4 — Refund & Concurrency
 
+Status: `IN PROGRESS` as of 2026-08-31.
+
 Full/partial refunds, refund reservation, concurrency protection, and integration tests.
 
 ### Phase 5 — Ledger
