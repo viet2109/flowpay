@@ -416,6 +416,9 @@ Maximum length:
 
 `255`
 
+The header is required and must not be blank. Keys are case-sensitive and are
+scoped without trimming or case normalization.
+
 Required for:
 
 - create PaymentIntent.
@@ -426,7 +429,8 @@ Scope:
 
 `merchant + operation + key`
 
-Equivalent replay returns the previous logical result and may include:
+Every completed equivalent replay returns the stored previous logical result
+and includes:
 
 `Idempotency-Replayed: true`
 
@@ -502,6 +506,10 @@ Location: /api/v1/payment-intents/pi_01K...
   }
 }
 ```
+
+A completed Create replay returns the same `201` status, public response body,
+and `Location` value as the original response, adds
+`Idempotency-Replayed: true`, and creates no second PaymentIntent.
 
 ### Confirm
 

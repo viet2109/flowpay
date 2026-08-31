@@ -162,7 +162,7 @@ required implementation order.
 
 ## Phase 3 — Idempotency
 
-Status: `IN PROGRESS`.
+Status: `DONE/FROZEN`.
 
 Completed tasks:
 
@@ -179,9 +179,6 @@ Completed tasks:
 - P3-T11 Expiration and cleanup.
 - P3-T12 Architecture, security, and error-mapping tests.
 - P3-T13 End-to-end concurrency and replay tests.
-
-Remaining tasks:
-
 - P3-T14 Quality gate and documentation freeze.
 
 See `phase-3-idempotency.md` for frozen decisions, dependencies, acceptance
