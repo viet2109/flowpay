@@ -25,6 +25,7 @@ public enum ErrorCode {
     ),
     PAYMENT_NOT_FOUND("Payment not found", "payment-not-found"),
     PAYMENT_INVALID_STATE("Payment invalid state", "payment-invalid-state"),
+    REFUND_NOT_FOUND("Refund not found", "refund-not-found"),
     REFUND_INVALID_PAYMENT_STATE(
             "Refund invalid payment state",
             "refund-invalid-payment-state"
