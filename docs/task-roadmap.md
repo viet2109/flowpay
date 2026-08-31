@@ -191,10 +191,10 @@ Status: `IN PROGRESS`.
 Completed tasks:
 
 - P4-T01 Phase 3 exit gate and Refund architecture freeze.
+- P4-T02 Refund database migration.
 
 Remaining tasks:
 
-- P4-T02 Refund database migration.
 - P4-T03 Refund aggregate and domain types.
 - P4-T04 Refund persistence adapters.
 - P4-T05 Payment refund-capacity public API.
