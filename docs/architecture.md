@@ -517,6 +517,11 @@ Use real PostgreSQL through Testcontainers.
 
 Do not replace PostgreSQL with H2.
 
+Phase 3 has a consolidated Spring Boot and MockMvc end-to-end suite backed by
+PostgreSQL Testcontainers and Flyway. It uses real threads and latches to verify
+Create/Confirm concurrency, merchant and operation scopes, stable replay
+snapshots, and exactly-once provider execution across all normalized outcomes.
+
 RabbitMQ integration tests use RabbitMQ Testcontainers when messaging is implemented.
 
 ### Architecture tests
