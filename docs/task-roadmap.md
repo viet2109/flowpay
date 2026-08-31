@@ -197,10 +197,10 @@ Completed tasks:
 - P4-T05 Payment refund-capacity public API.
 - P4-T06 Refund provider port and simulator.
 - P4-T07 Refund Idempotency operation and fingerprint.
+- P4-T08 Prepare Refund transaction.
 
 Remaining tasks:
 
-- P4-T08 Prepare Refund transaction.
 - P4-T09 Finalize Refund transaction.
 - P4-T10 Idempotent Refund orchestration.
 - P4-T11 Public create-Refund API.
