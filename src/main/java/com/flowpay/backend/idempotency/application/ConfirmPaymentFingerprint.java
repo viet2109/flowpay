@@ -5,7 +5,7 @@ import java.util.Objects;
 public record ConfirmPaymentFingerprint(
         int version,
         String paymentPublicId
-) {
+) implements RequestFingerprintInput {
 
     public static final int CURRENT_VERSION = 1;
 
@@ -24,5 +24,11 @@ public record ConfirmPaymentFingerprint(
 
     public static ConfirmPaymentFingerprint version1(String paymentPublicId) {
         return new ConfirmPaymentFingerprint(CURRENT_VERSION, paymentPublicId);
+    }
+
+    @Override
+    public void appendTo(RequestFingerprintCanonicalizer canonicalizer) {
+        canonicalizer.appendNumber("version", version);
+        canonicalizer.appendText("paymentPublicId", paymentPublicId);
     }
 }

@@ -144,6 +144,19 @@ class RequestFingerprintServiceTest {
     }
 
     @Test
+    void shouldPreserveFrozenPaymentFingerprintEncoding() {
+        assertThat(service.fingerprint(CreatePaymentFingerprint.version1(
+                50_000L,
+                "USD",
+                "ORDER-1001",
+                "Checkout payment"
+        ))).isEqualTo("f74e570217e5820135ff969edb51c37a2b6776ccdf01b2d7e1b2dfa1d94dc52d");
+        assertThat(service.fingerprint(
+                ConfirmPaymentFingerprint.version1("pi_1001")
+        )).isEqualTo("67b4ce45a3cc0058244a7e8638f00ea6cf110cd2a5ccdd24f0e4fc1cd4352157");
+    }
+
+    @Test
     void shouldRejectUnsupportedFingerprintVersionsAndInvalidSemanticInputs() {
         assertThatThrownBy(() -> new CreatePaymentFingerprint(
                 2,

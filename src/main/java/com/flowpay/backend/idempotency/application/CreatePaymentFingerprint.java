@@ -10,7 +10,7 @@ public record CreatePaymentFingerprint(
         String currency,
         String orderId,
         String description
-) {
+) implements RequestFingerprintInput {
 
     public static final int CURRENT_VERSION = 1;
 
@@ -41,6 +41,15 @@ public record CreatePaymentFingerprint(
                 orderId,
                 description
         );
+    }
+
+    @Override
+    public void appendTo(RequestFingerprintCanonicalizer canonicalizer) {
+        canonicalizer.appendNumber("version", version);
+        canonicalizer.appendNumber("amountMinor", amountMinor);
+        canonicalizer.appendText("currency", currency);
+        canonicalizer.appendText("orderId", orderId);
+        canonicalizer.appendText("description", description);
     }
 
     private static String normalizeCurrency(String currency) {
