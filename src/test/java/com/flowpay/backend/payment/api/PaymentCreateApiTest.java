@@ -88,7 +88,7 @@ class PaymentCreateApiTest extends PostgresIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(header().string(HttpHeaders.LOCATION, containsString(PATH + "/pi_")))
-                .andExpect(header().doesNotExist(PaymentCreationController.IDEMPOTENCY_REPLAYED_HEADER))
+                .andExpect(header().doesNotExist(PaymentIdempotencyHeaders.REPLAYED))
                 .andExpect(jsonPath("$.data.id").isString())
                 .andExpect(jsonPath("$.data.orderId").value("ORDER-1001"))
                 .andExpect(jsonPath("$.data.description").value("Payment for ORDER-1001"))
@@ -113,7 +113,7 @@ class PaymentCreateApiTest extends PostgresIntegrationTest {
         MvcResult replayed = performCreate(stored.rawKey(), IDEMPOTENCY_KEY, requestBody(50_000L))
                 .andExpect(status().isCreated())
                 .andExpect(header().string(
-                        PaymentCreationController.IDEMPOTENCY_REPLAYED_HEADER,
+                        PaymentIdempotencyHeaders.REPLAYED,
                         "true"
                 ))
                 .andExpect(header().string(
@@ -272,7 +272,7 @@ class PaymentCreateApiTest extends PostgresIntegrationTest {
     ) throws Exception {
         return mockMvc.perform(post(PATH)
                 .header(HttpHeaders.AUTHORIZATION, bearer(rawApiKey))
-                .header(PaymentCreationController.IDEMPOTENCY_KEY_HEADER, idempotencyKey)
+                .header(PaymentIdempotencyHeaders.KEY, idempotencyKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body));
     }

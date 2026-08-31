@@ -456,10 +456,8 @@ Merchant API-key authentication required.
 
 Phase availability:
 
-- Phase 3 exposes create with mandatory idempotency protection, along with the
-  Phase 2 retrieve, list, and transaction-attempt endpoints.
-- Confirm below remains non-public until P3-T10 exposes and verifies its HTTP
-  adapter. Its application flow and replay snapshot are complete as of P3-T09.
+- Phase 3 exposes create and confirm with mandatory idempotency protection,
+  along with the Phase 2 retrieve, list, and transaction-attempt endpoints.
 
 ### Create
 
@@ -563,6 +561,13 @@ The persisted snapshot contains only these public normalized fields. It does not
 contain internal IDs, entities, or raw provider payloads. A replay uses the
 stored snapshot and original HTTP status without rebuilding either from current
 Payment state.
+
+A completed replay returns the exact stored logical response with the original
+HTTP status and:
+
+```http
+Idempotency-Replayed: true
+```
 
 Invalid payment state:
 

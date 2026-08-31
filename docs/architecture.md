@@ -219,6 +219,12 @@ provider transaction ID, failure code, and failure message. `SUCCEEDED`,
 202. Replay decodes this stored snapshot and never reconstructs it from current
 Payment state or a raw provider response.
 
+The public create and confirm adapters both require merchant API-key
+authentication and an `Idempotency-Key`. Confirm is exposed only through
+`POST /api/v1/payment-intents/{paymentId}/confirm`; its controller maps the
+authenticated principal, path ID, and parsed key into the idempotent application
+command and never accesses Payment or Idempotency repositories directly.
+
 ## 6. Identity and dashboard authentication
 
 Dashboard users authenticate with JWT access tokens.
