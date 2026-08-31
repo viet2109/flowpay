@@ -458,8 +458,8 @@ Phase availability:
 
 - Phase 3 exposes create with mandatory idempotency protection, along with the
   Phase 2 retrieve, list, and transaction-attempt endpoints.
-- Confirm below remains non-public until its Phase 3 idempotency flow is
-  implemented and verified.
+- Confirm below remains non-public until P3-T10 exposes and verifies its HTTP
+  adapter. Its application flow and replay snapshot are complete as of P3-T09.
 
 ### Create
 
@@ -540,6 +540,29 @@ Provider unknown/timeout:
 Payment status `PROCESSING`.
 
 Latest transaction status `UNKNOWN`.
+
+The original result and every completed replay use the same logical response
+snapshot. The standard `data` envelope contains:
+
+```json
+{
+  "data": {
+    "paymentId": "pi_01K...",
+    "paymentStatus": "SUCCEEDED",
+    "transactionId": "ptxn_01K...",
+    "transactionStatus": "SUCCEEDED",
+    "provider": "SIMULATOR",
+    "providerTransactionId": "sim_01K...",
+    "failureCode": null,
+    "failureMessage": null
+  }
+}
+```
+
+The persisted snapshot contains only these public normalized fields. It does not
+contain internal IDs, entities, or raw provider payloads. A replay uses the
+stored snapshot and original HTTP status without rebuilding either from current
+Payment state.
 
 Invalid payment state:
 

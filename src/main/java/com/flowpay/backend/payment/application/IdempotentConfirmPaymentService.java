@@ -4,10 +4,13 @@ import com.flowpay.backend.idempotency.application.ConfirmPaymentFingerprint;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionCommand;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionResult;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionService;
+import com.flowpay.backend.idempotency.application.IdempotencyCompletionCommand;
+import com.flowpay.backend.idempotency.application.IdempotencyCompletionService;
 import com.flowpay.backend.idempotency.application.IdempotencyKeyReusedException;
 import com.flowpay.backend.idempotency.application.IdempotencyRequestInProgressException;
 import com.flowpay.backend.idempotency.application.IdempotencyReservationReleaseCommand;
 import com.flowpay.backend.idempotency.application.IdempotencyReservationReleaseService;
+import com.flowpay.backend.idempotency.application.IdempotencyStoredResponse;
 import com.flowpay.backend.idempotency.application.RequestFingerprintService;
 import com.flowpay.backend.idempotency.domain.IdempotencyOperation;
 import lombok.RequiredArgsConstructor;
@@ -17,11 +20,16 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class IdempotentConfirmPaymentService {
 
+    static final String PAYMENT_INTENT_RESOURCE = "PAYMENT_INTENT";
+
     private final RequestFingerprintService fingerprintService;
     private final PaymentConfirmationPreflightService preflightService;
     private final IdempotencyAcquisitionService acquisitionService;
     private final IdempotencyReservationReleaseService releaseService;
     private final ConfirmPaymentService confirmationService;
+    private final ConfirmPaymentResponseSnapshotMapper snapshotMapper;
+    private final ConfirmPaymentResponseSnapshotCodec snapshotCodec;
+    private final IdempotencyCompletionService completionService;
 
     public IdempotentConfirmPaymentResult confirm(IdempotentConfirmPaymentCommand command) {
         ConfirmPaymentCommand confirmCommand = command.toConfirmCommand();
@@ -35,7 +43,7 @@ public class IdempotentConfirmPaymentService {
                         IdempotencyOperation.PAYMENT_INTENT_CONFIRM,
                         command.idempotencyKey(),
                         requestHash,
-                        IdempotentCreatePaymentService.PAYMENT_INTENT_RESOURCE,
+                        PAYMENT_INTENT_RESOURCE,
                         preflight.paymentPublicId()
                 );
         IdempotencyAcquisitionResult acquisition = acquireForState(
@@ -50,9 +58,7 @@ public class IdempotentConfirmPaymentService {
                     acquisitionCommand,
                     acquisition.executionId()
             );
-            case REPLAY -> IdempotentConfirmPaymentResult.replay(
-                    acquisition.replayResponse()
-            );
+            case REPLAY -> replay(acquisition.replayResponse());
             case IN_PROGRESS -> throw new IdempotencyRequestInProgressException();
             case KEY_REUSED -> throw new IdempotencyKeyReusedException();
         };
@@ -86,8 +92,38 @@ public class IdempotentConfirmPaymentService {
             throw preparationFailure;
         }
 
-        return IdempotentConfirmPaymentResult.original(
-                confirmationService.executePrepared(prepared)
+        FinalizedPaymentConfirmation confirmation = confirmationService.executePrepared(prepared);
+        ConfirmPaymentResponseSnapshot snapshot = snapshotMapper.toSnapshot(confirmation);
+        int httpStatus = snapshot.httpStatus();
+        completionService.complete(new IdempotencyCompletionCommand(
+                executionId,
+                PAYMENT_INTENT_RESOURCE,
+                snapshot.paymentId(),
+                httpStatus,
+                snapshotCodec.encode(snapshot)
+        ));
+        return new IdempotentConfirmPaymentResult(
+                snapshot,
+                httpStatus,
+                false
+        );
+    }
+
+    private IdempotentConfirmPaymentResult replay(IdempotencyStoredResponse stored) {
+        if (!PAYMENT_INTENT_RESOURCE.equals(stored.resourceType())) {
+            throw new IllegalStateException("Stored confirm payment response is inconsistent");
+        }
+        ConfirmPaymentResponseSnapshot snapshot = snapshotCodec.decode(
+                stored.responsePayload()
+        );
+        if (!stored.resourcePublicId().equals(snapshot.paymentId())
+                || stored.httpStatus() != snapshot.httpStatus()) {
+            throw new IllegalStateException("Stored confirm payment response is inconsistent");
+        }
+        return new IdempotentConfirmPaymentResult(
+                snapshot,
+                stored.httpStatus(),
+                true
         );
     }
 

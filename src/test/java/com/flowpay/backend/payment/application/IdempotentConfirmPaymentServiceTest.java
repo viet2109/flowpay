@@ -8,6 +8,8 @@ import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionCommand
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionDecision;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionResult;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionService;
+import com.flowpay.backend.idempotency.application.IdempotencyCompletionCommand;
+import com.flowpay.backend.idempotency.application.IdempotencyCompletionService;
 import com.flowpay.backend.idempotency.application.IdempotencyKeyReusedException;
 import com.flowpay.backend.idempotency.application.IdempotencyRequestInProgressException;
 import com.flowpay.backend.idempotency.application.IdempotencyReservationReleaseCommand;
@@ -71,8 +73,29 @@ class IdempotentConfirmPaymentServiceTest {
                     "pi_confirm_idempotent",
                     PaymentStatus.SUCCEEDED,
                     "ptxn_confirm_idempotent",
-                    PaymentTransactionStatus.SUCCEEDED
+                    PaymentTransactionStatus.SUCCEEDED,
+                    "SIMULATOR",
+                    "sim_confirm_idempotent",
+                    null,
+                    null
             );
+    private static final ConfirmPaymentResponseSnapshot SNAPSHOT =
+            new ConfirmPaymentResponseSnapshot(
+                    "pi_confirm_idempotent",
+                    PaymentStatus.SUCCEEDED,
+                    "ptxn_confirm_idempotent",
+                    PaymentTransactionStatus.SUCCEEDED,
+                    "SIMULATOR",
+                    "sim_confirm_idempotent",
+                    null,
+                    null
+            );
+    private static final String SNAPSHOT_JSON = """
+            {"paymentId":"pi_confirm_idempotent","paymentStatus":"SUCCEEDED",\
+            "transactionId":"ptxn_confirm_idempotent","transactionStatus":"SUCCEEDED",\
+            "provider":"SIMULATOR","providerTransactionId":"sim_confirm_idempotent",\
+            "failureCode":null,"failureMessage":null}
+            """;
 
     @Mock
     private RequestFingerprintService fingerprintService;
@@ -89,6 +112,15 @@ class IdempotentConfirmPaymentServiceTest {
     @Mock
     private ConfirmPaymentService confirmationService;
 
+    @Mock
+    private ConfirmPaymentResponseSnapshotMapper snapshotMapper;
+
+    @Mock
+    private ConfirmPaymentResponseSnapshotCodec snapshotCodec;
+
+    @Mock
+    private IdempotencyCompletionService completionService;
+
     private IdempotentConfirmPaymentService service;
 
     @BeforeEach
@@ -98,7 +130,10 @@ class IdempotentConfirmPaymentServiceTest {
                 preflightService,
                 acquisitionService,
                 releaseService,
-                confirmationService
+                confirmationService,
+                snapshotMapper,
+                snapshotCodec,
+                completionService
         );
     }
 
@@ -112,12 +147,14 @@ class IdempotentConfirmPaymentServiceTest {
         ));
         when(confirmationService.prepare(COMMAND.toConfirmCommand())).thenReturn(PREPARED);
         when(confirmationService.executePrepared(PREPARED)).thenReturn(FINALIZED);
+        when(snapshotMapper.toSnapshot(FINALIZED)).thenReturn(SNAPSHOT);
+        when(snapshotCodec.encode(SNAPSHOT)).thenReturn(SNAPSHOT_JSON);
 
         IdempotentConfirmPaymentResult result = service.confirm(COMMAND);
 
         assertThat(result).isEqualTo(new IdempotentConfirmPaymentResult(
-                FINALIZED,
-                null,
+                SNAPSHOT,
+                200,
                 false
         ));
         ArgumentCaptor<IdempotencyAcquisitionCommand> acquisition =
@@ -134,6 +171,13 @@ class IdempotentConfirmPaymentServiceTest {
                 .isEqualTo("pi_confirm_idempotent");
         verify(confirmationService).prepare(COMMAND.toConfirmCommand());
         verify(confirmationService).executePrepared(PREPARED);
+        verify(completionService).complete(new IdempotencyCompletionCommand(
+                71L,
+                "PAYMENT_INTENT",
+                "pi_confirm_idempotent",
+                200,
+                SNAPSHOT_JSON
+        ));
         verifyNoInteractions(releaseService);
     }
 
@@ -152,7 +196,7 @@ class IdempotentConfirmPaymentServiceTest {
                 "PAYMENT_INTENT",
                 "pi_confirm_idempotent",
                 200,
-                "{\"data\":{\"id\":\"pi_confirm_idempotent\"}}"
+                SNAPSHOT_JSON
         );
         when(acquisitionService.findExisting(any())).thenReturn(Optional.of(
                 new IdempotencyAcquisitionResult(
@@ -161,15 +205,21 @@ class IdempotentConfirmPaymentServiceTest {
                         stored
                 )
         ));
+        when(snapshotCodec.decode(SNAPSHOT_JSON)).thenReturn(SNAPSHOT);
 
         IdempotentConfirmPaymentResult result = service.confirm(COMMAND);
 
         assertThat(result).isEqualTo(new IdempotentConfirmPaymentResult(
-                null,
-                stored,
+                SNAPSHOT,
+                200,
                 true
         ));
-        verifyNoInteractions(confirmationService, releaseService);
+        verifyNoInteractions(
+                confirmationService,
+                releaseService,
+                snapshotMapper,
+                completionService
+        );
     }
 
     @Test
@@ -247,6 +297,28 @@ class IdempotentConfirmPaymentServiceTest {
         when(confirmationService.executePrepared(PREPARED)).thenThrow(uncertain);
 
         assertThatThrownBy(() -> service.confirm(COMMAND)).isSameAs(uncertain);
+
+        verifyNoInteractions(releaseService);
+    }
+
+    @Test
+    void completionFailureAfterProviderShouldRetainReservationForSafeRecovery() {
+        stubPreflight();
+        when(acquisitionService.acquire(any())).thenReturn(new IdempotencyAcquisitionResult(
+                IdempotencyAcquisitionDecision.NEW,
+                75L,
+                null
+        ));
+        when(confirmationService.prepare(COMMAND.toConfirmCommand())).thenReturn(PREPARED);
+        when(confirmationService.executePrepared(PREPARED)).thenReturn(FINALIZED);
+        when(snapshotMapper.toSnapshot(FINALIZED)).thenReturn(SNAPSHOT);
+        when(snapshotCodec.encode(SNAPSHOT)).thenReturn(SNAPSHOT_JSON);
+        RuntimeException completionFailure = new RuntimeException("completion unavailable");
+        org.mockito.Mockito.doThrow(completionFailure)
+                .when(completionService)
+                .complete(any());
+
+        assertThatThrownBy(() -> service.confirm(COMMAND)).isSameAs(completionFailure);
 
         verifyNoInteractions(releaseService);
     }

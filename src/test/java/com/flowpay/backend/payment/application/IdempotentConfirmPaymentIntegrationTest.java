@@ -24,6 +24,8 @@ import com.flowpay.backend.testing.PostgresIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -67,6 +69,9 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
     private RequestFingerprintService fingerprintService;
 
     @Autowired
+    private ConfirmPaymentResponseSnapshotCodec snapshotCodec;
+
+    @Autowired
     private PaymentIntentRepository paymentIntentRepository;
 
     @Autowired
@@ -94,19 +99,32 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
         dropTx1FailureTrigger();
     }
 
-    @Test
-    void firstConfirmShouldCommitResourceReservationBeforeProviderFlow() {
-        PaymentFixture fixture = createPayment("reservation_commit");
+    @ParameterizedTest
+    @EnumSource(ProviderOutcome.class)
+    void confirmShouldPersistReplayableSnapshotForEveryProviderOutcome(
+            ProviderOutcome outcome
+    ) {
+        String suffix = outcome.name().toLowerCase();
+        PaymentFixture fixture = createPayment("snapshot_" + suffix);
+        paymentProvider.respondWith(outcome);
 
         IdempotentConfirmPaymentResult result = service.confirm(command(
                 fixture,
-                "confirm-reservation-commit"
+                "confirm-snapshot-" + suffix
         ));
 
         assertThat(result.replayed()).isFalse();
-        assertThat(result.confirmation().paymentStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
-        assertThat(result.confirmation().transactionStatus())
-                .isEqualTo(PaymentTransactionStatus.SUCCEEDED);
+        assertThat(result.response().paymentStatus()).isEqualTo(paymentStatus(outcome));
+        assertThat(result.response().transactionStatus())
+                .isEqualTo(transactionStatus(outcome));
+        assertThat(result.response().provider()).isEqualTo("SIMULATOR");
+        assertThat(result.response().failureCode())
+                .isEqualTo(paymentProvider.resultFor(outcome).failureCode());
+        assertThat(result.response().failureMessage())
+                .isEqualTo(paymentProvider.resultFor(outcome).failureMessage());
+        assertThat(result.httpStatus()).isEqualTo(
+                outcome == ProviderOutcome.UNKNOWN ? 202 : 200
+        );
         assertThat(paymentProvider.invocationCount()).isEqualTo(1);
         assertThat(paymentProvider.transactionActive()).isFalse();
         assertThat(paymentProvider.observedIdempotencyStatus())
@@ -120,11 +138,29 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
 
         IdempotencyRecord reservation = findConfirmReservation(
                 fixture.merchantId(),
-                "confirm-reservation-commit"
+                "confirm-snapshot-" + suffix
         );
-        assertThat(reservation.isProcessing()).isTrue();
+        assertThat(reservation.isCompleted()).isTrue();
         assertThat(reservation.resourceType()).isEqualTo(PAYMENT_RESOURCE);
         assertThat(reservation.resourcePublicId()).isEqualTo(fixture.paymentId());
+        assertThat(reservation.httpStatus()).isEqualTo(result.httpStatus());
+        assertThat(snapshotCodec.decode(reservation.responsePayload()))
+                .isEqualTo(result.response());
+        assertThat(reservation.responsePayload())
+                .contains("\"paymentId\"", fixture.paymentId())
+                .contains("\"transactionId\"", "ptxn_")
+                .doesNotContain("internalId", "merchantId", "raw", "payload");
+        assertThat(reservation.completedAt()).isNotNull();
+
+        IdempotentConfirmPaymentResult replay = service.confirm(command(
+                fixture,
+                "confirm-snapshot-" + suffix
+        ));
+
+        assertThat(replay.replayed()).isTrue();
+        assertThat(replay.response()).isEqualTo(result.response());
+        assertThat(replay.httpStatus()).isEqualTo(result.httpStatus());
+        assertThat(paymentProvider.invocationCount()).isEqualTo(1);
     }
 
     @Test
@@ -183,29 +219,14 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
                 .isInstanceOf(IdempotencyKeyReusedException.class);
 
         PaymentFixture replay = createPayment("duplicate_replay");
-        IdempotencyAcquisitionResult replayReservation = reserve(
+        IdempotentConfirmPaymentResult original = service.confirm(command(
                 replay,
                 "confirm-replay"
+        ));
+        jdbcTemplate.update(
+                "UPDATE payment_intents SET status = 'FAILED' WHERE public_id = ?",
+                replay.paymentId()
         );
-        IdempotencyRecord record = idempotencyRepository.findByInternalId(
-                replayReservation.executionId()
-        ).orElseThrow();
-        Instant completedAt = record.createdAt().plusSeconds(1);
-        record.complete(
-                PAYMENT_RESOURCE,
-                replay.paymentId(),
-                200,
-                "{\"data\":{\"id\":\"" + replay.paymentId() + "\"}}",
-                completedAt,
-                completedAt.plusSeconds(86_400)
-        );
-        idempotencyRepository.save(record);
-        PaymentIntent replayedPayment = paymentIntentRepository
-                .findByPublicId(replay.paymentId())
-                .orElseThrow();
-        replayedPayment.startProcessing(CREATED_AT.plusSeconds(1));
-        replayedPayment.markSucceeded(CREATED_AT.plusSeconds(2));
-        paymentIntentRepository.save(replayedPayment);
 
         IdempotentConfirmPaymentResult replayResult = service.confirm(command(
                 replay,
@@ -213,9 +234,11 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
         ));
 
         assertThat(replayResult.replayed()).isTrue();
-        assertThat(replayResult.replayResponse().resourcePublicId())
-                .isEqualTo(replay.paymentId());
-        assertThat(paymentProvider.invocationCount()).isZero();
+        assertThat(replayResult.response()).isEqualTo(original.response());
+        assertThat(replayResult.httpStatus()).isEqualTo(original.httpStatus());
+        assertThat(replayResult.response().paymentStatus())
+                .isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(paymentProvider.invocationCount()).isEqualTo(1);
     }
 
     @Test
@@ -282,8 +305,15 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
             );
 
             assertThat(results).filteredOn(IdempotentConfirmPaymentResult.class::isInstance)
-                    .hasSize(1);
-            assertThat(results).filteredOn(IdempotencyRequestInProgressException.class::isInstance)
+                    .hasSizeBetween(1, 2);
+            assertThat(results).allMatch(result ->
+                    result instanceof IdempotentConfirmPaymentResult
+                            || result instanceof IdempotencyRequestInProgressException
+            );
+            assertThat(results.stream()
+                    .filter(IdempotentConfirmPaymentResult.class::isInstance)
+                    .map(IdempotentConfirmPaymentResult.class::cast)
+                    .filter(result -> !result.replayed()))
                     .hasSize(1);
         } finally {
             executor.shutdownNow();
@@ -372,6 +402,22 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
                 "SELECT count(*) FROM idempotency_records",
                 Integer.class
         );
+    }
+
+    private static PaymentStatus paymentStatus(ProviderOutcome outcome) {
+        return switch (outcome) {
+            case SUCCESS -> PaymentStatus.SUCCEEDED;
+            case DECLINED, TECHNICAL_FAILURE -> PaymentStatus.FAILED;
+            case UNKNOWN -> PaymentStatus.PROCESSING;
+        };
+    }
+
+    private static PaymentTransactionStatus transactionStatus(ProviderOutcome outcome) {
+        return switch (outcome) {
+            case SUCCESS -> PaymentTransactionStatus.SUCCEEDED;
+            case DECLINED, TECHNICAL_FAILURE -> PaymentTransactionStatus.FAILED;
+            case UNKNOWN -> PaymentTransactionStatus.UNKNOWN;
+        };
     }
 
     private PaymentFixture createPayment(String suffix) {
@@ -482,6 +528,7 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
         private final JdbcTemplate jdbcTemplate;
         private final AtomicInteger invocationCount = new AtomicInteger();
         private volatile boolean failUncertainly;
+        private volatile ProviderOutcome outcome = ProviderOutcome.SUCCESS;
         private volatile boolean transactionActive;
         private volatile String observedIdempotencyStatus;
         private volatile String observedResourceType;
@@ -529,22 +576,61 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
             if (failUncertainly) {
                 throw new RuntimeException("simulated uncertain provider failure");
             }
-            return new PaymentProviderResult(
-                    "SIMULATOR",
-                    ProviderOutcome.SUCCESS,
-                    "sim_" + request.paymentPublicReference(),
-                    null,
-                    null
-            );
+            return resultFor(outcome, request.paymentPublicReference());
         }
 
         void failUncertainly() {
             failUncertainly = true;
         }
 
+        void respondWith(ProviderOutcome outcome) {
+            this.outcome = outcome;
+        }
+
+        PaymentProviderResult resultFor(ProviderOutcome outcome) {
+            return resultFor(outcome, "pi_snapshot");
+        }
+
+        private PaymentProviderResult resultFor(
+                ProviderOutcome outcome,
+                String paymentPublicId
+        ) {
+            return switch (outcome) {
+                case SUCCESS -> new PaymentProviderResult(
+                        "SIMULATOR",
+                        outcome,
+                        "sim_" + paymentPublicId,
+                        null,
+                        null
+                );
+                case DECLINED -> new PaymentProviderResult(
+                        "SIMULATOR",
+                        outcome,
+                        "sim_" + paymentPublicId,
+                        "CARD_DECLINED",
+                        "The provider declined the payment."
+                );
+                case UNKNOWN -> new PaymentProviderResult(
+                        "SIMULATOR",
+                        outcome,
+                        null,
+                        "PROVIDER_TIMEOUT",
+                        "The provider outcome is unknown."
+                );
+                case TECHNICAL_FAILURE -> new PaymentProviderResult(
+                        "SIMULATOR",
+                        outcome,
+                        null,
+                        "PROVIDER_UNAVAILABLE",
+                        "The provider operation did not complete."
+                );
+            };
+        }
+
         void reset() {
             invocationCount.set(0);
             failUncertainly = false;
+            outcome = ProviderOutcome.SUCCESS;
             transactionActive = false;
             observedIdempotencyStatus = null;
             observedResourceType = null;

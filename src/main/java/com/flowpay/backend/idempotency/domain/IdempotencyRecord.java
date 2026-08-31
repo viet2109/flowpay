@@ -155,6 +155,7 @@ public final class IdempotencyRecord {
         String completionResourceType = optionalText(resourceType, "resourceType");
         String completionResourcePublicId = optionalText(resourcePublicId, "resourcePublicId");
         validateResourcePair(completionResourceType, completionResourcePublicId);
+        validateReservedResource(completionResourceType, completionResourcePublicId);
         int completionHttpStatus = validateHttpStatus(httpStatus);
         String completionPayload = requireText(responsePayload, "responsePayload");
         Instant completionTime = Objects.requireNonNull(
@@ -174,6 +175,18 @@ public final class IdempotencyRecord {
         this.completedAt = completionTime;
         this.expiresAt = completionExpiry;
         this.status = IdempotencyStatus.COMPLETED;
+    }
+
+    private void validateReservedResource(
+            String completionResourceType,
+            String completionResourcePublicId
+    ) {
+        if (resourceType != null && (!resourceType.equals(completionResourceType)
+                || !resourcePublicId.equals(completionResourcePublicId))) {
+            throw new IllegalArgumentException(
+                    "completion resource must match the reserved resource"
+            );
+        }
     }
 
     public boolean isCompleted() {

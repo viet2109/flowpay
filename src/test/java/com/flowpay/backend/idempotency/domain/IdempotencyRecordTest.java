@@ -112,6 +112,34 @@ class IdempotencyRecordTest {
     }
 
     @Test
+    void shouldNotCompleteAReservationForAnotherResource() {
+        IdempotencyRecord record = IdempotencyRecord.startForResource(
+                41L,
+                IdempotencyOperation.PAYMENT_INTENT_CONFIRM,
+                IdempotencyKey.of("confirm-1001"),
+                REQUEST_HASH,
+                "PAYMENT_INTENT",
+                "pi_1001",
+                CREATED_AT,
+                INITIAL_EXPIRY
+        );
+        Instant completedAt = CREATED_AT.plusSeconds(10);
+
+        assertThatThrownBy(() -> record.complete(
+                "PAYMENT_INTENT",
+                "pi_other",
+                200,
+                "{\"paymentId\":\"pi_other\"}",
+                completedAt,
+                completedAt.plusSeconds(86_400)
+        )).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("completion resource must match the reserved resource");
+
+        assertThat(record.isProcessing()).isTrue();
+        assertThat(record.resourcePublicId()).isEqualTo("pi_1001");
+    }
+
+    @Test
     void shouldCalculateExpirationUsingStrictBeforeSemantics() {
         IdempotencyRecord record = newProcessingRecord();
 

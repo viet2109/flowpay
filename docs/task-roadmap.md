@@ -174,10 +174,10 @@ Completed tasks:
 - P3-T06 Atomic idempotent create-payment flow.
 - P3-T07 Public create-payment API and replay.
 - P3-T08 Confirm Idempotency reservation.
+- P3-T09 Confirm completion and response snapshot.
 
 Remaining tasks:
 
-- P3-T09 Confirm completion and response snapshot.
 - P3-T10 Public confirm-payment API.
 - P3-T11 Expiration and cleanup.
 - P3-T12 Architecture, security, and error-mapping tests.

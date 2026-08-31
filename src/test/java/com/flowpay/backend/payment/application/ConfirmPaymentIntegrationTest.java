@@ -111,7 +111,11 @@ class ConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
                 payment.publicId(),
                 expectedPaymentStatus,
                 transaction.publicId(),
-                expectedTransactionStatus
+                expectedTransactionStatus,
+                transaction.provider(),
+                transaction.providerTransactionId(),
+                transaction.failureCode(),
+                transaction.failureMessage()
         ));
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM payment_transactions "

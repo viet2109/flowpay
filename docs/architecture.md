@@ -212,6 +212,13 @@ can prove that Payment TX 1 failed and the provider was never invoked. From the
 point provider invocation begins, an unexpected failure is uncertain: retain the
 PROCESSING record and forbid automatic retry or release.
 
+After Payment TX 2, the completion transaction stores a stable public snapshot
+containing payment and transaction public IDs/statuses plus normalized provider,
+provider transaction ID, failure code, and failure message. `SUCCEEDED`,
+`DECLINED`, and `TECHNICAL_FAILURE` preserve HTTP status 200; `UNKNOWN` preserves
+202. Replay decodes this stored snapshot and never reconstructs it from current
+Payment state or a raw provider response.
+
 ## 6. Identity and dashboard authentication
 
 Dashboard users authenticate with JWT access tokens.

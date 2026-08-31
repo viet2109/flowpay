@@ -1,36 +1,19 @@
 package com.flowpay.backend.payment.application;
 
-import com.flowpay.backend.idempotency.application.IdempotencyStoredResponse;
+import java.util.Objects;
 
 public record IdempotentConfirmPaymentResult(
-        FinalizedPaymentConfirmation confirmation,
-        IdempotencyStoredResponse replayResponse,
+        ConfirmPaymentResponseSnapshot response,
+        int httpStatus,
         boolean replayed
 ) {
 
     public IdempotentConfirmPaymentResult {
-        boolean hasConfirmation = confirmation != null;
-        boolean hasReplayResponse = replayResponse != null;
-        if (hasConfirmation == hasReplayResponse || replayed != hasReplayResponse) {
+        Objects.requireNonNull(response, "response must not be null");
+        if (httpStatus != response.httpStatus()) {
             throw new IllegalArgumentException(
-                    "Result must contain exactly one original or replay response"
+                    "confirm payment httpStatus must match the response outcome"
             );
         }
-    }
-
-    static IdempotentConfirmPaymentResult original(
-            FinalizedPaymentConfirmation confirmation
-    ) {
-        if (confirmation == null) {
-            throw new IllegalArgumentException("confirmation must not be null");
-        }
-        return new IdempotentConfirmPaymentResult(confirmation, null, false);
-    }
-
-    static IdempotentConfirmPaymentResult replay(IdempotencyStoredResponse response) {
-        if (response == null) {
-            throw new IllegalArgumentException("response must not be null");
-        }
-        return new IdempotentConfirmPaymentResult(null, response, true);
     }
 }
