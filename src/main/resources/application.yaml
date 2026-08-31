@@ -36,6 +36,14 @@ logging:
     console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] [requestId=%X{requestId:-}] %logger{36} - %msg%n"
 
 flowpay:
+  idempotency:
+    retention: ${IDEMPOTENCY_RETENTION:24h}
+    cleanup:
+      enabled: ${IDEMPOTENCY_CLEANUP_ENABLED:true}
+      batch-size: ${IDEMPOTENCY_CLEANUP_BATCH_SIZE:100}
+      max-batches-per-run: ${IDEMPOTENCY_CLEANUP_MAX_BATCHES_PER_RUN:10}
+      initial-delay: ${IDEMPOTENCY_CLEANUP_INITIAL_DELAY:15m}
+      fixed-delay: ${IDEMPOTENCY_CLEANUP_FIXED_DELAY:15m}
   payment:
     provider: ${PAYMENT_PROVIDER:simulator}
     simulator:

@@ -225,6 +225,14 @@ authentication and an `Idempotency-Key`. Confirm is exposed only through
 authenticated principal, path ID, and parsed key into the idempotent application
 command and never accesses Payment or Idempotency repositories directly.
 
+Idempotency retention defaults to 24 hours and is configurable. A new
+PROCESSING record expires relative to creation time; successful completion
+resets expiration relative to completion time so the full replay window is
+preserved. Cleanup runs on a configurable schedule and deletes only expired
+COMPLETED records through bounded PostgreSQL batches. Each run also has a
+configured batch limit, and PROCESSING records remain untouched even when their
+provisional expiration is in the past.
+
 ## 6. Identity and dashboard authentication
 
 Dashboard users authenticate with JWT access tokens.

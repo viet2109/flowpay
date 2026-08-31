@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 
@@ -42,6 +43,21 @@ public class IdempotencyRepositoryAdapter implements IdempotencyRepository {
               AND status = 'PROCESSING'
               AND resource_type = ?
               AND resource_public_id = ?
+            """;
+
+    private static final String DELETE_EXPIRED_COMPLETED_SQL = """
+            WITH cleanup_batch AS (
+                SELECT id
+                FROM idempotency_records
+                WHERE status = 'COMPLETED'
+                  AND expires_at < ?
+                ORDER BY expires_at, id
+                LIMIT ?
+                FOR UPDATE SKIP LOCKED
+            )
+            DELETE FROM idempotency_records AS record
+            USING cleanup_batch
+            WHERE record.id = cleanup_batch.id
             """;
 
     private final IdempotencyJpaRepository repository;
@@ -118,5 +134,20 @@ public class IdempotencyRepositoryAdapter implements IdempotencyRepository {
                 resourceType,
                 resourcePublicId
         ) == 1;
+    }
+
+    @Override
+    public int deleteExpiredCompletedBefore(Instant expiresBefore, int limit) {
+        if (expiresBefore == null) {
+            throw new IllegalArgumentException("expiresBefore must not be null");
+        }
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be positive");
+        }
+        return jdbcTemplate.update(
+                DELETE_EXPIRED_COMPLETED_SQL,
+                expiresBefore.atOffset(ZoneOffset.UTC),
+                limit
+        );
     }
 }

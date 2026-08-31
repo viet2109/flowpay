@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -32,6 +33,7 @@ class IdempotencyAcquisitionServiceTest {
     private static final String REQUEST_HASH = "a".repeat(64);
     private static final String OTHER_HASH = "b".repeat(64);
     private static final IdempotencyKey KEY = IdempotencyKey.of("checkout-1001");
+    private static final Duration RETENTION = Duration.ofHours(6);
 
     @Mock
     private IdempotencyRepository repository;
@@ -42,7 +44,8 @@ class IdempotencyAcquisitionServiceTest {
     void setUp() {
         service = new IdempotencyAcquisitionService(
                 repository,
-                Clock.fixed(NOW, ZoneOffset.UTC)
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                properties(RETENTION)
         );
     }
 
@@ -64,7 +67,7 @@ class IdempotencyAcquisitionServiceTest {
         assertThat(candidate.getValue().isProcessing()).isTrue();
         assertThat(candidate.getValue().createdAt()).isEqualTo(NOW);
         assertThat(candidate.getValue().expiresAt())
-                .isEqualTo(NOW.plus(IdempotencyRetention.DEFAULT));
+                .isEqualTo(NOW.plus(RETENTION));
         verify(repository, never()).findByScope(anyLong(), any(), any());
     }
 
@@ -263,6 +266,19 @@ class IdempotencyAcquisitionServiceTest {
                 record.createdAt(),
                 record.completedAt(),
                 record.expiresAt()
+        );
+    }
+
+    private IdempotencyProperties properties(Duration retention) {
+        return new IdempotencyProperties(
+                retention,
+                new IdempotencyProperties.Cleanup(
+                        false,
+                        100,
+                        10,
+                        Duration.ZERO,
+                        Duration.ofMinutes(15)
+                )
         );
     }
 }

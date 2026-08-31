@@ -15,6 +15,7 @@ public class IdempotencyCompletionService {
 
     private final IdempotencyRepository repository;
     private final Clock clock;
+    private final IdempotencyProperties properties;
 
     @Transactional
     public void complete(IdempotencyCompletionCommand command) {
@@ -29,7 +30,7 @@ public class IdempotencyCompletionService {
                 command.httpStatus(),
                 command.responsePayload(),
                 completedAt,
-                completedAt.plus(IdempotencyRetention.DEFAULT)
+                completedAt.plus(properties.retention())
         );
         repository.save(record);
     }

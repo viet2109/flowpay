@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -26,6 +27,7 @@ import static org.mockito.Mockito.when;
 class IdempotencyCompletionServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-08-31T10:00:00Z");
+    private static final Duration RETENTION = Duration.ofHours(3);
 
     @Mock
     private IdempotencyRepository repository;
@@ -36,7 +38,8 @@ class IdempotencyCompletionServiceTest {
     void setUp() {
         service = new IdempotencyCompletionService(
                 repository,
-                Clock.fixed(NOW, ZoneOffset.UTC)
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                properties(RETENTION)
         );
     }
 
@@ -59,7 +62,7 @@ class IdempotencyCompletionServiceTest {
         assertThat(record.httpStatus()).isEqualTo(201);
         assertThat(record.responsePayload()).contains("pi_complete");
         assertThat(record.completedAt()).isEqualTo(NOW);
-        assertThat(record.expiresAt()).isEqualTo(NOW.plus(IdempotencyRetention.DEFAULT));
+        assertThat(record.expiresAt()).isEqualTo(NOW.plus(RETENTION));
     }
 
     @Test
@@ -98,6 +101,19 @@ class IdempotencyCompletionServiceTest {
                 NOW.minusSeconds(30),
                 null,
                 NOW.plusSeconds(3_600)
+        );
+    }
+
+    private IdempotencyProperties properties(Duration retention) {
+        return new IdempotencyProperties(
+                retention,
+                new IdempotencyProperties.Cleanup(
+                        false,
+                        100,
+                        10,
+                        Duration.ZERO,
+                        Duration.ofMinutes(15)
+                )
         );
     }
 }

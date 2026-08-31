@@ -1,5 +1,6 @@
 package com.flowpay.backend.idempotency.domain;
 
+import java.time.Instant;
 import java.util.Optional;
 
 public interface IdempotencyRepository {
@@ -25,4 +26,6 @@ public interface IdempotencyRepository {
             String resourceType,
             String resourcePublicId
     );
+
+    int deleteExpiredCompletedBefore(Instant expiresBefore, int limit);
 }

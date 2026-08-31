@@ -16,6 +16,7 @@ public class IdempotencyAcquisitionService {
 
     private final IdempotencyRepository repository;
     private final Clock clock;
+    private final IdempotencyProperties properties;
 
     @Transactional
     public IdempotencyAcquisitionResult acquire(IdempotencyAcquisitionCommand command) {
@@ -40,11 +41,11 @@ public class IdempotencyAcquisitionService {
         return findExistingDecision(command);
     }
 
-    private static IdempotencyRecord newCandidate(
+    private IdempotencyRecord newCandidate(
             IdempotencyAcquisitionCommand command,
             Instant createdAt
     ) {
-        Instant expiresAt = createdAt.plus(IdempotencyRetention.DEFAULT);
+        Instant expiresAt = createdAt.plus(properties.retention());
         if (command.hasResource()) {
             return IdempotencyRecord.startForResource(
                     command.merchantId(),

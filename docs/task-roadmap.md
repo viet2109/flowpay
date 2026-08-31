@@ -176,10 +176,10 @@ Completed tasks:
 - P3-T08 Confirm Idempotency reservation.
 - P3-T09 Confirm completion and response snapshot.
 - P3-T10 Public confirm-payment API.
+- P3-T11 Expiration and cleanup.
 
 Remaining tasks:
 
-- P3-T11 Expiration and cleanup.
 - P3-T12 Architecture, security, and error-mapping tests.
 - P3-T13 End-to-end concurrency and replay tests.
 - P3-T14 Quality gate and documentation freeze.
