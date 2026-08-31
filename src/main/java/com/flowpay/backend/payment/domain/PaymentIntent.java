@@ -130,6 +130,51 @@ public final class PaymentIntent {
         transitionFrom(PaymentStatus.PROCESSING, PaymentStatus.FAILED, changedAt);
     }
 
+    public void reserveRefund(Money refundAmount, Instant changedAt) {
+        requireRefundableStatus();
+        Money requested = requirePositiveRefundAmount(refundAmount);
+        if (requested.compareTo(refundableAmount()) > 0) {
+            throw new IllegalStateException("refund amount exceeds available capacity");
+        }
+        Instant changeTime = validateChangeTime(changedAt);
+        Money newReservedAmount = refundReservedAmount.add(requested);
+
+        refundReservedAmount = newReservedAmount;
+        updatedAt = changeTime;
+    }
+
+    public void completeRefund(Money refundAmount, Instant changedAt) {
+        requireRefundableStatus();
+        Money completed = requirePositiveRefundAmount(refundAmount);
+        if (completed.compareTo(refundReservedAmount) > 0) {
+            throw new IllegalStateException("refund amount exceeds reserved capacity");
+        }
+        Instant changeTime = validateChangeTime(changedAt);
+        Money newReservedAmount = refundReservedAmount.subtract(completed);
+        Money newRefundedAmount = refundedAmount.add(completed);
+        PaymentStatus newStatus = newRefundedAmount.compareTo(amount) == 0
+                ? PaymentStatus.REFUNDED
+                : PaymentStatus.PARTIALLY_REFUNDED;
+
+        refundReservedAmount = newReservedAmount;
+        refundedAmount = newRefundedAmount;
+        status = newStatus;
+        updatedAt = changeTime;
+    }
+
+    public void releaseRefund(Money refundAmount, Instant changedAt) {
+        requireRefundableStatus();
+        Money released = requirePositiveRefundAmount(refundAmount);
+        if (released.compareTo(refundReservedAmount) > 0) {
+            throw new IllegalStateException("refund amount exceeds reserved capacity");
+        }
+        Instant changeTime = validateChangeTime(changedAt);
+        Money newReservedAmount = refundReservedAmount.subtract(released);
+
+        refundReservedAmount = newReservedAmount;
+        updatedAt = changeTime;
+    }
+
     private void transitionFrom(PaymentStatus expected, PaymentStatus target, Instant changedAt) {
         if (status != expected) {
             throw new IllegalStateException(
@@ -142,6 +187,33 @@ public final class PaymentIntent {
         }
         status = target;
         updatedAt = transitionTime;
+    }
+
+    private void requireRefundableStatus() {
+        if (status != PaymentStatus.SUCCEEDED && status != PaymentStatus.PARTIALLY_REFUNDED) {
+            throw new IllegalStateException(
+                    "PaymentIntent cannot change refund capacity from " + status
+            );
+        }
+    }
+
+    private Money requirePositiveRefundAmount(Money refundAmount) {
+        Money value = Objects.requireNonNull(refundAmount, "refundAmount must not be null");
+        if (!amount.sameCurrency(value)) {
+            throw new IllegalArgumentException("refund amount must use the payment currency");
+        }
+        if (!value.isPositive()) {
+            throw new IllegalArgumentException("refund amount must be positive");
+        }
+        return value;
+    }
+
+    private Instant validateChangeTime(Instant changedAt) {
+        Instant changeTime = Objects.requireNonNull(changedAt, "changedAt must not be null");
+        if (changeTime.isBefore(updatedAt)) {
+            throw new IllegalArgumentException("changedAt must not be before updatedAt");
+        }
+        return changeTime;
     }
 
     private static Long validateInternalId(Long internalId) {

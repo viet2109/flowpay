@@ -43,6 +43,15 @@ public class PaymentIntentRepositoryAdapter implements PaymentIntentRepository {
     }
 
     @Override
+    public Optional<PaymentIntent> findByPublicIdAndMerchantIdForUpdate(
+            String publicId,
+            long merchantId
+    ) {
+        return repository.findByPublicIdAndMerchantIdForUpdate(publicId, merchantId)
+                .map(PaymentIntentPersistenceMapper::toDomain);
+    }
+
+    @Override
     public PaymentIntentPage search(PaymentIntentSearchCriteria criteria) {
         PageRequest pageRequest = PageRequest.of(
                 criteria.page(),

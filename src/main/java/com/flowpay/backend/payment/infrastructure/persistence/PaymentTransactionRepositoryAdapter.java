@@ -2,6 +2,7 @@ package com.flowpay.backend.payment.infrastructure.persistence;
 
 import com.flowpay.backend.payment.application.PaymentTransactionRepository;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
+import com.flowpay.backend.payment.domain.PaymentTransactionStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -33,6 +34,17 @@ public class PaymentTransactionRepositoryAdapter implements PaymentTransactionRe
         return repository.findAllByPaymentIntentIdOrderByAttemptNoAsc(paymentIntentId).stream()
                 .map(PaymentTransactionPersistenceMapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public List<PaymentTransaction> findByPaymentIntentIdAndStatus(
+            long paymentIntentId,
+            PaymentTransactionStatus status
+    ) {
+        return repository.findAllByPaymentIntentIdAndStatusOrderByAttemptNoAsc(
+                paymentIntentId,
+                status
+        ).stream().map(PaymentTransactionPersistenceMapper::toDomain).toList();
     }
 
     @Override
