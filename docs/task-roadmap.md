@@ -195,10 +195,10 @@ Completed tasks:
 - P4-T03 Refund aggregate and domain types.
 - P4-T04 Refund persistence adapters.
 - P4-T05 Payment refund-capacity public API.
+- P4-T06 Refund provider port and simulator.
 
 Remaining tasks:
 
-- P4-T06 Refund provider port and simulator.
 - P4-T07 Refund Idempotency operation and fingerprint.
 - P4-T08 Prepare Refund transaction.
 - P4-T09 Finalize Refund transaction.
