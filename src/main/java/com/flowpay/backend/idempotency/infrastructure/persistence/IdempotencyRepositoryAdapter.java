@@ -22,12 +22,26 @@ public class IdempotencyRepositoryAdapter implements IdempotencyRepository {
                 idempotency_key,
                 request_hash,
                 status,
+                resource_type,
+                resource_public_id,
                 created_at,
                 expires_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (merchant_id, operation, idempotency_key) DO NOTHING
             RETURNING id
+            """;
+
+    private static final String RELEASE_PROCESSING_RESERVATION_SQL = """
+            DELETE FROM idempotency_records
+            WHERE id = ?
+              AND merchant_id = ?
+              AND operation = ?
+              AND idempotency_key = ?
+              AND request_hash = ?
+              AND status = 'PROCESSING'
+              AND resource_type = ?
+              AND resource_public_id = ?
             """;
 
     private final IdempotencyJpaRepository repository;
@@ -57,6 +71,8 @@ public class IdempotencyRepositoryAdapter implements IdempotencyRepository {
                 record.idempotencyKey().value(),
                 record.requestHash(),
                 record.status().name(),
+                record.resourceType(),
+                record.resourcePublicId(),
                 record.createdAt().atOffset(ZoneOffset.UTC),
                 record.expiresAt().atOffset(ZoneOffset.UTC)
         ).stream().findFirst().map(
@@ -80,5 +96,27 @@ public class IdempotencyRepositoryAdapter implements IdempotencyRepository {
                 operation,
                 idempotencyKey.value()
         ).map(IdempotencyPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public boolean releaseProcessingReservation(
+            long internalId,
+            long merchantId,
+            IdempotencyOperation operation,
+            IdempotencyKey idempotencyKey,
+            String requestHash,
+            String resourceType,
+            String resourcePublicId
+    ) {
+        return jdbcTemplate.update(
+                RELEASE_PROCESSING_RESERVATION_SQL,
+                internalId,
+                merchantId,
+                operation.name(),
+                idempotencyKey.value(),
+                requestHash,
+                resourceType,
+                resourcePublicId
+        ) == 1;
     }
 }

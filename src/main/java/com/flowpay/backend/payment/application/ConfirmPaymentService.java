@@ -13,13 +13,19 @@ public class ConfirmPaymentService {
     private final FinalizePaymentConfirmationService finalizationService;
 
     public FinalizedPaymentConfirmation confirm(ConfirmPaymentCommand command) {
-        PreparedPaymentConfirmation prepared = preparationService.prepare(
+        return executePrepared(prepare(command));
+    }
+
+    PreparedPaymentConfirmation prepare(ConfirmPaymentCommand command) {
+        return preparationService.prepare(
                 new PreparePaymentConfirmationCommand(
                         command.merchantContext(),
                         command.paymentPublicId()
                 )
         );
+    }
 
+    FinalizedPaymentConfirmation executePrepared(PreparedPaymentConfirmation prepared) {
         PaymentProviderResult providerResult = paymentProvider.charge(
                 new PaymentProviderRequest(
                         prepared.paymentPublicId(),

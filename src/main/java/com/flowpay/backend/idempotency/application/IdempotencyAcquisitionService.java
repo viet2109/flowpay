@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -19,33 +20,67 @@ public class IdempotencyAcquisitionService {
     @Transactional
     public IdempotencyAcquisitionResult acquire(IdempotencyAcquisitionCommand command) {
         Instant createdAt = clock.instant();
-        IdempotencyRecord candidate = IdempotencyRecord.start(
-                command.merchantId(),
-                command.operation(),
-                command.idempotencyKey(),
-                command.requestHash(),
-                createdAt,
-                createdAt.plus(IdempotencyRetention.DEFAULT)
-        );
+        IdempotencyRecord candidate = newCandidate(command, createdAt);
 
         return repository.tryInsert(candidate)
                 .map(inserted -> IdempotencyAcquisitionResult.newExecution(
                         requireInternalId(inserted)
                 ))
-                .orElseGet(() -> decideExisting(command));
+                .orElseGet(() -> findExistingDecision(command).orElseThrow(() ->
+                        new IllegalStateException(
+                                "Conflicting idempotency record could not be loaded"
+                        )
+                ));
     }
 
-    private IdempotencyAcquisitionResult decideExisting(
+    @Transactional(readOnly = true)
+    public Optional<IdempotencyAcquisitionResult> findExisting(
             IdempotencyAcquisitionCommand command
     ) {
-        IdempotencyRecord existing = repository.findByScope(
+        return findExistingDecision(command);
+    }
+
+    private static IdempotencyRecord newCandidate(
+            IdempotencyAcquisitionCommand command,
+            Instant createdAt
+    ) {
+        Instant expiresAt = createdAt.plus(IdempotencyRetention.DEFAULT);
+        if (command.hasResource()) {
+            return IdempotencyRecord.startForResource(
+                    command.merchantId(),
+                    command.operation(),
+                    command.idempotencyKey(),
+                    command.requestHash(),
+                    command.resourceType(),
+                    command.resourcePublicId(),
+                    createdAt,
+                    expiresAt
+            );
+        }
+        return IdempotencyRecord.start(
+                command.merchantId(),
+                command.operation(),
+                command.idempotencyKey(),
+                command.requestHash(),
+                createdAt,
+                expiresAt
+        );
+    }
+
+    private Optional<IdempotencyAcquisitionResult> findExistingDecision(
+            IdempotencyAcquisitionCommand command
+    ) {
+        return repository.findByScope(
                 command.merchantId(),
                 command.operation(),
                 command.idempotencyKey()
-        ).orElseThrow(() -> new IllegalStateException(
-                "Conflicting idempotency record could not be loaded"
-        ));
+        ).map(existing -> decideExisting(command, existing));
+    }
 
+    private static IdempotencyAcquisitionResult decideExisting(
+            IdempotencyAcquisitionCommand command,
+            IdempotencyRecord existing
+    ) {
         if (!existing.requestHash().equals(command.requestHash())) {
             return IdempotencyAcquisitionResult.keyReused();
         }

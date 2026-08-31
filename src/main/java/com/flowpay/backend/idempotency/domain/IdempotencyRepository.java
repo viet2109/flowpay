@@ -15,4 +15,14 @@ public interface IdempotencyRepository {
             IdempotencyOperation operation,
             IdempotencyKey idempotencyKey
     );
+
+    boolean releaseProcessingReservation(
+            long internalId,
+            long merchantId,
+            IdempotencyOperation operation,
+            IdempotencyKey idempotencyKey,
+            String requestHash,
+            String resourceType,
+            String resourcePublicId
+    );
 }

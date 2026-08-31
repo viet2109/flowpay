@@ -69,6 +69,32 @@ class IdempotencyAcquisitionServiceTest {
     }
 
     @Test
+    void shouldAttachResourceMetadataToNewProcessingReservation() {
+        when(repository.tryInsert(any())).thenAnswer(invocation -> Optional.of(
+                persisted(invocation.getArgument(0), 72L)
+        ));
+        IdempotencyAcquisitionCommand command = IdempotencyAcquisitionCommand.forResource(
+                41L,
+                IdempotencyOperation.PAYMENT_INTENT_CONFIRM,
+                KEY,
+                REQUEST_HASH,
+                "PAYMENT_INTENT",
+                "pi_1001"
+        );
+
+        IdempotencyAcquisitionResult result = service.acquire(command);
+
+        assertThat(result.decision()).isEqualTo(IdempotencyAcquisitionDecision.NEW);
+        ArgumentCaptor<IdempotencyRecord> candidate = ArgumentCaptor.forClass(
+                IdempotencyRecord.class
+        );
+        verify(repository).tryInsert(candidate.capture());
+        assertThat(candidate.getValue().isProcessing()).isTrue();
+        assertThat(candidate.getValue().resourceType()).isEqualTo("PAYMENT_INTENT");
+        assertThat(candidate.getValue().resourcePublicId()).isEqualTo("pi_1001");
+    }
+
+    @Test
     void shouldReturnReplayForSameHashCompletedRecord() {
         IdempotencyRecord existing = completedRecord(REQUEST_HASH);
         when(repository.tryInsert(any())).thenReturn(Optional.empty());
@@ -137,6 +163,24 @@ class IdempotencyAcquisitionServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Conflicting idempotency record could not be loaded")
                 .hasMessageNotContaining(KEY.value());
+    }
+
+    @Test
+    void shouldInspectExistingDecisionWithoutAttemptingAnInsert() {
+        IdempotencyRecord existing = processingRecord(REQUEST_HASH);
+        when(repository.findByScope(
+                41L,
+                IdempotencyOperation.PAYMENT_INTENT_CREATE,
+                KEY
+        )).thenReturn(Optional.of(existing));
+
+        Optional<IdempotencyAcquisitionResult> result = service.findExisting(
+                command(REQUEST_HASH)
+        );
+
+        assertThat(result).get().extracting(IdempotencyAcquisitionResult::decision)
+                .isEqualTo(IdempotencyAcquisitionDecision.IN_PROGRESS);
+        verify(repository, never()).tryInsert(any());
     }
 
     @Test

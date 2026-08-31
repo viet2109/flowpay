@@ -174,7 +174,50 @@ class IdempotencyPersistenceTest extends PostgresIntegrationTest {
                 merchantId,
                 IdempotencyOperation.PAYMENT_INTENT_CREATE,
                 IdempotencyKey.of("shared-key")
-        )).isEmpty();
+                )).isEmpty();
+    }
+
+    @Test
+    void shouldReleaseOnlyTheExactlyOwnedProcessingReservation() {
+        long merchantId = insertMerchant("mrc_idempotency_release");
+        IdempotencyRecord reservation = idempotencyRepository.tryInsert(
+                IdempotencyRecord.startForResource(
+                        merchantId,
+                        IdempotencyOperation.PAYMENT_INTENT_CONFIRM,
+                        IdempotencyKey.of("confirm-release"),
+                        REQUEST_HASH,
+                        "PAYMENT_INTENT",
+                        "pi_release",
+                        CREATED_AT,
+                        INITIAL_EXPIRY
+                )
+        ).orElseThrow();
+
+        boolean wrongOwnerReleased = idempotencyRepository.releaseProcessingReservation(
+                reservation.internalId(),
+                merchantId,
+                IdempotencyOperation.PAYMENT_INTENT_CONFIRM,
+                IdempotencyKey.of("confirm-release"),
+                "b".repeat(64),
+                "PAYMENT_INTENT",
+                "pi_release"
+        );
+
+        assertThat(wrongOwnerReleased).isFalse();
+        assertThat(idempotencyRepository.findByInternalId(reservation.internalId())).isPresent();
+
+        boolean ownerReleased = idempotencyRepository.releaseProcessingReservation(
+                reservation.internalId(),
+                merchantId,
+                IdempotencyOperation.PAYMENT_INTENT_CONFIRM,
+                IdempotencyKey.of("confirm-release"),
+                REQUEST_HASH,
+                "PAYMENT_INTENT",
+                "pi_release"
+        );
+
+        assertThat(ownerReleased).isTrue();
+        assertThat(idempotencyRepository.findByInternalId(reservation.internalId())).isEmpty();
     }
 
     @Test

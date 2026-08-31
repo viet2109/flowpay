@@ -81,6 +81,33 @@ public final class IdempotencyRecord {
         );
     }
 
+    public static IdempotencyRecord startForResource(
+            long merchantId,
+            IdempotencyOperation operation,
+            IdempotencyKey idempotencyKey,
+            String requestHash,
+            String resourceType,
+            String resourcePublicId,
+            Instant createdAt,
+            Instant expiresAt
+    ) {
+        return new IdempotencyRecord(
+                null,
+                merchantId,
+                operation,
+                idempotencyKey,
+                requestHash,
+                IdempotencyStatus.PROCESSING,
+                resourceType,
+                resourcePublicId,
+                null,
+                null,
+                createdAt,
+                null,
+                expiresAt
+        );
+    }
+
     public static IdempotencyRecord rehydrate(
             long internalId,
             long merchantId,

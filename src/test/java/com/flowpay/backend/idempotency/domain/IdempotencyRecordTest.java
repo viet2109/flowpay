@@ -35,6 +35,27 @@ class IdempotencyRecordTest {
     }
 
     @Test
+    void shouldStartResourceReservationInProcessingState() {
+        IdempotencyRecord record = IdempotencyRecord.startForResource(
+                41L,
+                IdempotencyOperation.PAYMENT_INTENT_CONFIRM,
+                IdempotencyKey.of("confirm-1001"),
+                REQUEST_HASH,
+                "PAYMENT_INTENT",
+                "pi_1001",
+                CREATED_AT,
+                INITIAL_EXPIRY
+        );
+
+        assertThat(record.isProcessing()).isTrue();
+        assertThat(record.resourceType()).isEqualTo("PAYMENT_INTENT");
+        assertThat(record.resourcePublicId()).isEqualTo("pi_1001");
+        assertThat(record.httpStatus()).isNull();
+        assertThat(record.responsePayload()).isNull();
+        assertThat(record.completedAt()).isNull();
+    }
+
+    @Test
     void shouldCompleteProcessingRecordWithStableResponseSnapshot() {
         IdempotencyRecord record = newProcessingRecord();
         Instant completedAt = CREATED_AT.plusSeconds(10);
