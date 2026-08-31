@@ -98,7 +98,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ProblemDetail handleUnexpected(Exception exception, HttpServletRequest request) {
-        log.error("Unhandled request failure", exception);
+        log.error("Unhandled request failure");
         return problems.create(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 ErrorCode.INTERNAL_ERROR,

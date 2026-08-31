@@ -33,6 +33,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.ObjectMapper;
 
@@ -161,15 +162,22 @@ class PaymentConfirmApiTest extends PostgresIntegrationTest {
         mockMvc.perform(post(path)
                         .header(HttpHeaders.AUTHORIZATION, bearer(stored.rawKey())))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"));
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"))
+                .andExpect(jsonPath("$.type").value(
+                        "https://flowpay.dev/problems/idempotency-key-required"
+                ))
+                .andExpect(jsonPath("$.requestId").isString())
+                .andExpect(safeProblem(stored.rawKey()));
         performConfirm(stored.rawKey(), payment.publicId(), "   ")
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"));
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"))
+                .andExpect(safeProblem(stored.rawKey()));
         String oversized = "k".repeat(256);
         performConfirm(stored.rawKey(), payment.publicId(), oversized)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(content().string(not(containsString(oversized))));
+                .andExpect(content().string(not(containsString(oversized))))
+                .andExpect(safeProblem(stored.rawKey(), oversized));
 
         assertThat(paymentProvider.invocationCount()).isZero();
         assertThat(countRows("payment_transactions", stored.merchantId())).isZero();
@@ -190,7 +198,8 @@ class PaymentConfirmApiTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED"))
                 .andExpect(jsonPath("$.type").value(
                         "https://flowpay.dev/problems/idempotency-key-reused"
-                ));
+                ))
+                .andExpect(safeProblem(stored.rawKey(), "confirm-reused"));
 
         assertThat(paymentProvider.invocationCount()).isEqualTo(1);
         assertThat(countRows("payment_transactions", stored.merchantId())).isEqualTo(1);
@@ -199,13 +208,20 @@ class PaymentConfirmApiTest extends PostgresIntegrationTest {
 
     @Test
     void shouldRejectInvalidAndRevokedApiKeysBeforeConfirmation() throws Exception {
+        mockMvc.perform(post(path("pi_confirm_missing_key"))
+                        .header(PaymentIdempotencyHeaders.KEY, "confirm-missing-api-key"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"))
+                .andExpect(safeProblem("confirm-missing-api-key"));
+
         GeneratedApiKeySecret unknown = secretCodec.generate();
         mockMvc.perform(post(path("pi_confirm_unknown_key"))
                         .header(HttpHeaders.AUTHORIZATION, bearer(unknown.rawKey()))
                         .header(PaymentIdempotencyHeaders.KEY, "confirm-unknown-key"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_API_KEY"))
-                .andExpect(content().string(not(containsString(unknown.rawKey()))));
+                .andExpect(content().string(not(containsString(unknown.rawKey()))))
+                .andExpect(safeProblem(unknown.rawKey(), "confirm-unknown-key"));
 
         StoredKey revoked = createStoredKey("mrc_confirm_revoked", "key_confirm_revoked");
         PaymentIntent payment = createPayment(revoked, "pi_confirm_revoked");
@@ -216,7 +232,8 @@ class PaymentConfirmApiTest extends PostgresIntegrationTest {
         performConfirm(revoked.rawKey(), payment.publicId(), "confirm-revoked")
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("API_KEY_REVOKED"))
-                .andExpect(content().string(not(containsString(revoked.rawKey()))));
+                .andExpect(content().string(not(containsString(revoked.rawKey()))))
+                .andExpect(safeProblem(revoked.rawKey(), "confirm-revoked"));
 
         assertThat(paymentProvider.invocationCount()).isZero();
         assertThat(jdbcTemplate.queryForObject(
@@ -258,7 +275,12 @@ class PaymentConfirmApiTest extends PostgresIntegrationTest {
             performConfirm(stored.rawKey(), payment.publicId(), "confirm-concurrent")
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.code")
-                            .value("IDEMPOTENCY_REQUEST_IN_PROGRESS"));
+                            .value("IDEMPOTENCY_REQUEST_IN_PROGRESS"))
+                    .andExpect(jsonPath("$.type").value(
+                            "https://flowpay.dev/problems/idempotency-request-in-progress"
+                    ))
+                    .andExpect(jsonPath("$.requestId").isString())
+                    .andExpect(safeProblem(stored.rawKey(), "confirm-concurrent"));
 
             paymentProvider.releaseInvocation();
             assertThat(original.get(20, TimeUnit.SECONDS).getResponse().getStatus())
@@ -357,6 +379,24 @@ class PaymentConfirmApiTest extends PostgresIntegrationTest {
 
     private static String bearer(String rawKey) {
         return "Bearer " + rawKey;
+    }
+
+    private static ResultMatcher safeProblem(String... sensitiveValues) {
+        return result -> assertThat(result.getResponse().getContentAsString())
+                .doesNotContain(sensitiveValues)
+                .doesNotContain(
+                        "internalId",
+                        "merchantId",
+                        "executionId",
+                        "requestHash",
+                        "responsePayload",
+                        "IdempotencyRecordEntity",
+                        "idempotency_records",
+                        "uq_idempotency_records_scope",
+                        "DataIntegrityViolationException",
+                        "org.hibernate",
+                        "org.postgresql"
+                );
     }
 
     private static PaymentStatus paymentStatus(ProviderOutcome outcome) {

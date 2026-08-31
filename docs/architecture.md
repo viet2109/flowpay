@@ -536,6 +536,13 @@ Request ID is placed in MDC and returned in the response.
 
 Do not log secrets.
 
+Known authentication and Idempotency failures must not log supplied credentials,
+Idempotency keys, request hashes, or internal identifiers. The unexpected HTTP
+error fallback emits only a generic failure marker; it must not log exception
+messages or stack traces that can contain SQL constraint names, persistence
+details, or request values. Correlation remains available through the request ID
+already carried in MDC.
+
 Actuator and Micrometer provide health/metrics foundation.
 
 OpenTelemetry support may be configured for tracing, but business-specific metrics/traces are added when corresponding features exist.

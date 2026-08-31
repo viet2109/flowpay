@@ -105,6 +105,24 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule idempotencyJpaEntitiesMustRemainPackagePrivate = classes()
+            .that().resideInAPackage(
+                    "com.flowpay.backend.idempotency.infrastructure.persistence.."
+            )
+            .and().haveSimpleNameEndingWith("Entity")
+            .should().notBePublic()
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule idempotencyJpaRepositoriesMustRemainPackagePrivate = classes()
+            .that().resideInAPackage(
+                    "com.flowpay.backend.idempotency.infrastructure.persistence.."
+            )
+            .and().haveSimpleNameEndingWith("JpaRepository")
+            .should().notBePublic()
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule applicationCodeMustNotAccessSecurityContextDirectly = noClasses()
             .that().resideInAPackage("..application..")
             .should().dependOnClassesThat().haveFullyQualifiedName(

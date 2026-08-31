@@ -25,6 +25,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultMatcher;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
@@ -137,17 +138,24 @@ class PaymentCreateApiTest extends PostgresIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(50_000L)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"));
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"))
+                .andExpect(jsonPath("$.type").value(
+                        "https://flowpay.dev/problems/idempotency-key-required"
+                ))
+                .andExpect(jsonPath("$.requestId").isString())
+                .andExpect(safeProblem(stored.rawKey()));
 
         performCreate(stored.rawKey(), "   ", requestBody(50_000L))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"));
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"))
+                .andExpect(safeProblem(stored.rawKey()));
 
         String oversized = "k".repeat(256);
         performCreate(stored.rawKey(), oversized, requestBody(50_000L))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(content().string(not(containsString(oversized))));
+                .andExpect(content().string(not(containsString(oversized))))
+                .andExpect(safeProblem(stored.rawKey(), oversized));
 
         assertThat(countRows("payment_intents", stored.merchantId())).isZero();
         assertThat(countRows("idempotency_records", stored.merchantId())).isZero();
@@ -189,7 +197,8 @@ class PaymentCreateApiTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED"))
                 .andExpect(jsonPath("$.type").value(
                         "https://flowpay.dev/problems/idempotency-key-reused"
-                ));
+                ))
+                .andExpect(safeProblem(reused.rawKey(), "reused-key"));
         assertThat(countRows("payment_intents", reused.merchantId())).isEqualTo(1);
 
         StoredKey processing = createStoredKey(
@@ -212,17 +221,31 @@ class PaymentCreateApiTest extends PostgresIntegrationTest {
 
         performCreate(processing.rawKey(), processingKey.value(), requestBody(50_000L))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_REQUEST_IN_PROGRESS"));
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_REQUEST_IN_PROGRESS"))
+                .andExpect(jsonPath("$.type").value(
+                        "https://flowpay.dev/problems/idempotency-request-in-progress"
+                ))
+                .andExpect(jsonPath("$.requestId").isString())
+                .andExpect(safeProblem(processing.rawKey(), processingKey.value()));
         assertThat(countRows("payment_intents", processing.merchantId())).isZero();
     }
 
     @Test
     void shouldRejectInvalidAndRevokedApiKeysBeforeCreate() throws Exception {
+        mockMvc.perform(post(PATH)
+                        .header(PaymentIdempotencyHeaders.KEY, IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody(50_000L)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"))
+                .andExpect(safeProblem(IDEMPOTENCY_KEY));
+
         GeneratedApiKeySecret unknown = secretCodec.generate();
         performCreate(unknown.rawKey(), IDEMPOTENCY_KEY, requestBody(50_000L))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_API_KEY"))
-                .andExpect(content().string(not(containsString(unknown.rawKey()))));
+                .andExpect(content().string(not(containsString(unknown.rawKey()))))
+                .andExpect(safeProblem(unknown.rawKey(), IDEMPOTENCY_KEY));
 
         StoredKey revoked = createStoredKey("mrc_create_revoked", "key_create_revoked");
         ApiKey apiKey = apiKeyRepository.findByPublicId(revoked.apiKeyPublicId()).orElseThrow();
@@ -232,7 +255,8 @@ class PaymentCreateApiTest extends PostgresIntegrationTest {
         performCreate(revoked.rawKey(), IDEMPOTENCY_KEY, requestBody(50_000L))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("API_KEY_REVOKED"))
-                .andExpect(content().string(not(containsString(revoked.rawKey()))));
+                .andExpect(content().string(not(containsString(revoked.rawKey()))))
+                .andExpect(safeProblem(revoked.rawKey(), IDEMPOTENCY_KEY));
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM payment_intents",
@@ -327,6 +351,24 @@ class PaymentCreateApiTest extends PostgresIntegrationTest {
 
     private static String bearer(String rawKey) {
         return "Bearer " + rawKey;
+    }
+
+    private static ResultMatcher safeProblem(String... sensitiveValues) {
+        return result -> assertThat(result.getResponse().getContentAsString())
+                .doesNotContain(sensitiveValues)
+                .doesNotContain(
+                        "internalId",
+                        "merchantId",
+                        "executionId",
+                        "requestHash",
+                        "responsePayload",
+                        "IdempotencyRecordEntity",
+                        "idempotency_records",
+                        "uq_idempotency_records_scope",
+                        "DataIntegrityViolationException",
+                        "org.hibernate",
+                        "org.postgresql"
+                );
     }
 
     private record StoredKey(long merchantId, String apiKeyPublicId, String rawKey) {
