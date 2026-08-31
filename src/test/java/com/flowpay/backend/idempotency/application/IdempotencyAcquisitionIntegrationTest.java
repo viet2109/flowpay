@@ -62,13 +62,16 @@ class IdempotencyAcquisitionIntegrationTest extends PostgresIntegrationTest {
         IdempotencyAcquisitionResult duplicate = acquisitionService.acquire(command);
 
         assertThat(first.decision()).isEqualTo(IdempotencyAcquisitionDecision.NEW);
-        assertThat(first.record().internalId()).isPositive();
-        assertThat(first.record().isProcessing()).isTrue();
-        assertThat(Duration.between(first.record().createdAt(), first.record().expiresAt()))
+        assertThat(first.executionId()).isPositive();
+        IdempotencyRecord persisted = idempotencyRepository.findByInternalId(
+                first.executionId()
+        ).orElseThrow();
+        assertThat(persisted.isProcessing()).isTrue();
+        assertThat(Duration.between(persisted.createdAt(), persisted.expiresAt()))
                 .isEqualTo(Duration.ofHours(24));
         assertThat(duplicate.decision())
                 .isEqualTo(IdempotencyAcquisitionDecision.IN_PROGRESS);
-        assertThat(duplicate.record().internalId()).isEqualTo(first.record().internalId());
+        assertThat(duplicate.executionId()).isNull();
         assertThat(countScopedRows(
                 merchantId,
                 IdempotencyOperation.PAYMENT_INTENT_CREATE,
@@ -85,7 +88,10 @@ class IdempotencyAcquisitionIntegrationTest extends PostgresIntegrationTest {
                 "checkout-replay",
                 REQUEST_HASH
         );
-        IdempotencyRecord record = acquisitionService.acquire(command).record();
+        long executionId = acquisitionService.acquire(command).executionId();
+        IdempotencyRecord record = idempotencyRepository.findByInternalId(
+                executionId
+        ).orElseThrow();
         Instant completedAt = record.createdAt().plusSeconds(1);
         record.complete(
                 "PAYMENT_INTENT",
@@ -100,9 +106,9 @@ class IdempotencyAcquisitionIntegrationTest extends PostgresIntegrationTest {
         IdempotencyAcquisitionResult replay = acquisitionService.acquire(command);
 
         assertThat(replay.decision()).isEqualTo(IdempotencyAcquisitionDecision.REPLAY);
-        assertThat(replay.record().resourcePublicId()).isEqualTo("pi_replay");
-        assertThat(replay.record().httpStatus()).isEqualTo(201);
-        assertThat(replay.record().responsePayload()).contains("pi_replay");
+        assertThat(replay.replayResponse().resourcePublicId()).isEqualTo("pi_replay");
+        assertThat(replay.replayResponse().httpStatus()).isEqualTo(201);
+        assertThat(replay.replayResponse().responsePayload()).contains("pi_replay");
     }
 
     @Test

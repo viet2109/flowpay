@@ -171,10 +171,10 @@ Completed tasks:
 - P3-T03 Idempotency domain and persistence.
 - P3-T04 Operation scope, key validation, and request fingerprinting.
 - P3-T05 Concurrent Idempotency acquisition engine.
+- P3-T06 Atomic idempotent create-payment flow.
 
 Remaining tasks:
 
-- P3-T06 Atomic idempotent create-payment flow.
 - P3-T07 Public create-payment API and replay.
 - P3-T08 Confirm Idempotency reservation.
 - P3-T09 Confirm completion and response snapshot.

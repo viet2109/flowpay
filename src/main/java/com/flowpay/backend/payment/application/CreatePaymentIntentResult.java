@@ -12,6 +12,7 @@ public record CreatePaymentIntentResult(
         PaymentStatus status,
         long refundedAmountMinor,
         long refundReservedAmountMinor,
+        long refundableAmountMinor,
         String description,
         Instant createdAt
 ) {

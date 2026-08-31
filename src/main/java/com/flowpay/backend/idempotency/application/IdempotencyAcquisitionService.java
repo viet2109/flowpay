@@ -7,14 +7,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
 public class IdempotencyAcquisitionService {
-
-    static final Duration DEFAULT_RETENTION = Duration.ofHours(24);
 
     private final IdempotencyRepository repository;
     private final Clock clock;
@@ -28,13 +25,12 @@ public class IdempotencyAcquisitionService {
                 command.idempotencyKey(),
                 command.requestHash(),
                 createdAt,
-                createdAt.plus(DEFAULT_RETENTION)
+                createdAt.plus(IdempotencyRetention.DEFAULT)
         );
 
         return repository.tryInsert(candidate)
-                .map(inserted -> new IdempotencyAcquisitionResult(
-                        IdempotencyAcquisitionDecision.NEW,
-                        inserted
+                .map(inserted -> IdempotencyAcquisitionResult.newExecution(
+                        requireInternalId(inserted)
                 ))
                 .orElseGet(() -> decideExisting(command));
     }
@@ -51,20 +47,23 @@ public class IdempotencyAcquisitionService {
         ));
 
         if (!existing.requestHash().equals(command.requestHash())) {
-            return new IdempotencyAcquisitionResult(
-                    IdempotencyAcquisitionDecision.KEY_REUSED,
-                    existing
-            );
+            return IdempotencyAcquisitionResult.keyReused();
         }
         if (existing.isCompleted()) {
-            return new IdempotencyAcquisitionResult(
-                    IdempotencyAcquisitionDecision.REPLAY,
-                    existing
-            );
+            return IdempotencyAcquisitionResult.replay(new IdempotencyStoredResponse(
+                    existing.resourceType(),
+                    existing.resourcePublicId(),
+                    existing.httpStatus(),
+                    existing.responsePayload()
+            ));
         }
-        return new IdempotencyAcquisitionResult(
-                IdempotencyAcquisitionDecision.IN_PROGRESS,
-                existing
-        );
+        return IdempotencyAcquisitionResult.inProgress();
+    }
+
+    private static long requireInternalId(IdempotencyRecord record) {
+        if (record.internalId() == null) {
+            throw new IllegalStateException("Inserted idempotency record has no identifier");
+        }
+        return record.internalId();
     }
 }

@@ -65,6 +65,11 @@ public class IdempotencyRepositoryAdapter implements IdempotencyRepository {
     }
 
     @Override
+    public Optional<IdempotencyRecord> findByInternalId(long internalId) {
+        return repository.findById(internalId).map(IdempotencyPersistenceMapper::toDomain);
+    }
+
+    @Override
     public Optional<IdempotencyRecord> findByScope(
             long merchantId,
             IdempotencyOperation operation,

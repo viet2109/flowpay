@@ -8,6 +8,8 @@ public interface IdempotencyRepository {
 
     Optional<IdempotencyRecord> tryInsert(IdempotencyRecord record);
 
+    Optional<IdempotencyRecord> findByInternalId(long internalId);
+
     Optional<IdempotencyRecord> findByScope(
             long merchantId,
             IdempotencyOperation operation,

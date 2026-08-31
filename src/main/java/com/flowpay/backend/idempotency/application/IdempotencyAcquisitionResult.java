@@ -1,36 +1,73 @@
 package com.flowpay.backend.idempotency.application;
 
-import com.flowpay.backend.idempotency.domain.IdempotencyRecord;
-
 import java.util.Objects;
 
 public record IdempotencyAcquisitionResult(
         IdempotencyAcquisitionDecision decision,
-        IdempotencyRecord record
+        Long executionId,
+        IdempotencyStoredResponse replayResponse
 ) {
 
     public IdempotencyAcquisitionResult {
         Objects.requireNonNull(decision, "decision must not be null");
-        Objects.requireNonNull(record, "record must not be null");
+        if (executionId != null && executionId <= 0) {
+            throw new IllegalArgumentException("executionId must be positive");
+        }
 
         switch (decision) {
-            case NEW, IN_PROGRESS -> {
-                if (!record.isProcessing()) {
+            case NEW -> {
+                if (executionId == null || replayResponse != null) {
                     throw new IllegalArgumentException(
-                            decision + " decision requires a PROCESSING record"
+                            "NEW decision requires only an executionId"
                     );
                 }
             }
             case REPLAY -> {
-                if (!record.isCompleted()) {
+                if (executionId != null || replayResponse == null) {
                     throw new IllegalArgumentException(
-                            "REPLAY decision requires a COMPLETED record"
+                            "REPLAY decision requires only a stored response"
                     );
                 }
             }
-            case KEY_REUSED -> {
-                // Both PROCESSING and COMPLETED records may own a reused key.
+            case IN_PROGRESS, KEY_REUSED -> {
+                if (executionId != null || replayResponse != null) {
+                    throw new IllegalArgumentException(
+                            decision + " decision must not expose record state"
+                    );
+                }
             }
         }
+    }
+
+    static IdempotencyAcquisitionResult newExecution(long executionId) {
+        return new IdempotencyAcquisitionResult(
+                IdempotencyAcquisitionDecision.NEW,
+                executionId,
+                null
+        );
+    }
+
+    static IdempotencyAcquisitionResult replay(IdempotencyStoredResponse response) {
+        return new IdempotencyAcquisitionResult(
+                IdempotencyAcquisitionDecision.REPLAY,
+                null,
+                response
+        );
+    }
+
+    static IdempotencyAcquisitionResult inProgress() {
+        return new IdempotencyAcquisitionResult(
+                IdempotencyAcquisitionDecision.IN_PROGRESS,
+                null,
+                null
+        );
+    }
+
+    static IdempotencyAcquisitionResult keyReused() {
+        return new IdempotencyAcquisitionResult(
+                IdempotencyAcquisitionDecision.KEY_REUSED,
+                null,
+                null
+        );
     }
 }

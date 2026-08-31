@@ -55,11 +55,16 @@ class IdempotencyAcquisitionServiceTest {
         IdempotencyAcquisitionResult result = service.acquire(command(REQUEST_HASH));
 
         assertThat(result.decision()).isEqualTo(IdempotencyAcquisitionDecision.NEW);
-        assertThat(result.record().internalId()).isEqualTo(71L);
-        assertThat(result.record().isProcessing()).isTrue();
-        assertThat(result.record().createdAt()).isEqualTo(NOW);
-        assertThat(result.record().expiresAt())
-                .isEqualTo(NOW.plus(IdempotencyAcquisitionService.DEFAULT_RETENTION));
+        assertThat(result.executionId()).isEqualTo(71L);
+        assertThat(result.replayResponse()).isNull();
+        ArgumentCaptor<IdempotencyRecord> candidate = ArgumentCaptor.forClass(
+                IdempotencyRecord.class
+        );
+        verify(repository).tryInsert(candidate.capture());
+        assertThat(candidate.getValue().isProcessing()).isTrue();
+        assertThat(candidate.getValue().createdAt()).isEqualTo(NOW);
+        assertThat(candidate.getValue().expiresAt())
+                .isEqualTo(NOW.plus(IdempotencyRetention.DEFAULT));
         verify(repository, never()).findByScope(anyLong(), any(), any());
     }
 
@@ -76,7 +81,13 @@ class IdempotencyAcquisitionServiceTest {
         IdempotencyAcquisitionResult result = service.acquire(command(REQUEST_HASH));
 
         assertThat(result.decision()).isEqualTo(IdempotencyAcquisitionDecision.REPLAY);
-        assertThat(result.record()).isSameAs(existing);
+        assertThat(result.executionId()).isNull();
+        assertThat(result.replayResponse()).isEqualTo(new IdempotencyStoredResponse(
+                "PAYMENT_INTENT",
+                "pi_1001",
+                201,
+                "{\"data\":{\"id\":\"pi_1001\"}}"
+        ));
     }
 
     @Test
@@ -92,7 +103,8 @@ class IdempotencyAcquisitionServiceTest {
         IdempotencyAcquisitionResult result = service.acquire(command(REQUEST_HASH));
 
         assertThat(result.decision()).isEqualTo(IdempotencyAcquisitionDecision.IN_PROGRESS);
-        assertThat(result.record()).isSameAs(existing);
+        assertThat(result.executionId()).isNull();
+        assertThat(result.replayResponse()).isNull();
     }
 
     @Test
@@ -108,7 +120,8 @@ class IdempotencyAcquisitionServiceTest {
         IdempotencyAcquisitionResult result = service.acquire(command(OTHER_HASH));
 
         assertThat(result.decision()).isEqualTo(IdempotencyAcquisitionDecision.KEY_REUSED);
-        assertThat(result.record()).isSameAs(existing);
+        assertThat(result.executionId()).isNull();
+        assertThat(result.replayResponse()).isNull();
     }
 
     @Test
@@ -139,14 +152,16 @@ class IdempotencyAcquisitionServiceTest {
     void resultShouldProtectDecisionStateConsistency() {
         assertThatThrownBy(() -> new IdempotencyAcquisitionResult(
                 IdempotencyAcquisitionDecision.REPLAY,
-                processingRecord(REQUEST_HASH)
+                1L,
+                null
         )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("REPLAY decision requires a COMPLETED record");
+                .hasMessage("REPLAY decision requires only a stored response");
         assertThatThrownBy(() -> new IdempotencyAcquisitionResult(
                 IdempotencyAcquisitionDecision.NEW,
-                completedRecord(REQUEST_HASH)
+                null,
+                null
         )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("NEW decision requires a PROCESSING record");
+                .hasMessage("NEW decision requires only an executionId");
     }
 
     private IdempotencyAcquisitionCommand command(String requestHash) {
