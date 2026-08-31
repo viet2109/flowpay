@@ -456,9 +456,10 @@ Merchant API-key authentication required.
 
 Phase availability:
 
-- Phase 2 exposes only the retrieve, list, and transaction-attempt endpoints.
-- Create and confirm below are the target contracts for Phase 3 and remain
-  non-public until idempotency is implemented and verified.
+- Phase 3 exposes create with mandatory idempotency protection, along with the
+  Phase 2 retrieve, list, and transaction-attempt endpoints.
+- Confirm below remains non-public until its Phase 3 idempotency flow is
+  implemented and verified.
 
 ### Create
 
