@@ -248,9 +248,20 @@ class PaymentRefundApiIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(paymentRefundApi.requireOwnedPayment(ownerId, payment.publicId()))
                 .isEqualTo(new OwnedPaymentSnapshot(payment.internalId(), payment.publicId()));
+        assertThat(paymentRefundApi.requireOwnedPaymentByInternalId(
+                ownerId,
+                payment.internalId()
+        )).isEqualTo(new OwnedPaymentSnapshot(payment.internalId(), payment.publicId()));
         assertThatThrownBy(() -> paymentRefundApi.requireOwnedPayment(
                 otherId,
                 payment.publicId()
+        )).isInstanceOfSatisfying(ApiException.class, exception -> {
+            assertThat(exception.code()).isEqualTo(ErrorCode.PAYMENT_NOT_FOUND);
+            assertThat(exception.status().value()).isEqualTo(404);
+        });
+        assertThatThrownBy(() -> paymentRefundApi.requireOwnedPaymentByInternalId(
+                otherId,
+                payment.internalId()
         )).isInstanceOfSatisfying(ApiException.class, exception -> {
             assertThat(exception.code()).isEqualTo(ErrorCode.PAYMENT_NOT_FOUND);
             assertThat(exception.status().value()).isEqualTo(404);

@@ -13,6 +13,8 @@ public interface PaymentIntentRepository {
 
     Optional<PaymentIntent> findByPublicIdAndMerchantId(String publicId, long merchantId);
 
+    Optional<PaymentIntent> findByInternalIdAndMerchantId(long internalId, long merchantId);
+
     Optional<PaymentIntent> findByPublicIdAndMerchantIdForUpdate(
             String publicId,
             long merchantId

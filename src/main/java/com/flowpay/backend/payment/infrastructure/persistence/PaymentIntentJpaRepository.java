@@ -19,6 +19,8 @@ interface PaymentIntentJpaRepository extends
 
     Optional<PaymentIntentEntity> findByPublicIdAndMerchantId(String publicId, long merchantId);
 
+    Optional<PaymentIntentEntity> findByIdAndMerchantId(long id, long merchantId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT payment

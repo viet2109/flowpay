@@ -9,6 +9,11 @@ public interface PaymentRefundApi {
 
     OwnedPaymentSnapshot requireOwnedPayment(long merchantInternalId, String paymentPublicId);
 
+    OwnedPaymentSnapshot requireOwnedPaymentByInternalId(
+            long merchantInternalId,
+            long paymentInternalId
+    );
+
     PaymentRefundReservation reserveRefund(
             long merchantInternalId,
             String paymentPublicId,

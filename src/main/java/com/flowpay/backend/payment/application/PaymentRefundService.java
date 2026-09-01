@@ -40,6 +40,24 @@ public class PaymentRefundService implements PaymentRefundApi {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public OwnedPaymentSnapshot requireOwnedPaymentByInternalId(
+            long merchantInternalId,
+            long paymentInternalId
+    ) {
+        if (merchantInternalId <= 0) {
+            throw new IllegalArgumentException("merchantInternalId must be positive");
+        }
+        if (paymentInternalId <= 0) {
+            throw new IllegalArgumentException("paymentInternalId must be positive");
+        }
+        PaymentIntent payment = paymentIntentRepository
+                .findByInternalIdAndMerchantId(paymentInternalId, merchantInternalId)
+                .orElseThrow(PaymentRefundService::paymentNotFound);
+        return new OwnedPaymentSnapshot(payment.internalId(), payment.publicId());
+    }
+
+    @Override
     @Transactional
     public PaymentRefundReservation reserveRefund(
             long merchantInternalId,
