@@ -2,6 +2,8 @@ package com.flowpay.backend.payment.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
+import com.flowpay.backend.ledger.application.LedgerPostingApi;
+import com.flowpay.backend.ledger.application.PostPaymentSucceededCommand;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
@@ -28,6 +30,7 @@ public class FinalizePaymentConfirmationService {
 
     private final PaymentIntentRepository paymentIntentRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
+    private final LedgerPostingApi ledgerPostingApi;
     private final Clock clock;
 
     @Transactional
@@ -41,25 +44,39 @@ public class FinalizePaymentConfirmationService {
                 .findByPublicId(command.transactionPublicId())
                 .orElseThrow(FinalizePaymentConfirmationService::notFound);
 
-        validateConfirmation(payment, transaction, command.providerResult());
-        applyOutcome(payment, transaction, command.providerResult(), clock.instant());
+        PaymentProviderResult providerResult = command.providerResult();
+        validateConfirmation(payment, transaction, providerResult);
+        Instant completedAt = clock.instant();
+        applyOutcome(payment, transaction, providerResult, completedAt);
 
+        PaymentIntent savedPayment;
+        PaymentTransaction savedTransaction;
         try {
-            PaymentIntent savedPayment = paymentIntentRepository.save(payment);
-            PaymentTransaction savedTransaction = paymentTransactionRepository.save(transaction);
-            return new FinalizedPaymentConfirmation(
-                    savedPayment.publicId(),
-                    savedPayment.status(),
-                    savedTransaction.publicId(),
-                    savedTransaction.status(),
-                    savedTransaction.provider(),
-                    savedTransaction.providerTransactionId(),
-                    savedTransaction.failureCode(),
-                    savedTransaction.failureMessage()
-            );
+            savedPayment = paymentIntentRepository.save(payment);
+            savedTransaction = paymentTransactionRepository.save(transaction);
         } catch (OptimisticLockingFailureException | DataIntegrityViolationException exception) {
             throw invalidState();
         }
+
+        if (providerResult.outcome() == ProviderOutcome.SUCCESS) {
+            ledgerPostingApi.postPaymentSucceeded(new PostPaymentSucceededCommand(
+                    savedPayment.merchantId(),
+                    savedPayment.publicId(),
+                    savedPayment.amount(),
+                    completedAt
+            ));
+        }
+
+        return new FinalizedPaymentConfirmation(
+                savedPayment.publicId(),
+                savedPayment.status(),
+                savedTransaction.publicId(),
+                savedTransaction.status(),
+                savedTransaction.provider(),
+                savedTransaction.providerTransactionId(),
+                savedTransaction.failureCode(),
+                savedTransaction.failureMessage()
+        );
     }
 
     private static void validateConfirmation(

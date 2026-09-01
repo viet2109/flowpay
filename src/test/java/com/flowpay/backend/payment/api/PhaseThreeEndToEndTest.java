@@ -81,9 +81,9 @@ class PhaseThreeEndToEndTest extends PostgresIntegrationTest {
     void cleanData() {
         provider.reset();
         jdbcTemplate.update("""
-                TRUNCATE TABLE idempotency_records, payment_transactions, payment_intents,
-                    refresh_tokens, merchant_api_keys, merchant_members, merchants, users
-                    RESTART IDENTITY CASCADE
+                TRUNCATE TABLE ledger_entries, ledger_transactions, ledger_accounts,
+                    idempotency_records, payment_transactions, payment_intents, refresh_tokens,
+                    merchant_api_keys, merchant_members, merchants, users RESTART IDENTITY CASCADE
                 """);
     }
 
@@ -326,7 +326,7 @@ class PhaseThreeEndToEndTest extends PostgresIntegrationTest {
                 FROM flyway_schema_history
                 WHERE success = true
                 ORDER BY installed_rank
-                """, Integer.class)).containsExactly(1, 2, 3, 4, 5, 6, 7);
+                """, Integer.class)).startsWith(1, 2, 3, 4, 5, 6, 7);
         assertThat(jdbcTemplate.queryForObject("SELECT version()", String.class))
                 .contains("PostgreSQL");
         assertThat(jdbcTemplate.queryForObject("""

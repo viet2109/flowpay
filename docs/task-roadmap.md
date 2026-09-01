@@ -211,17 +211,27 @@ acceptance criteria, and the mandatory implementation order.
 
 ## Phase 5 — Ledger
 
-Planned tasks:
+Status: `DONE/FROZEN`.
 
-- ledger schema.
-- Money/account model.
-- LedgerTransaction aggregate.
-- balance invariant.
-- payment capture posting.
-- refund posting.
-- reversal support.
-- duplicate-event protection.
-- integration tests.
+Completed tasks:
+
+- P5-T01 Phase 4 exit gate and Ledger architecture freeze.
+- P5-T02 Ledger database migration.
+- P5-T03 LedgerAccount domain and accounting identity.
+- P5-T04 LedgerTransaction aggregate and balance invariant.
+- P5-T05 Ledger persistence adapters.
+- P5-T06 Concurrency-safe Ledger account provisioning.
+- P5-T07 Idempotent Ledger posting engine.
+- P5-T08 Payment success Ledger integration.
+- P5-T09 Refund success Ledger integration.
+- P5-T10 Reversal posting.
+- P5-T11 Ledger atomicity and accounting integration tests.
+- P5-T12 Duplicate posting and concurrency tests.
+- P5-T13 Architecture, security, and regression tests.
+- P5-T14 Quality gate and documentation freeze.
+
+See `phase-5-ledger.md` for frozen decisions, dependencies, acceptance criteria,
+and the mandatory implementation order.
 
 ## Phase 6 — Outbox & RabbitMQ
 

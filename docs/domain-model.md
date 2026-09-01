@@ -322,8 +322,14 @@ Examples:
 
 - system clearing
 - merchant payable
-- FlowPay fee revenue
-- refund clearing
+
+Active Phase 5 identities are:
+
+- `SYSTEM_CLEARING`: owner type `SYSTEM`, no owner ID.
+- `MERCHANT_PAYABLE`: owner type `MERCHANT`, positive merchant internal ID.
+
+Currency is part of deterministic account identity. Phase 5 accounts are
+created `ACTIVE` and expose no mutation or cached balance behavior.
 
 Fields:
 
@@ -350,6 +356,11 @@ Fields:
 - occurred/created timestamps
 - entries
 
+Active posting types are `PAYMENT_SUCCEEDED`, `REFUND_SUCCEEDED`, and
+`REVERSAL`. Their reference types are respectively `PAYMENT_INTENT`, `REFUND`,
+and `LEDGER_TRANSACTION`, using public source IDs. A posted transaction has no
+mutable status/version/update lifecycle.
+
 ### LedgerEntry — Child Entity
 
 Belongs to exactly one LedgerTransaction.
@@ -368,7 +379,17 @@ Direction:
 - `DEBIT`
 - `CREDIT`
 
+Entry amounts are positive minor units. Every transaction contains at least one
+debit and one credit, uses one currency across all referenced accounts, assigns
+positive unique entry numbers, and enforces exact overflow-safe debit/credit
+balance before persistence.
+
 A LedgerEntry is not an aggregate root and is not independently mutated.
+
+A reversal is a new immutable LedgerTransaction that flips every original entry
+direction while preserving accounts, amounts, and currency. The original rows
+remain unchanged; Phase 5 permits one reversal per original and does not reverse
+a reversal.
 
 ## 8. Webhook module
 

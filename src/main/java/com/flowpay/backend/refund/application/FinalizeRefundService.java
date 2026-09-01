@@ -2,6 +2,8 @@ package com.flowpay.backend.refund.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
+import com.flowpay.backend.ledger.application.LedgerPostingApi;
+import com.flowpay.backend.ledger.application.PostRefundSucceededCommand;
 import com.flowpay.backend.payment.application.PaymentRefundApi;
 import com.flowpay.backend.refund.domain.Refund;
 import com.flowpay.backend.refund.domain.RefundFailure;
@@ -23,6 +25,7 @@ public class FinalizeRefundService {
 
     private final RefundRepository refundRepository;
     private final PaymentRefundApi paymentRefundApi;
+    private final LedgerPostingApi ledgerPostingApi;
     private final Clock clock;
 
     @Transactional
@@ -36,7 +39,20 @@ public class FinalizeRefundService {
         Instant finalizedAt = clock.instant();
         applyOutcome(refund, command, finalizedAt);
         Refund saved = refundRepository.save(refund);
+        postSuccessfulRefund(saved, finalizedAt);
         return toResult(saved, command.paymentPublicId());
+    }
+
+    private void postSuccessfulRefund(Refund refund, Instant finalizedAt) {
+        if (refund.status() != RefundStatus.SUCCEEDED) {
+            return;
+        }
+        ledgerPostingApi.postRefundSucceeded(new PostRefundSucceededCommand(
+                refund.merchantId(),
+                refund.publicId(),
+                refund.amount(),
+                finalizedAt
+        ));
     }
 
     private void applyOutcome(

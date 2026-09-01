@@ -459,6 +459,20 @@ This section describes the target architecture from Phase 6 onward. Through
 Phase 4, FlowPay has no transactional outbox, RabbitMQ business-event publisher,
 Ledger consumer, or Webhook consumer implementation.
 
+Phase 5 uses one explicit transitional exception: successful Payment and Refund
+finalization calls `LedgerPostingApi` synchronously through Ledger's application
+boundary, and the Ledger posting joins the existing local PostgreSQL
+finalization transaction. Payment and Refund must not depend on Ledger domain,
+persistence, JPA, or infrastructure. Phase 6 replaces this direct trigger with
+the transactional outbox and an at-least-once Ledger consumer while reusing the
+same duplicate-safe posting API.
+
+No provider call is moved into a database transaction. If Ledger persistence
+fails after an external provider has already returned success, the local
+financial finalization rolls back while the external effect may remain. The
+local operation and Idempotency record remain processing; automatic retry or
+reconciliation of that state is outside Phase 5.
+
 Business modules do not publish RabbitMQ messages directly.
 
 They publish explicit integration events through an abstraction that persists an outbox row in the same database transaction as the business state change.
@@ -500,7 +514,10 @@ payment.succeeded.v1
    +--> Webhook
 ```
 
-Payment should not synchronously call Ledger and Webhook services inside the payment transaction.
+Outside the explicit Phase 5 local-atomicity exception above, Payment should not
+synchronously call Ledger or Webhook services inside the payment transaction.
+Webhook remains event-driven only, and Phase 6 removes the temporary direct
+Ledger trigger.
 
 ## 14. Persistence
 

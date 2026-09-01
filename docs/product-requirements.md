@@ -159,7 +159,13 @@ Full/partial refunds, refund reservation, concurrency protection, and integratio
 
 ### Phase 5 — Ledger
 
-Double-entry ledger accounts, transactions, entries, posting rules, and duplicate-consumer protection.
+Status: `DONE/FROZEN` as of 2026-09-01.
+
+Double-entry Ledger accounts, immutable balanced transactions and entries,
+concurrency-safe account provisioning, deterministic duplicate-safe posting,
+Payment/Refund success accounting, and reversal postings. Phase 5 uses a
+transitional synchronous local posting trigger; Outbox, RabbitMQ, integration
+events, and consumer delivery remain owned by Phase 6.
 
 ### Phase 6 — Outbox & RabbitMQ
 

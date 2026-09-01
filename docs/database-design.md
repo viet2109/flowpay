@@ -397,7 +397,7 @@ id                  BIGINT PK
 public_id           VARCHAR NOT NULL UNIQUE
 account_code        VARCHAR NOT NULL UNIQUE
 account_type        VARCHAR NOT NULL
-owner_type          VARCHAR NULL
+owner_type          VARCHAR NOT NULL
 owner_id            BIGINT NULL
 currency            CHAR(3) NOT NULL
 status              VARCHAR NOT NULL
@@ -424,6 +424,32 @@ Duplicate-posting protection:
 UNIQUE(posting_type, reference_type, reference_id)
 ```
 
+Row-local Ledger account and transaction checks:
+
+```sql
+CHECK (account_type IN ('SYSTEM_CLEARING', 'MERCHANT_PAYABLE'))
+CHECK (owner_type IN ('SYSTEM', 'MERCHANT'))
+CHECK (status IN ('ACTIVE', 'CLOSED'))
+CHECK (
+    (account_type = 'SYSTEM_CLEARING'
+        AND owner_type = 'SYSTEM'
+        AND owner_id IS NULL)
+    OR
+    (account_type = 'MERCHANT_PAYABLE'
+        AND owner_type = 'MERCHANT'
+        AND owner_id IS NOT NULL
+        AND owner_id > 0)
+)
+
+CHECK (posting_type IN ('PAYMENT_SUCCEEDED', 'REFUND_SUCCEEDED', 'REVERSAL'))
+CHECK (reference_type IN ('PAYMENT_INTENT', 'REFUND', 'LEDGER_TRANSACTION'))
+CHECK (
+    (posting_type = 'PAYMENT_SUCCEEDED' AND reference_type = 'PAYMENT_INTENT')
+    OR (posting_type = 'REFUND_SUCCEEDED' AND reference_type = 'REFUND')
+    OR (posting_type = 'REVERSAL' AND reference_type = 'LEDGER_TRANSACTION')
+)
+```
+
 ### `ledger_entries`
 
 ```text
@@ -441,6 +467,7 @@ Constraints:
 ```sql
 CHECK (amount_minor > 0)
 CHECK (direction IN ('DEBIT', 'CREDIT'))
+CHECK (entry_no > 0)
 UNIQUE(ledger_transaction_id, entry_no)
 ```
 
@@ -631,6 +658,12 @@ Phase 5:
 ```text
 V008__ledger.sql
 ```
+
+V008 creates an empty Ledger and does not backfill existing successful Payment
+or Refund rows. Ledger accounting is complete only for a clean installation or
+a separately reviewed cutover with no pre-existing financial history. A
+non-empty deployment requires a future backfill/opening-balance policy before
+Ledger can be treated as the complete accounting record.
 
 Phase 6:
 

@@ -57,8 +57,10 @@ class ConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
     @BeforeEach
     void cleanData() {
         jdbcTemplate.update(
-                "TRUNCATE TABLE payment_transactions, payment_intents, merchant_members, "
-                        + "merchant_api_keys, refresh_tokens, merchants, users RESTART IDENTITY CASCADE"
+                "TRUNCATE TABLE ledger_entries, ledger_transactions, ledger_accounts, "
+                        + "payment_transactions, payment_intents, merchant_members, "
+                        + "merchant_api_keys, refresh_tokens, merchants, users "
+                        + "RESTART IDENTITY CASCADE"
         );
         paymentProvider.reset();
     }
@@ -123,6 +125,15 @@ class ConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
                 Integer.class,
                 payment.internalId()
         )).isEqualTo(1);
+        int expectedPostingCount = outcome == ProviderOutcome.SUCCESS ? 1 : 0;
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM ledger_transactions",
+                Integer.class
+        )).isEqualTo(expectedPostingCount);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM ledger_entries",
+                Integer.class
+        )).isEqualTo(expectedPostingCount * 2);
     }
 
     @Test

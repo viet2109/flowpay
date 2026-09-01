@@ -3,6 +3,9 @@ package com.flowpay.backend.payment.application;
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.common.money.Money;
+import com.flowpay.backend.ledger.application.LedgerPostingApi;
+import com.flowpay.backend.ledger.application.LedgerPostingException;
+import com.flowpay.backend.ledger.application.PostPaymentSucceededCommand;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
@@ -49,6 +52,9 @@ class FinalizePaymentConfirmationServiceTest {
     @Mock
     private PaymentTransactionRepository paymentTransactionRepository;
 
+    @Mock
+    private LedgerPostingApi ledgerPostingApi;
+
     private FinalizePaymentConfirmationService service;
 
     @BeforeEach
@@ -56,6 +62,7 @@ class FinalizePaymentConfirmationServiceTest {
         service = new FinalizePaymentConfirmationService(
                 paymentIntentRepository,
                 paymentTransactionRepository,
+                ledgerPostingApi,
                 Clock.fixed(COMPLETED_AT, ZoneOffset.UTC)
         );
     }
@@ -87,6 +94,18 @@ class FinalizePaymentConfirmationServiceTest {
         }
         verify(paymentIntentRepository).save(payment);
         verify(paymentTransactionRepository).save(transaction);
+        if (providerResult.outcome() == ProviderOutcome.SUCCESS) {
+            verify(ledgerPostingApi).postPaymentSucceeded(
+                    new PostPaymentSucceededCommand(
+                            payment.merchantId(),
+                            payment.publicId(),
+                            payment.amount(),
+                            COMPLETED_AT
+                    )
+            );
+        } else {
+            verifyNoInteractions(ledgerPostingApi);
+        }
         assertThat(result).isEqualTo(new FinalizedPaymentConfirmation(
                 "pi_finalize",
                 expectedPaymentStatus,
@@ -199,6 +218,24 @@ class FinalizePaymentConfirmationServiceTest {
                 .thenThrow(new DataIntegrityViolationException("transaction update failed"));
 
         assertInvalidState(() -> service.finalizeConfirmation(command(success())));
+    }
+
+    @Test
+    void shouldPropagateLedgerFailureWithoutMisclassifyingItAsPaymentState() {
+        PaymentIntent payment = processingPayment();
+        PaymentTransaction transaction = processingTransaction(payment.internalId());
+        arrangeSuccessfulPersistence(payment, transaction);
+        LedgerPostingException ledgerFailure = org.mockito.Mockito.mock(
+                LedgerPostingException.class
+        );
+        when(ledgerPostingApi.postPaymentSucceeded(any(PostPaymentSucceededCommand.class)))
+                .thenThrow(ledgerFailure);
+
+        assertThatThrownBy(() -> service.finalizeConfirmation(command(success())))
+                .isSameAs(ledgerFailure)
+                .isNotInstanceOf(ApiException.class);
+        verify(paymentIntentRepository).save(payment);
+        verify(paymentTransactionRepository).save(transaction);
     }
 
     @Test
