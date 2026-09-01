@@ -89,9 +89,10 @@ class PaymentConfirmApiTest extends PostgresIntegrationTest {
     @BeforeEach
     void cleanData() {
         jdbcTemplate.update("""
-                TRUNCATE TABLE idempotency_records, payment_transactions, payment_intents,
-                    refresh_tokens, merchant_api_keys, merchant_members, merchants, users
-                    RESTART IDENTITY CASCADE
+                TRUNCATE TABLE ledger_entries, ledger_transactions, ledger_accounts,
+                    idempotency_records, payment_transactions, payment_intents,
+                    refresh_tokens, merchant_api_keys, merchant_members, merchants,
+                    users RESTART IDENTITY CASCADE
                 """);
         paymentProvider.reset();
     }
@@ -131,6 +132,12 @@ class PaymentConfirmApiTest extends PostgresIntegrationTest {
                 .andExpect(content().string(not(containsString("executionId"))))
                 .andExpect(content().string(not(containsString("requestHash"))))
                 .andExpect(content().string(not(containsString("responsePayload"))))
+                .andExpect(content().string(not(containsString("ltxn_"))))
+                .andExpect(content().string(not(containsString("la_"))))
+                .andExpect(content().string(not(containsString("SYSTEM_CLEARING:"))))
+                .andExpect(content().string(not(containsString(
+                        "MERCHANT_PAYABLE:" + stored.merchantId()
+                ))))
                 .andExpect(content().string(not(containsString(stored.rawKey()))))
                 .andExpect(content().string(not(containsString(idempotencyKey))))
                 .andReturn();
@@ -393,6 +400,16 @@ class PaymentConfirmApiTest extends PostgresIntegrationTest {
                         "IdempotencyRecordEntity",
                         "idempotency_records",
                         "uq_idempotency_records_scope",
+                        "LedgerAccountEntity",
+                        "LedgerTransactionEntity",
+                        "ledger_accounts",
+                        "ledger_transactions",
+                        "ledger_entries",
+                        "uq_ledger_transactions_business_reference",
+                        "ltxn_",
+                        "la_",
+                        "SYSTEM_CLEARING:",
+                        "MERCHANT_PAYABLE:",
                         "DataIntegrityViolationException",
                         "org.hibernate",
                         "org.postgresql"

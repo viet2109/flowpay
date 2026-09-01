@@ -138,6 +138,46 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule ledgerMustNotDependOnMerchantInfrastructure = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.ledger..")
+            .should().dependOnClassesThat().resideInAPackage(
+                    "com.flowpay.backend.merchant.infrastructure.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule ledgerMustNotDependOnIdempotency = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.ledger..")
+            .should().dependOnClassesThat().resideInAPackage(
+                    "com.flowpay.backend.idempotency.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule ledgerJpaEntitiesMustRemainPackagePrivate = classes()
+            .that().resideInAPackage(
+                    "com.flowpay.backend.ledger.infrastructure.persistence.."
+            )
+            .and().haveSimpleNameEndingWith("Entity")
+            .should().notBePublic()
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule ledgerJpaRepositoriesMustRemainPackagePrivate = classes()
+            .that().resideInAPackage(
+                    "com.flowpay.backend.ledger.infrastructure.persistence.."
+            )
+            .and().haveSimpleNameEndingWith("JpaRepository")
+            .should().notBePublic()
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule ledgerMustNotExposeHttpControllersInPhaseFive = classes()
+            .that().resideInAPackage("com.flowpay.backend.ledger..")
+            .should().notBeAnnotatedWith(RestController.class)
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule refundMustNotDependOnMerchantInfrastructure = noClasses()
             .that().resideInAPackage("com.flowpay.backend.refund..")
             .should().dependOnClassesThat().resideInAPackage(
