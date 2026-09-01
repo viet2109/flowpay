@@ -320,13 +320,13 @@ class PhaseThreeEndToEndTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void flywayShouldHaveAppliedTheCleanPhaseThreeMigrationChain() {
+    void flywayShouldHaveAppliedTheCleanMigrationChain() {
         assertThat(jdbcTemplate.queryForList("""
                 SELECT version::integer
                 FROM flyway_schema_history
                 WHERE success = true
                 ORDER BY installed_rank
-                """, Integer.class)).containsExactly(1, 2, 3, 4, 5, 6);
+                """, Integer.class)).containsExactly(1, 2, 3, 4, 5, 6, 7);
         assertThat(jdbcTemplate.queryForObject("SELECT version()", String.class))
                 .contains("PostgreSQL");
         assertThat(jdbcTemplate.queryForObject("""

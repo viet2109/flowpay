@@ -186,17 +186,28 @@ criteria, and the mandatory implementation order.
 
 ## Phase 4 — Refund & Concurrency
 
-Planned tasks:
+Status: `DONE/FROZEN`.
 
-- refund migration/domain.
-- payment refund-capacity public API.
-- refund reservation.
-- provider refund simulation.
-- complete/release reservation.
-- full refund.
-- partial/multiple refund.
-- concurrent over-refund tests.
-- integration tests.
+Completed tasks:
+
+- P4-T01 Phase 3 exit gate and Refund architecture freeze.
+- P4-T02 Refund database migration.
+- P4-T03 Refund aggregate and domain types.
+- P4-T04 Refund persistence adapters.
+- P4-T05 Payment refund-capacity public API.
+- P4-T06 Refund provider port and simulator.
+- P4-T07 Refund Idempotency operation and fingerprint.
+- P4-T08 Prepare Refund transaction.
+- P4-T09 Finalize Refund transaction.
+- P4-T10 Idempotent Refund orchestration.
+- P4-T11 Public create-Refund API.
+- P4-T12 Refund query APIs.
+- P4-T13 Idempotency and concurrency integration tests.
+- P4-T14 Architecture, security, and regression tests.
+- P4-T15 Quality gate and documentation freeze.
+
+See `phase-4-refund-concurrency.md` for frozen decisions, dependencies,
+acceptance criteria, and the mandatory implementation order.
 
 ## Phase 5 — Ledger
 

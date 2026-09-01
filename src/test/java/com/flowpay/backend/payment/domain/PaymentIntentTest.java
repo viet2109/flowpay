@@ -224,6 +224,116 @@ class PaymentIntentTest {
     }
 
     @Test
+    void shouldReserveCompleteAndReleaseRefundCapacity() {
+        PaymentIntent payment = succeededPayment("pi_refund_capacity");
+
+        payment.reserveRefund(Money.of(300_000L, "VND"), CREATED_AT.plusSeconds(3));
+
+        assertThat(payment.refundedAmount()).isEqualTo(Money.of(0L, "VND"));
+        assertThat(payment.refundReservedAmount()).isEqualTo(Money.of(300_000L, "VND"));
+        assertThat(payment.refundableAmount()).isEqualTo(Money.of(200_000L, "VND"));
+        assertThat(payment.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+
+        payment.completeRefund(Money.of(200_000L, "VND"), CREATED_AT.plusSeconds(4));
+
+        assertThat(payment.refundedAmount()).isEqualTo(Money.of(200_000L, "VND"));
+        assertThat(payment.refundReservedAmount()).isEqualTo(Money.of(100_000L, "VND"));
+        assertThat(payment.status()).isEqualTo(PaymentStatus.PARTIALLY_REFUNDED);
+
+        payment.releaseRefund(Money.of(100_000L, "VND"), CREATED_AT.plusSeconds(5));
+
+        assertThat(payment.refundedAmount()).isEqualTo(Money.of(200_000L, "VND"));
+        assertThat(payment.refundReservedAmount()).isEqualTo(Money.of(0L, "VND"));
+        assertThat(payment.status()).isEqualTo(PaymentStatus.PARTIALLY_REFUNDED);
+    }
+
+    @Test
+    void shouldMarkPaymentRefundedWhenCompletionReachesOriginalAmount() {
+        PaymentIntent payment = succeededPayment("pi_fully_refunded");
+        payment.reserveRefund(AMOUNT, CREATED_AT.plusSeconds(3));
+
+        payment.completeRefund(AMOUNT, CREATED_AT.plusSeconds(4));
+
+        assertThat(payment.refundedAmount()).isEqualTo(AMOUNT);
+        assertThat(payment.refundReservedAmount()).isEqualTo(Money.of(0L, "VND"));
+        assertThat(payment.refundableAmount()).isEqualTo(Money.of(0L, "VND"));
+        assertThat(payment.status()).isEqualTo(PaymentStatus.REFUNDED);
+    }
+
+    @Test
+    void shouldRejectRefundCapacityChangesOutsideRefundableStates() {
+        PaymentIntent created = newPayment("pi_created_refund");
+        PaymentIntent processing = processingPayment("pi_processing_refund");
+        PaymentIntent failed = failedPayment("pi_failed_refund");
+        PaymentIntent refunded = succeededPayment("pi_refunded_refund");
+        refunded.reserveRefund(AMOUNT, CREATED_AT.plusSeconds(3));
+        refunded.completeRefund(AMOUNT, CREATED_AT.plusSeconds(4));
+
+        assertThatThrownBy(() -> created.reserveRefund(
+                Money.of(1L, "VND"),
+                CREATED_AT.plusSeconds(5)
+        )).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> processing.reserveRefund(
+                Money.of(1L, "VND"),
+                CREATED_AT.plusSeconds(5)
+        )).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> failed.reserveRefund(
+                Money.of(1L, "VND"),
+                CREATED_AT.plusSeconds(5)
+        )).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> refunded.reserveRefund(
+                Money.of(1L, "VND"),
+                CREATED_AT.plusSeconds(5)
+        )).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void shouldRejectInvalidRefundAmountsWithoutMutation() {
+        PaymentIntent payment = succeededPayment("pi_invalid_refund_amount");
+
+        assertThatThrownBy(() -> payment.reserveRefund(
+                Money.of(0L, "VND"),
+                CREATED_AT.plusSeconds(3)
+        )).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("refund amount must be positive");
+        assertThatThrownBy(() -> payment.reserveRefund(
+                Money.of(1L, "USD"),
+                CREATED_AT.plusSeconds(3)
+        )).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("refund amount must use the payment currency");
+        assertThatThrownBy(() -> payment.reserveRefund(
+                Money.of(500_001L, "VND"),
+                CREATED_AT.plusSeconds(3)
+        )).isInstanceOf(IllegalStateException.class)
+                .hasMessage("refund amount exceeds available capacity");
+
+        assertThat(payment.refundedAmount()).isEqualTo(Money.of(0L, "VND"));
+        assertThat(payment.refundReservedAmount()).isEqualTo(Money.of(0L, "VND"));
+        assertThat(payment.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+    }
+
+    @Test
+    void shouldRejectCompletionOrReleaseAboveReservationWithoutMutation() {
+        PaymentIntent payment = succeededPayment("pi_invalid_reserved_refund");
+        payment.reserveRefund(Money.of(100_000L, "VND"), CREATED_AT.plusSeconds(3));
+
+        assertThatThrownBy(() -> payment.completeRefund(
+                Money.of(100_001L, "VND"),
+                CREATED_AT.plusSeconds(4)
+        )).isInstanceOf(IllegalStateException.class)
+                .hasMessage("refund amount exceeds reserved capacity");
+        assertThatThrownBy(() -> payment.releaseRefund(
+                Money.of(100_001L, "VND"),
+                CREATED_AT.plusSeconds(4)
+        )).isInstanceOf(IllegalStateException.class)
+                .hasMessage("refund amount exceeds reserved capacity");
+
+        assertThat(payment.refundedAmount()).isEqualTo(Money.of(0L, "VND"));
+        assertThat(payment.refundReservedAmount()).isEqualTo(Money.of(100_000L, "VND"));
+        assertThat(payment.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+    }
+
+    @Test
     void shouldRejectNonMonotonicTransitionTime() {
         PaymentIntent payment = processingPayment("pi_bad_time");
 

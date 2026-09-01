@@ -372,6 +372,37 @@ On failure:
 
 Because the refund-total invariant belongs to `PaymentIntent`, the Payment module owns the locking/concurrency mechanism protecting it.
 
+Refund-capacity decisions use a short pessimistic Payment row lock. The lock is
+released before provider I/O; optimistic versions and the PostgreSQL refund
+check remain additional protection.
+
+### BR-REF-006 — Provider outcomes
+
+Provider `SUCCESS` consumes the reservation and increases refunded amount.
+Known `DECLINED` or `TECHNICAL_FAILURE` outcomes release the reservation and
+produce a terminal failed Refund.
+
+An `UNKNOWN` or otherwise ambiguous outcome does not release capacity and does
+not mark the Refund failed. Refund remains `PROCESSING` until a future approved
+reconciliation mechanism resolves it.
+
+### BR-REF-007 — Refund idempotency
+
+Refund creation uses operation `REFUND_CREATE` with scope:
+
+`merchant + operation + idempotency key`
+
+The semantic fingerprint contains the Payment public ID, amount in minor units,
+and one normalized optional reason. Completed replay preserves the original
+status, body, and `Location` and never reserves again, creates another Refund,
+or invokes the provider.
+
+### BR-REF-008 — Refund reason
+
+Reason is optional, trimmed once, blank-normalized to `null`, and limited to 255
+characters. The same normalized value is used by fingerprinting, the aggregate,
+provider request, and public response.
+
 ## 9. Ledger
 
 ### BR-LED-001 — Double-entry

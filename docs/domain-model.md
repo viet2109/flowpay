@@ -283,9 +283,11 @@ Fields:
 - Money
 - status
 - reason
+- provider
 - provider refund ID
+- safe normalized failure code/message
 - version
-- timestamps
+- created, updated, and optional completed timestamps
 
 Status:
 
@@ -293,6 +295,18 @@ Status:
 - `PROCESSING`
 - `SUCCEEDED`
 - `FAILED`
+
+Lifecycle:
+
+```text
+CREATED -> PROCESSING -> SUCCEEDED
+                      -> FAILED
+```
+
+Provider `UNKNOWN` records only safe provider metadata, leaves Refund
+`PROCESSING`, and does not set a completed timestamp. `SUCCEEDED` and `FAILED`
+are terminal in Phase 4. Optional reason is represented by one Refund-owned
+normalized value: trim, blank to `null`, maximum 255 characters.
 
 Refund does not mutate PaymentIntent directly.
 
@@ -495,16 +509,24 @@ May expose immutable `PaymentSnapshot` for Refund decisions.
 
 Owns refund-capacity mutations on PaymentIntent:
 
+- require a merchant-owned Payment snapshot
 - reserve refund
 - complete refund
 - release refund
 
+Reservation derives currency from Payment and returns immutable provider-call
+data, including the explicit successful charge provider/reference. The API
+never exposes a Payment aggregate/entity and never assumes the latest provider
+attempt is successful. Refund finalization always locks Refund before invoking
+the Payment capacity mutation that locks Payment.
+
 ### Idempotency application contracts
 
-Used by Payment write orchestration to acquire a scoped execution, complete and
-replay a stored public response, or safely release a Confirm reservation before
-provider invocation. Decisions are explicit (`NEW`, `REPLAY`, `IN_PROGRESS`,
-`KEY_REUSED`) and do not expose Idempotency persistence entities.
+Used by Payment and Refund write orchestration to acquire a scoped execution,
+complete and replay a stored public response, or safely release a Payment
+Confirm reservation before provider invocation. Decisions are explicit (`NEW`,
+`REPLAY`, `IN_PROGRESS`, `KEY_REUSED`) and do not expose Idempotency persistence
+entities.
 
 ## 11. Value objects
 

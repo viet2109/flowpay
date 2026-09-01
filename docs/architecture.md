@@ -233,6 +233,59 @@ COMPLETED records through bounded PostgreSQL batches. Each run also has a
 configured batch limit, and PROCESSING records remain untouched even when their
 provisional expiration is in the past.
 
+### Refund transaction and concurrency boundaries
+
+Refund is a dedicated module. It owns the Refund aggregate, persistence,
+provider port/simulator, orchestration, and HTTP APIs. PaymentIntent remains the
+sole owner of refund capacity and the invariant:
+
+```text
+refundedAmount + refundReservedAmount <= paymentAmount
+```
+
+Refund may call only `MerchantAccessApi`, `PaymentRefundApi`, and Idempotency
+application contracts. It never accesses Merchant, Payment, or Idempotency
+entities/repositories/infrastructure. `PaymentRefundApi` returns immutable
+snapshots and performs an explicit successful-charge lookup; a latest
+PaymentTransaction is not assumed to be the successful provider operation.
+
+Refund processing uses four boundaries:
+
+```text
+PREPARE TX
+- acquire REFUND_CREATE Idempotency ownership
+- lock merchant-owned PaymentIntent
+- validate and reserve refund capacity
+- create Refund PROCESSING
+COMMIT
+
+NO DATABASE TX / NO ROW LOCK
+- invoke RefundProviderPort
+
+FINALIZE TX
+- lock merchant-owned Refund
+- lock PaymentIntent
+- SUCCESS: consume reservation and mark Refund SUCCEEDED
+- known failure: release reservation and mark Refund FAILED
+- UNKNOWN: retain reservation and Refund PROCESSING
+COMMIT
+
+IDEMPOTENCY COMPLETION TX
+- store REFUND resource identity and original public response snapshot
+COMMIT
+```
+
+The fixed finalization lock order is Refund row then Payment row. Both rows use
+pessimistic write locking only in short local transactions; existing optimistic
+versions and the PostgreSQL Payment refund-total check remain secondary/final
+guards. No lock or transaction crosses provider I/O.
+
+The existing normalized provider outcome enum belongs to Payment domain, so
+Refund defines an equivalent Refund-owned outcome contract rather than creating
+a Refund-to-Payment-domain dependency merely to reuse a type. Unexpected or
+ambiguous provider failures preserve Refund `PROCESSING`, the Payment
+reservation, and Idempotency `PROCESSING`; retry/reconciliation is deferred.
+
 ## 6. Identity and dashboard authentication
 
 Dashboard users authenticate with JWT access tokens.
@@ -402,6 +455,10 @@ Provider-specific results are normalized into FlowPay meanings such as:
 
 ## 12. Events and outbox
 
+This section describes the target architecture from Phase 6 onward. Through
+Phase 4, FlowPay has no transactional outbox, RabbitMQ business-event publisher,
+Ledger consumer, or Webhook consumer implementation.
+
 Business modules do not publish RabbitMQ messages directly.
 
 They publish explicit integration events through an abstraction that persists an outbox row in the same database transaction as the business state change.
@@ -430,7 +487,7 @@ Use a synchronous module API only when a business operation needs another module
 
 Example:
 
-`Refund -> PaymentQueryApi`
+`Refund -> PaymentRefundApi`
 
 Use events for downstream side effects.
 
@@ -521,6 +578,11 @@ Phase 3 has a consolidated Spring Boot and MockMvc end-to-end suite backed by
 PostgreSQL Testcontainers and Flyway. It uses real threads and latches to verify
 Create/Confirm concurrency, merchant and operation scopes, stable replay
 snapshots, and exactly-once provider execution across all normalized outcomes.
+
+Phase 4 extends the PostgreSQL-backed verification with clean V007 migration,
+Refund domain/persistence/API/security coverage, same-key Idempotency replay,
+different-key over-refund concurrency, fixed lock ordering, provider calls
+outside database transactions, and Payment/Phase 3 regression protection.
 
 RabbitMQ integration tests use RabbitMQ Testcontainers when messaging is implemented.
 

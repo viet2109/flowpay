@@ -7,10 +7,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class IdempotencyOperationTest {
 
     @Test
-    void shouldExposeOnlyFrozenPhaseThreeOperations() {
+    void shouldExposeOnlyApprovedOperationsThroughRefundCreation() {
         assertThat(IdempotencyOperation.values()).containsExactly(
                 IdempotencyOperation.PAYMENT_INTENT_CREATE,
-                IdempotencyOperation.PAYMENT_INTENT_CONFIRM
+                IdempotencyOperation.PAYMENT_INTENT_CONFIRM,
+                IdempotencyOperation.REFUND_CREATE
         );
     }
 }

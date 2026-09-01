@@ -315,10 +315,14 @@ Phase 3 actively uses only `PROCESSING` and `COMPLETED`. `FAILED` is reserved fo
 future explicitly approved recovery semantics and must not be produced by Phase
 3 application code.
 
-Phase 3 operations:
+Operations through Phase 3:
 
 - `PAYMENT_INTENT_CREATE`
 - `PAYMENT_INTENT_CONFIRM`
+
+Phase 4 adds `REFUND_CREATE`. V007 replaces the V006 operation check with the
+same named constraint accepting exactly all three operations; V006 remains
+immutable.
 
 `request_hash` stores exactly 64 lowercase hexadecimal SHA-256 characters.
 
@@ -352,12 +356,19 @@ payment_intent_id      BIGINT NOT NULL FK -> payment_intents.id
 amount_minor           BIGINT NOT NULL
 currency               CHAR(3) NOT NULL
 status                 VARCHAR NOT NULL
-reason                 VARCHAR NULL
+reason                 VARCHAR(255) NULL
+provider               VARCHAR NOT NULL
 provider_refund_id     VARCHAR NULL
+failure_code           VARCHAR NULL
+failure_message        VARCHAR NULL
 created_at             TIMESTAMPTZ NOT NULL
 updated_at             TIMESTAMPTZ NOT NULL
+completed_at           TIMESTAMPTZ NULL
 version                BIGINT NOT NULL DEFAULT 0
 ```
+
+`reason` has maximum length 255. Status values are `CREATED`, `PROCESSING`,
+`SUCCEEDED`, and `FAILED`. Provider `UNKNOWN` leaves the row `PROCESSING`.
 
 Constraint:
 
@@ -368,10 +379,14 @@ CHECK (amount_minor > 0)
 Indexes:
 
 ```text
-INDEX(payment_intent_id, created_at)
+INDEX(payment_intent_id, created_at DESC)
 INDEX(merchant_id, created_at DESC)
 INDEX(merchant_id, status, created_at DESC)
 ```
+
+The Merchant and Payment foreign keys do not use `ON DELETE CASCADE`. A
+provider-refund uniqueness constraint is not added until provider semantics
+define a safe uniqueness scope.
 
 ## 6. Ledger
 
@@ -605,6 +620,11 @@ Phase 4:
 ```text
 V007__refunds.sql
 ```
+
+V007 also replaces `ck_idempotency_records_operation` so it accepts
+`PAYMENT_INTENT_CREATE`, `PAYMENT_INTENT_CONFIRM`, and `REFUND_CREATE`. It does
+not edit V006 or change Idempotency columns, uniqueness, statuses, retention, or
+indexes.
 
 Phase 5:
 

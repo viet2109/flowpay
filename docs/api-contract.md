@@ -633,12 +633,22 @@ Request:
 }
 ```
 
-Currency is derived from the payment.
+Currency is derived from the payment. Reason is optional, trimmed, blank-normalized
+to `null`, and limited to 255 characters.
 
-Success:
+Provider outcomes:
+
+```text
+SUCCESS            -> 201 Created, Refund SUCCEEDED
+DECLINED           -> 201 Created, Refund FAILED
+TECHNICAL_FAILURE  -> 201 Created, Refund FAILED
+UNKNOWN            -> 202 Accepted, Refund PROCESSING
+```
+
+Every created outcome includes:
 
 ```http
-201 Created
+Location: /api/v1/refunds/re_01K...
 ```
 
 ```json
@@ -650,10 +660,22 @@ Success:
     "currency": "VND",
     "status": "SUCCEEDED",
     "reason": "CUSTOMER_REQUEST",
-    "createdAt": "2026-08-18T03:00:00Z"
+    "provider": "SIMULATOR",
+    "providerRefundId": "sim_refund_01K...",
+    "failureCode": null,
+    "failureMessage": null,
+    "createdAt": "2026-08-18T03:00:00Z",
+    "updatedAt": "2026-08-18T03:00:01Z",
+    "completedAt": "2026-08-18T03:00:01Z"
   }
 }
 ```
+
+The same response fields are used by create, retrieve, list, and the stored
+Idempotency snapshot. Non-applicable values remain explicit JSON `null` values.
+A completed replay returns the original status, body, and `Location`, adds
+`Idempotency-Replayed: true`, and never invokes the provider or mutates Payment
+capacity again.
 
 Exceeds refundable amount:
 
@@ -662,6 +684,14 @@ Exceeds refundable amount:
 ```
 
 `REFUND_AMOUNT_EXCEEDS_AVAILABLE`
+
+Invalid Payment state:
+
+```http
+409 Conflict
+```
+
+`REFUND_INVALID_PAYMENT_STATE`
 
 ### Retrieve refund
 
@@ -674,6 +704,10 @@ GET /api/v1/refunds/{refundId}
 ```http
 GET /api/v1/payment-intents/{paymentId}/refunds
 ```
+
+Defaults are page `0`, size `20`, maximum size `100`, ordered by `createdAt DESC`.
+All Refund endpoints require merchant API-key authentication and cross-merchant
+Payment/Refund access behaves as not found.
 
 ## 13. Webhook endpoint management
 

@@ -48,6 +48,10 @@ flowpay:
     provider: ${PAYMENT_PROVIDER:simulator}
     simulator:
       default-outcome: ${PAYMENT_SIMULATOR_DEFAULT_OUTCOME:SUCCESS}
+  refund:
+    provider: ${REFUND_PROVIDER:simulator}
+    simulator:
+      default-outcome: ${REFUND_SIMULATOR_DEFAULT_OUTCOME:SUCCESS}
   security:
     prometheus-public: false
     jwt:

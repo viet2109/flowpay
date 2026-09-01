@@ -137,7 +137,7 @@ class IdempotencyAcquisitionIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void sameTextualKeyShouldBeIndependentAcrossMerchantAndOperationScopes() {
+    void sameTextualKeyShouldBeIndependentAcrossMerchantAndAllOperationScopes() {
         long merchantId = insertMerchant("mrc_acquire_scope");
         long otherMerchantId = insertMerchant("mrc_acquire_scope_other");
 
@@ -155,8 +155,20 @@ class IdempotencyAcquisitionIntegrationTest extends PostgresIntegrationTest {
                         REQUEST_HASH
                 )).decision(),
                 acquisitionService.acquire(command(
+                        merchantId,
+                        IdempotencyOperation.REFUND_CREATE,
+                        "shared-key",
+                        REQUEST_HASH
+                )).decision(),
+                acquisitionService.acquire(command(
                         otherMerchantId,
                         IdempotencyOperation.PAYMENT_INTENT_CREATE,
+                        "shared-key",
+                        REQUEST_HASH
+                )).decision(),
+                acquisitionService.acquire(command(
+                        otherMerchantId,
+                        IdempotencyOperation.REFUND_CREATE,
                         "shared-key",
                         REQUEST_HASH
                 )).decision()
@@ -165,13 +177,15 @@ class IdempotencyAcquisitionIntegrationTest extends PostgresIntegrationTest {
         assertThat(decisions).containsExactly(
                 IdempotencyAcquisitionDecision.NEW,
                 IdempotencyAcquisitionDecision.NEW,
+                IdempotencyAcquisitionDecision.NEW,
+                IdempotencyAcquisitionDecision.NEW,
                 IdempotencyAcquisitionDecision.NEW
         );
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM idempotency_records WHERE idempotency_key = ?",
                 Integer.class,
                 "shared-key"
-        )).isEqualTo(3);
+        )).isEqualTo(5);
     }
 
     @Test

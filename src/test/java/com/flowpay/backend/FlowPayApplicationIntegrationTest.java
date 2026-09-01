@@ -20,7 +20,7 @@ class FlowPayApplicationIntegrationTest extends PostgresIntegrationTest {
     void shouldStartWithRealPostgresAndApplyFlywayMigrations() {
         Integer databaseResult = jdbcTemplate.queryForObject("select 1", Integer.class);
         Integer latestMigrationCount = jdbcTemplate.queryForObject(
-                "select count(*) from flyway_schema_history where version = '006' and success = true",
+                "select count(*) from flyway_schema_history where version = '007' and success = true",
                 Integer.class
         );
 
