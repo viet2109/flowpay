@@ -186,7 +186,7 @@ criteria, and the mandatory implementation order.
 
 ## Phase 4 — Refund & Concurrency
 
-Status: `IN PROGRESS`.
+Status: `DONE/FROZEN`.
 
 Completed tasks:
 
@@ -204,9 +204,6 @@ Completed tasks:
 - P4-T12 Refund query APIs.
 - P4-T13 Idempotency and concurrency integration tests.
 - P4-T14 Architecture, security, and regression tests.
-
-Remaining tasks:
-
 - P4-T15 Quality gate and documentation freeze.
 
 See `phase-4-refund-concurrency.md` for frozen decisions, dependencies,

@@ -455,6 +455,10 @@ Provider-specific results are normalized into FlowPay meanings such as:
 
 ## 12. Events and outbox
 
+This section describes the target architecture from Phase 6 onward. Through
+Phase 4, FlowPay has no transactional outbox, RabbitMQ business-event publisher,
+Ledger consumer, or Webhook consumer implementation.
+
 Business modules do not publish RabbitMQ messages directly.
 
 They publish explicit integration events through an abstraction that persists an outbox row in the same database transaction as the business state change.
@@ -574,6 +578,11 @@ Phase 3 has a consolidated Spring Boot and MockMvc end-to-end suite backed by
 PostgreSQL Testcontainers and Flyway. It uses real threads and latches to verify
 Create/Confirm concurrency, merchant and operation scopes, stable replay
 snapshots, and exactly-once provider execution across all normalized outcomes.
+
+Phase 4 extends the PostgreSQL-backed verification with clean V007 migration,
+Refund domain/persistence/API/security coverage, same-key Idempotency replay,
+different-key over-refund concurrency, fixed lock ordering, provider calls
+outside database transactions, and Payment/Phase 3 regression protection.
 
 RabbitMQ integration tests use RabbitMQ Testcontainers when messaging is implemented.
 

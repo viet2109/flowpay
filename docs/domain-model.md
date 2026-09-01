@@ -522,10 +522,11 @@ the Payment capacity mutation that locks Payment.
 
 ### Idempotency application contracts
 
-Used by Payment write orchestration to acquire a scoped execution, complete and
-replay a stored public response, or safely release a Confirm reservation before
-provider invocation. Decisions are explicit (`NEW`, `REPLAY`, `IN_PROGRESS`,
-`KEY_REUSED`) and do not expose Idempotency persistence entities.
+Used by Payment and Refund write orchestration to acquire a scoped execution,
+complete and replay a stored public response, or safely release a Payment
+Confirm reservation before provider invocation. Decisions are explicit (`NEW`,
+`REPLAY`, `IN_PROGRESS`, `KEY_REUSED`) and do not expose Idempotency persistence
+entities.
 
 ## 11. Value objects
 
