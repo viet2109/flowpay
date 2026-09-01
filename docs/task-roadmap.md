@@ -211,7 +211,7 @@ acceptance criteria, and the mandatory implementation order.
 
 ## Phase 5 — Ledger
 
-Status: `IN PROGRESS`.
+Status: `DONE/FROZEN`.
 
 Completed tasks:
 
@@ -228,9 +228,6 @@ Completed tasks:
 - P5-T11 Ledger atomicity and accounting integration tests.
 - P5-T12 Duplicate posting and concurrency tests.
 - P5-T13 Architecture, security, and regression tests.
-
-Remaining tasks:
-
 - P5-T14 Quality gate and documentation freeze.
 
 See `phase-5-ledger.md` for frozen decisions, dependencies, acceptance criteria,
