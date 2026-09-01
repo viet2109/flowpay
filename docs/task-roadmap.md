@@ -216,10 +216,10 @@ Status: `IN PROGRESS`.
 Completed tasks:
 
 - P5-T01 Phase 4 exit gate and Ledger architecture freeze.
+- P5-T02 Ledger database migration.
 
 Remaining tasks:
 
-- P5-T02 Ledger database migration.
 - P5-T03 LedgerAccount domain and accounting identity.
 - P5-T04 LedgerTransaction aggregate and balance invariant.
 - P5-T05 Ledger persistence adapters.

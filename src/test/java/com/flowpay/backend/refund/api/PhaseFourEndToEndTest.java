@@ -394,7 +394,7 @@ class PhaseFourEndToEndTest extends PostgresIntegrationTest {
                 FROM flyway_schema_history
                 WHERE success = true
                 ORDER BY installed_rank
-                """, Integer.class)).containsExactly(1, 2, 3, 4, 5, 6, 7);
+                """, Integer.class)).startsWith(1, 2, 3, 4, 5, 6, 7);
         assertThat(jdbcTemplate.queryForObject("SELECT version()", String.class))
                 .contains("PostgreSQL");
     }

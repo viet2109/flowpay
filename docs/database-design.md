@@ -437,6 +437,7 @@ CHECK (
     OR
     (account_type = 'MERCHANT_PAYABLE'
         AND owner_type = 'MERCHANT'
+        AND owner_id IS NOT NULL
         AND owner_id > 0)
 )
 
