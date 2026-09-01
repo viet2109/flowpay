@@ -242,10 +242,10 @@ Completed tasks:
 - P6-T01 Phase 5 exit gate and eventing architecture freeze.
 - P6-T02 Outbox database migration.
 - P6-T03 Versioned integration-event contracts and producer ports.
+- P6-T04 Transactional Outbox writer and persistence.
 
 Remaining tasks:
 
-- P6-T04 Transactional Outbox writer and persistence.
 - P6-T05 RabbitMQ topology and confirmed publisher.
 - P6-T06 Outbox relay and publication retry.
 - P6-T07 Ledger integration-event consumer.

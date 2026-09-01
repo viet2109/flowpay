@@ -281,6 +281,16 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule outboxPersistenceMustRemainBrokerIndependent = noClasses()
+            .that().resideInAPackage(
+                    "com.flowpay.backend.infrastructure.messaging.outbox.."
+            )
+            .should().dependOnClassesThat().resideInAPackage(
+                    "org.springframework.amqp.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule topLevelPackagesMustBeFreeOfCycles = slices()
             .matching("com.flowpay.backend.(*)..")
             .should().beFreeOfCycles()
