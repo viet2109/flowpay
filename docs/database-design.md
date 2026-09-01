@@ -499,6 +499,24 @@ Status:
 - `PUBLISHED`
 - `FAILED`
 
+Database constraints:
+
+```sql
+UNIQUE(event_id)
+CHECK (status IN ('PENDING', 'PUBLISHED', 'FAILED'))
+CHECK (retry_count >= 0)
+CHECK (
+    (status = 'PUBLISHED' AND published_at IS NOT NULL)
+    OR
+    (status IN ('PENDING', 'FAILED') AND published_at IS NULL)
+)
+```
+
+`FAILED` is retryable rather than terminal. Relay retries reuse the same
+`event_id`; `PUBLISHED` is terminal for normal relay selection. Aggregate IDs
+are source public IDs and have no polymorphic foreign key. V009 creates no
+historical Payment, Refund, or Ledger backfill rows.
+
 Worker index:
 
 ```sql

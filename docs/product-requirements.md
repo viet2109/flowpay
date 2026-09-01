@@ -169,7 +169,11 @@ events, and consumer delivery remain owned by Phase 6.
 
 ### Phase 6 — Outbox & RabbitMQ
 
-Transactional outbox, event relay, RabbitMQ, consumer idempotency, and integration events.
+Status: `IN PROGRESS` as of 2026-09-01.
+
+Transactional Outbox persistence, confirmed RabbitMQ publication, retryable
+relay, at-least-once delivery, bounded consumer retry/dead-lettering, and
+idempotent eventual Ledger posting for versioned Payment/Refund success events.
 
 ### Phase 7 — Webhooks
 

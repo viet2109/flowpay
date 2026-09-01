@@ -495,6 +495,25 @@ RabbitMQ
 
 Integration events are versioned contracts and must not serialize JPA entities.
 
+The frozen Phase 6 success pipeline uses `payment.succeeded.v1` and
+`refund.succeeded.v1`. The source finalization transaction persists business
+state and a `PENDING` Outbox row atomically, but never performs broker I/O. The
+relay reads an immutable due-event snapshot in a short database transaction,
+publishes without an active database transaction, and records `PUBLISHED` only
+after a positive publisher confirm and successful routing. Publication failure
+remains durably retryable with capped backoff.
+
+RabbitMQ delivery is at-least-once. A top-level transport listener validates
+the explicit envelope and delegates to a transactional Ledger event handler,
+which reuses the existing `LedgerPostingApi`. Ledger business-reference
+uniqueness absorbs equivalent duplicate delivery. No generic exactly-once,
+Inbox, distributed lock, or PostgreSQL/RabbitMQ XA boundary is introduced.
+
+Until the Payment and Refund cutover tasks are completed, the Phase 5 direct
+Ledger calls remain the operational path. The cutover removes those production
+dependencies only after the Outbox writer, confirmed publisher, relay, and
+Ledger consumer are independently verified.
+
 ## 13. Synchronous query versus asynchronous side effect
 
 Use a synchronous module API only when a business operation needs another module's current state to make a decision.

@@ -483,6 +483,41 @@ Do not serialize JPA entities or domain aggregates directly.
 
 Consumers must assume at-least-once delivery and protect against duplicate processing.
 
+### BR-EVT-005 — Source transaction atomicity
+
+A successful Payment or Refund finalization and its required integration event
+must persist in the same PostgreSQL transaction. Failure to serialize or insert
+the Outbox event rolls back the local source finalization. RabbitMQ publication
+must not occur inside that transaction.
+
+### BR-EVT-006 — Active Phase 6 success contracts
+
+Phase 6 publishes only `payment.succeeded.v1` and `refund.succeeded.v1`.
+Integration-event IDs remain stable across relay retries, aggregate IDs use
+source public IDs, and envelope occurrence time must equal the occurrence time
+inside the explicit V1 payload.
+
+### BR-EVT-007 — Confirmed retryable publication
+
+An Outbox event becomes `PUBLISHED` only after a positive publisher confirm and
+successful routing. A negative acknowledgement, confirm timeout, broker error,
+or mandatory return leaves the event retryable. Concurrent relay publication
+may create duplicate messages and must never downgrade `PUBLISHED` to `FAILED`.
+
+### BR-EVT-008 — Idempotent Ledger consumption
+
+The Ledger consumer owns a local PostgreSQL transaction and reuses the existing
+duplicate-safe `LedgerPostingApi`. An equivalent duplicate is successful
+consumption; a contradictory duplicate fails closed and follows bounded retry
+and dead-letter handling.
+
+### BR-EVT-009 — Reliability claim
+
+FlowPay guarantees atomic business-state/event persistence, at-least-once
+publication and delivery, and an idempotent Ledger effect. It does not claim
+exactly-once publication or delivery, or distributed ACID across PostgreSQL and
+RabbitMQ.
+
 ## 11. Webhooks
 
 ### BR-WEB-001 — Delivery semantics
