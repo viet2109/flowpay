@@ -203,10 +203,10 @@ Completed tasks:
 - P4-T11 Public create-Refund API.
 - P4-T12 Refund query APIs.
 - P4-T13 Idempotency and concurrency integration tests.
+- P4-T14 Architecture, security, and regression tests.
 
 Remaining tasks:
 
-- P4-T14 Architecture, security, and regression tests.
 - P4-T15 Quality gate and documentation freeze.
 
 See `phase-4-refund-concurrency.md` for frozen decisions, dependencies,

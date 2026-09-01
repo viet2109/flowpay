@@ -18,6 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultMatcher;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
@@ -299,6 +300,42 @@ class RefundQueryApiTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
     }
 
+    @Test
+    void shouldRejectInvalidRevokedAndInactiveCredentialsWithoutLeakingInternals()
+            throws Exception {
+        GeneratedApiKeySecret invalid = secretCodec.generate();
+        performGet(invalid.rawKey(), "re_refund_invalid_key")
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_API_KEY"))
+                .andExpect(safeProblem(invalid.rawKey()));
+
+        StoredKey revoked = createStoredKey(
+                "mrc_refund_query_revoked",
+                "key_refund_query_revoked"
+        );
+        ApiKey revokedKey = apiKeyRepository.findByPublicId(revoked.apiKeyPublicId())
+                .orElseThrow();
+        revokedKey.revoke(CREATED_AT.plusSeconds(1));
+        apiKeyRepository.save(revokedKey);
+        performGet(revoked.rawKey(), "re_refund_revoked_key")
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("API_KEY_REVOKED"))
+                .andExpect(safeProblem(revoked.rawKey()));
+
+        StoredKey inactive = createStoredKey(
+                "mrc_refund_query_inactive",
+                "key_refund_query_inactive"
+        );
+        jdbcTemplate.update(
+                "UPDATE merchants SET status = 'SUSPENDED' WHERE id = ?",
+                inactive.merchantId()
+        );
+        performList(inactive.rawKey(), "pi_refund_query_inactive", "")
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("MERCHANT_SUSPENDED"))
+                .andExpect(safeProblem(inactive.rawKey()));
+    }
+
     private org.springframework.test.web.servlet.ResultActions performGet(
             String rawApiKey,
             String refundPublicId
@@ -332,7 +369,7 @@ class RefundQueryApiTest extends PostgresIntegrationTest {
                 null,
                 CREATED_AT
         ));
-        return new StoredKey(merchant.id(), secret.rawKey());
+        return new StoredKey(merchant.id(), apiKey.publicId(), secret.rawKey());
     }
 
     private PaymentFixture insertPayment(
@@ -437,7 +474,27 @@ class RefundQueryApiTest extends PostgresIntegrationTest {
         return value.atOffset(ZoneOffset.UTC);
     }
 
-    private record StoredKey(long merchantId, String rawKey) {
+    private static ResultMatcher safeProblem(String... sensitiveValues) {
+        return result -> assertThat(result.getResponse().getContentAsString())
+                .doesNotContain(sensitiveValues)
+                .doesNotContain(
+                        "internalId",
+                        "merchantId",
+                        "paymentIntentId",
+                        "requestHash",
+                        "responsePayload",
+                        "rawProviderPayload",
+                        "idempotency_records",
+                        "refunds_pkey",
+                        "DataIntegrityViolationException",
+                        "ObjectOptimisticLockingFailureException",
+                        "org.hibernate",
+                        "org.postgresql",
+                        "\"version\""
+                );
+    }
+
+    private record StoredKey(long merchantId, String apiKeyPublicId, String rawKey) {
     }
 
     private record PaymentFixture(long internalId, String publicId) {

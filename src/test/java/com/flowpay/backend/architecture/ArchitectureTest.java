@@ -71,6 +71,12 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule restControllersMustNotDependOnInfrastructure = noClasses()
+            .that().areAnnotatedWith(RestController.class)
+            .should().dependOnClassesThat().resideInAPackage("..infrastructure..")
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule merchantMustNotDependOnIdentityInfrastructure = noClasses()
             .that().resideInAPackage("com.flowpay.backend.merchant..")
             .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.identity.infrastructure..")
@@ -95,6 +101,40 @@ class ArchitectureTest {
                     "com.flowpay.backend.payment.domain..",
                     "com.flowpay.backend.payment.infrastructure.."
             )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule refundMustNotDependOnMerchantInfrastructure = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.refund..")
+            .should().dependOnClassesThat().resideInAPackage(
+                    "com.flowpay.backend.merchant.infrastructure.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule refundMustNotDependOnIdempotencyInfrastructure = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.refund..")
+            .should().dependOnClassesThat().resideInAPackage(
+                    "com.flowpay.backend.idempotency.infrastructure.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule refundJpaEntitiesMustRemainPackagePrivate = classes()
+            .that().resideInAPackage(
+                    "com.flowpay.backend.refund.infrastructure.persistence.."
+            )
+            .and().haveSimpleNameEndingWith("Entity")
+            .should().notBePublic()
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule refundJpaRepositoriesMustRemainPackagePrivate = classes()
+            .that().resideInAPackage(
+                    "com.flowpay.backend.refund.infrastructure.persistence.."
+            )
+            .and().haveSimpleNameEndingWith("JpaRepository")
+            .should().notBePublic()
             .allowEmptyShould(true);
 
     @ArchTest
