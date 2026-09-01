@@ -91,7 +91,7 @@ class LedgerAccountProvisioningIntegrationTest extends PostgresIntegrationTest {
     @Test
     void concurrentSystemProvisioningShouldCreateOneCanonicalRow() throws Exception {
         List<LedgerAccount> results = provisionConcurrently(
-                2,
+                12,
                 () -> provisioningService.requireSystemClearing(VND)
         );
 
@@ -103,7 +103,7 @@ class LedgerAccountProvisioningIntegrationTest extends PostgresIntegrationTest {
     void concurrentMerchantProvisioningShouldCreateOneCanonicalRowForAllCallers()
             throws Exception {
         List<LedgerAccount> results = provisionConcurrently(
-                6,
+                12,
                 () -> provisioningService.requireMerchantPayable(29L, VND)
         );
 
