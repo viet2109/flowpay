@@ -81,9 +81,9 @@ class PhaseThreeEndToEndTest extends PostgresIntegrationTest {
     void cleanData() {
         provider.reset();
         jdbcTemplate.update("""
-                TRUNCATE TABLE idempotency_records, payment_transactions, payment_intents,
-                    refresh_tokens, merchant_api_keys, merchant_members, merchants, users
-                    RESTART IDENTITY CASCADE
+                TRUNCATE TABLE ledger_entries, ledger_transactions, ledger_accounts,
+                    idempotency_records, payment_transactions, payment_intents, refresh_tokens,
+                    merchant_api_keys, merchant_members, merchants, users RESTART IDENTITY CASCADE
                 """);
     }
 

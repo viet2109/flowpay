@@ -87,9 +87,9 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
     void cleanData() {
         dropTx1FailureTrigger();
         jdbcTemplate.update("""
-                TRUNCATE TABLE idempotency_records, payment_transactions, payment_intents,
-                    refresh_tokens, merchant_api_keys, merchant_members, merchants, users
-                    RESTART IDENTITY CASCADE
+                TRUNCATE TABLE ledger_entries, ledger_transactions, ledger_accounts,
+                    idempotency_records, payment_transactions, payment_intents, refresh_tokens,
+                    merchant_api_keys, merchant_members, merchants, users RESTART IDENTITY CASCADE
                 """);
         paymentProvider.reset();
     }
@@ -126,6 +126,15 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
                 outcome == ProviderOutcome.UNKNOWN ? 202 : 200
         );
         assertThat(paymentProvider.invocationCount()).isEqualTo(1);
+        int expectedPostingCount = outcome == ProviderOutcome.SUCCESS ? 1 : 0;
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM ledger_transactions",
+                Integer.class
+        )).isEqualTo(expectedPostingCount);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM ledger_entries",
+                Integer.class
+        )).isEqualTo(expectedPostingCount * 2);
         assertThat(paymentProvider.transactionActive()).isFalse();
         assertThat(paymentProvider.observedIdempotencyStatus())
                 .isEqualTo(IdempotencyStatus.PROCESSING.name());
@@ -161,6 +170,14 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
         assertThat(replay.response()).isEqualTo(result.response());
         assertThat(replay.httpStatus()).isEqualTo(result.httpStatus());
         assertThat(paymentProvider.invocationCount()).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM ledger_transactions",
+                Integer.class
+        )).isEqualTo(expectedPostingCount);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM ledger_entries",
+                Integer.class
+        )).isEqualTo(expectedPostingCount * 2);
     }
 
     @Test
@@ -223,6 +240,8 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
                 replay,
                 "confirm-replay"
         ));
+        int postingCountBeforeReplay = countLedgerRows("ledger_transactions");
+        int entryCountBeforeReplay = countLedgerRows("ledger_entries");
         jdbcTemplate.update(
                 "UPDATE payment_intents SET status = 'FAILED' WHERE public_id = ?",
                 replay.paymentId()
@@ -239,6 +258,10 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
         assertThat(replayResult.response().paymentStatus())
                 .isEqualTo(PaymentStatus.SUCCEEDED);
         assertThat(paymentProvider.invocationCount()).isEqualTo(1);
+        assertThat(countLedgerRows("ledger_transactions")).isEqualTo(
+                postingCountBeforeReplay
+        );
+        assertThat(countLedgerRows("ledger_entries")).isEqualTo(entryCountBeforeReplay);
     }
 
     @Test
@@ -402,6 +425,10 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
                 "SELECT count(*) FROM idempotency_records",
                 Integer.class
         );
+    }
+
+    private int countLedgerRows(String table) {
+        return jdbcTemplate.queryForObject("SELECT count(*) FROM " + table, Integer.class);
     }
 
     private static PaymentStatus paymentStatus(ProviderOutcome outcome) {
