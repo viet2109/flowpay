@@ -266,6 +266,21 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule producerEventContractsMustRemainBrokerAndConsumerIndependent = noClasses()
+            .that().resideInAnyPackage(
+                    "com.flowpay.backend.payment.application.event..",
+                    "com.flowpay.backend.refund.application.event.."
+            )
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "org.springframework.amqp..",
+                    "com.fasterxml.jackson..",
+                    "jakarta.persistence..",
+                    "com.flowpay.backend.ledger..",
+                    "com.flowpay.backend.webhook.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule topLevelPackagesMustBeFreeOfCycles = slices()
             .matching("com.flowpay.backend.(*)..")
             .should().beFreeOfCycles()
