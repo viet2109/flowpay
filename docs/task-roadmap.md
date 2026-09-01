@@ -225,10 +225,10 @@ Completed tasks:
 - P5-T08 Payment success Ledger integration.
 - P5-T09 Refund success Ledger integration.
 - P5-T10 Reversal posting.
+- P5-T11 Ledger atomicity and accounting integration tests.
 
 Remaining tasks:
 
-- P5-T11 Ledger atomicity and accounting integration tests.
 - P5-T12 Duplicate posting and concurrency tests.
 - P5-T13 Architecture, security, and regression tests.
 - P5-T14 Quality gate and documentation freeze.
