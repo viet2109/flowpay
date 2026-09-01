@@ -429,6 +429,40 @@ A business event may be delivered more than once.
 
 Ledger posting must be idempotent for a business reference.
 
+An equivalent duplicate has the same posting/reference identity, currency,
+accounts, directions, amounts, and source business occurrence time. Stored
+descriptions are Ledger-owned and canonical. A contradictory duplicate fails
+closed instead of creating or accepting different accounting data.
+
+### BR-LED-005 — Minimal account identity
+
+Phase 5 uses only `SYSTEM_CLEARING` owned by `SYSTEM` with no owner ID and
+`MERCHANT_PAYABLE` owned by `MERCHANT` with a positive merchant internal ID.
+Currency is part of account identity. Both Payment and Refund resolve System
+Clearing before Merchant Payable so concurrent first-use posting follows one
+database acquisition order.
+
+### BR-LED-006 — Payment and Refund posting rules
+
+A successful Payment debits System Clearing and credits Merchant Payable for
+the original Payment Money. A successful Refund debits Merchant Payable and
+credits System Clearing for the Refund Money. Failed or unknown outcomes do not
+post.
+
+### BR-LED-007 — Transitional local atomicity
+
+During Phase 5 only, a successful financial finalization and its Ledger posting
+join one local PostgreSQL transaction through `LedgerPostingApi`. Provider I/O
+remains outside database transactions. If Ledger fails after provider success,
+the local finalization rolls back but the provider effect may remain; automatic
+recovery/reconciliation is not implemented in Phase 5.
+
+### BR-LED-008 — Historical cutover limitation
+
+V008 does not backfill prior successful Payments or Refunds. Without a separately
+reviewed backfill/opening-balance policy, Ledger completeness is guaranteed only
+for clean installations with no pre-Phase-5 financial history.
+
 ## 10. Outbox and integration events
 
 ### BR-EVT-001 — Reliable event persistence

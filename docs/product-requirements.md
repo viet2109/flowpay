@@ -159,6 +159,8 @@ Full/partial refunds, refund reservation, concurrency protection, and integratio
 
 ### Phase 5 — Ledger
 
+Status: `IN PROGRESS` as of 2026-09-01.
+
 Double-entry ledger accounts, transactions, entries, posting rules, and duplicate-consumer protection.
 
 ### Phase 6 — Outbox & RabbitMQ
