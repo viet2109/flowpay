@@ -221,10 +221,10 @@ Completed tasks:
 - P5-T04 LedgerTransaction aggregate and balance invariant.
 - P5-T05 Ledger persistence adapters.
 - P5-T06 Concurrency-safe Ledger account provisioning.
+- P5-T07 Idempotent Ledger posting engine.
 
 Remaining tasks:
 
-- P5-T07 Idempotent Ledger posting engine.
 - P5-T08 Payment success Ledger integration.
 - P5-T09 Refund success Ledger integration.
 - P5-T10 Reversal posting.
