@@ -60,7 +60,8 @@ class IdempotentRefundIntegrationTest extends PostgresIntegrationTest {
     void cleanData() {
         dropCompletionFailureTrigger();
         jdbcTemplate.update("""
-                TRUNCATE TABLE refunds, idempotency_records, payment_transactions,
+                TRUNCATE TABLE ledger_entries, ledger_transactions, ledger_accounts,
+                    refunds, idempotency_records, payment_transactions,
                     payment_intents, merchant_members, merchant_api_keys, refresh_tokens,
                     merchants, users RESTART IDENTITY CASCADE
                 """);
@@ -137,6 +138,9 @@ class IdempotentRefundIntegrationTest extends PostgresIntegrationTest {
         assertThat(replay.httpStatus()).isEqualTo(result.httpStatus());
         assertThat(refundProvider.invocationCount()).isEqualTo(1);
         assertThat(countRefunds(fixture.merchantId())).isEqualTo(1);
+        assertThat(countRefundPostings()).isEqualTo(
+                outcome == RefundProviderOutcome.SUCCESS ? 1 : 0
+        );
     }
 
     @Test
@@ -193,6 +197,7 @@ class IdempotentRefundIntegrationTest extends PostgresIntegrationTest {
         assertThat(refundProvider.invocationCount()).isEqualTo(1);
         assertThat(singleRefundStatus(fixture.merchantId())).isEqualTo("PROCESSING");
         assertCapacity(fixture, 0L, 300L, "SUCCEEDED");
+        assertThat(countRefundPostings()).isZero();
         Map<String, Object> idempotency = idempotency(
                 fixture.merchantId(),
                 "refund-uncertain"
@@ -220,6 +225,7 @@ class IdempotentRefundIntegrationTest extends PostgresIntegrationTest {
         assertCapacity(fixture, 250L, 0L, "PARTIALLY_REFUNDED");
         assertThat(idempotency(fixture.merchantId(), "refund-completion-failure")
                 .get("status")).isEqualTo("PROCESSING");
+        assertThat(countRefundPostings()).isEqualTo(1);
 
         assertThatThrownBy(() -> service.create(command))
                 .isInstanceOf(IdempotencyRequestInProgressException.class);
@@ -386,6 +392,13 @@ class IdempotentRefundIntegrationTest extends PostgresIntegrationTest {
                 "SELECT count(*) FROM refunds WHERE merchant_id = ?",
                 Integer.class,
                 merchantId
+        );
+    }
+
+    private int countRefundPostings() {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM ledger_transactions WHERE posting_type = 'REFUND_SUCCEEDED'",
+                Integer.class
         );
     }
 

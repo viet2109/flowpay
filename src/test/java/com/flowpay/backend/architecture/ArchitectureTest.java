@@ -121,6 +121,23 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule refundMustUseOnlyLedgerApplicationBoundary = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.refund..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.flowpay.backend.ledger.domain..",
+                    "com.flowpay.backend.ledger.infrastructure.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule ledgerMustNotDependOnRefund = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.ledger..")
+            .should().dependOnClassesThat().resideInAPackage(
+                    "com.flowpay.backend.refund.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule refundMustNotDependOnMerchantInfrastructure = noClasses()
             .that().resideInAPackage("com.flowpay.backend.refund..")
             .should().dependOnClassesThat().resideInAPackage(
