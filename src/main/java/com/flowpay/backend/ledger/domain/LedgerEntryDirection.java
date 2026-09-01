@@ -2,5 +2,9 @@ package com.flowpay.backend.ledger.domain;
 
 public enum LedgerEntryDirection {
     DEBIT,
-    CREDIT
+    CREDIT;
+
+    public LedgerEntryDirection opposite() {
+        return this == DEBIT ? CREDIT : DEBIT;
+    }
 }

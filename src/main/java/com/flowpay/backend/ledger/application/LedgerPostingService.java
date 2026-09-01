@@ -114,7 +114,7 @@ public class LedgerPostingService implements LedgerPostingApi {
         );
     }
 
-    private LedgerPostingResult claim(LedgerTransaction candidate) {
+    LedgerPostingResult claim(LedgerTransaction candidate) {
         LedgerTransaction persisted;
         try {
             persisted = transactionRepository.tryInsert(candidate).orElse(null);

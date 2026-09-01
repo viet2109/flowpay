@@ -2,6 +2,8 @@ package com.flowpay.backend.architecture;
 
 import com.flowpay.backend.idempotency.application.IdempotencyCompletionCommand;
 import com.flowpay.backend.idempotency.application.IdempotencyCompletionService;
+import com.flowpay.backend.ledger.application.LedgerReversalService;
+import com.flowpay.backend.ledger.application.ReverseLedgerTransactionCommand;
 import com.flowpay.backend.payment.application.ConfirmPaymentCommand;
 import com.flowpay.backend.payment.application.ConfirmPaymentService;
 import com.flowpay.backend.payment.application.FinalizePaymentConfirmationCommand;
@@ -77,6 +79,15 @@ class TransactionBoundaryRegressionTest {
                 IdempotencyCompletionService.class,
                 "complete",
                 IdempotencyCompletionCommand.class
+        );
+    }
+
+    @Test
+    void ledgerReversalMustOwnItsTransactionBoundary() throws Exception {
+        assertTransactional(
+                LedgerReversalService.class,
+                "reverse",
+                ReverseLedgerTransactionCommand.class
         );
     }
 

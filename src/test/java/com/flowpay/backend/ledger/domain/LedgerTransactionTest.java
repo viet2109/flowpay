@@ -282,6 +282,113 @@ class LedgerTransactionTest {
     }
 
     @Test
+    void shouldCreateFullBalancedReversalWithoutMutatingOriginal() {
+        LedgerTransaction original = postPayment(
+                "ltxn_original_payment",
+                List.of(
+                        debit(systemAccount(1L, VND), 1_000L, VND),
+                        credit(merchantAccount(2L, 15L, VND), 600L, VND),
+                        credit(merchantAccount(3L, 16L, VND), 400L, VND)
+                )
+        );
+        Instant reversalOccurredAt = OCCURRED_AT.plusSeconds(60);
+        Instant reversalCreatedAt = reversalOccurredAt.plusSeconds(1);
+
+        LedgerTransaction reversal = original.reverse(
+                "ltxn_reversal_payment",
+                "Correct duplicated payment posting",
+                reversalOccurredAt,
+                reversalCreatedAt
+        );
+
+        assertThat(reversal.internalId()).isNull();
+        assertThat(reversal.postingType()).isEqualTo(LedgerPostingType.REVERSAL);
+        assertThat(reversal.businessReference()).isEqualTo(
+                LedgerBusinessReference.ledgerTransaction("ltxn_original_payment")
+        );
+        assertThat(reversal.currency()).isEqualTo(VND);
+        assertThat(reversal.description()).isEqualTo(
+                "Correct duplicated payment posting"
+        );
+        assertThat(reversal.occurredAt()).isEqualTo(reversalOccurredAt);
+        assertThat(reversal.createdAt()).isEqualTo(reversalCreatedAt);
+        assertThat(reversal.entries()).extracting(
+                LedgerEntry::entryNo,
+                LedgerEntry::ledgerAccountId,
+                LedgerEntry::direction,
+                LedgerEntry::amountMinor,
+                LedgerEntry::createdAt
+        ).containsExactly(
+                org.assertj.core.groups.Tuple.tuple(
+                        1,
+                        1L,
+                        LedgerEntryDirection.CREDIT,
+                        1_000L,
+                        reversalCreatedAt
+                ),
+                org.assertj.core.groups.Tuple.tuple(
+                        2,
+                        2L,
+                        LedgerEntryDirection.DEBIT,
+                        600L,
+                        reversalCreatedAt
+                ),
+                org.assertj.core.groups.Tuple.tuple(
+                        3,
+                        3L,
+                        LedgerEntryDirection.DEBIT,
+                        400L,
+                        reversalCreatedAt
+                )
+        );
+        assertThat(original.postingType()).isEqualTo(
+                LedgerPostingType.PAYMENT_SUCCEEDED
+        );
+        assertThat(original.entries()).extracting(
+                LedgerEntry::direction,
+                LedgerEntry::amountMinor
+        ).containsExactly(
+                org.assertj.core.groups.Tuple.tuple(
+                        LedgerEntryDirection.DEBIT,
+                        1_000L
+                ),
+                org.assertj.core.groups.Tuple.tuple(
+                        LedgerEntryDirection.CREDIT,
+                        600L
+                ),
+                org.assertj.core.groups.Tuple.tuple(
+                        LedgerEntryDirection.CREDIT,
+                        400L
+                )
+        );
+    }
+
+    @Test
+    void shouldRejectReverseAReversal() {
+        LedgerTransaction original = postPayment(
+                "ltxn_original_for_chain",
+                List.of(
+                        debit(systemAccount(1L, VND), 1_000L, VND),
+                        credit(merchantAccount(2L, 15L, VND), 1_000L, VND)
+                )
+        );
+        LedgerTransaction reversal = original.reverse(
+                "ltxn_first_reversal",
+                "First and only reversal",
+                OCCURRED_AT.plusSeconds(60),
+                CREATED_AT.plusSeconds(60)
+        );
+
+        assertThatThrownBy(() -> reversal.reverse(
+                "ltxn_second_reversal",
+                "Forbidden reversal chain",
+                OCCURRED_AT.plusSeconds(120),
+                CREATED_AT.plusSeconds(120)
+        )).isInstanceOf(IllegalStateException.class)
+                .hasMessage("A reversal posting cannot be reversed");
+    }
+
+    @Test
     void shouldExposeImmutablePostedAggregate() {
         List<LedgerEntryDraft> drafts = new ArrayList<>(List.of(
                 debit(systemAccount(1L, VND), 1_000L, VND),

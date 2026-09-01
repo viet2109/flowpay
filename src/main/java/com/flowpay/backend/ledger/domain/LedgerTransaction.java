@@ -114,6 +114,35 @@ public final class LedgerTransaction {
         );
     }
 
+    public LedgerTransaction reverse(
+            String reversalPublicId,
+            String reversalDescription,
+            Instant reversalOccurredAt,
+            Instant reversalCreatedAt
+    ) {
+        if (postingType == LedgerPostingType.REVERSAL) {
+            throw new IllegalStateException("A reversal posting cannot be reversed");
+        }
+        Instant created = Objects.requireNonNull(
+                reversalCreatedAt,
+                "reversalCreatedAt must not be null"
+        );
+        return new LedgerTransaction(
+                null,
+                reversalPublicId,
+                LedgerPostingType.REVERSAL,
+                LedgerBusinessReference.ledgerTransaction(publicId),
+                currency,
+                reversalDescription,
+                Objects.requireNonNull(
+                        reversalOccurredAt,
+                        "reversalOccurredAt must not be null"
+                ),
+                created,
+                entries.stream().map(entry -> entry.reverse(created)).toList()
+        );
+    }
+
     private static void validateDraft(Currency currency, LedgerEntryDraft draft) {
         LedgerEntryDraft value = Objects.requireNonNull(draft, "entryDraft must not be null");
         LedgerAccount account = value.account();

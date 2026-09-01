@@ -93,6 +93,22 @@ public final class LedgerEntry {
         );
     }
 
+    LedgerEntry reverse(Instant reversalCreatedAt) {
+        return new LedgerEntry(
+                null,
+                null,
+                ledgerAccountId,
+                entryNo,
+                direction.opposite(),
+                amountMinor,
+                accountCurrency,
+                Objects.requireNonNull(
+                        reversalCreatedAt,
+                        "reversalCreatedAt must not be null"
+                )
+        );
+    }
+
     private static Long validateOptionalId(Long value, String fieldName) {
         if (value != null && value <= 0) {
             throw new IllegalArgumentException(fieldName + " must be positive");
