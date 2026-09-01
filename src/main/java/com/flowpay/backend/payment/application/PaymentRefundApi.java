@@ -23,12 +23,14 @@ public interface PaymentRefundApi {
     void completeRefund(
             long merchantInternalId,
             String paymentPublicId,
+            long expectedPaymentInternalId,
             Money amount
     );
 
     void releaseRefund(
             long merchantInternalId,
             String paymentPublicId,
+            long expectedPaymentInternalId,
             Money amount
     );
 }

@@ -2,7 +2,6 @@ package com.flowpay.backend.refund.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
-import com.flowpay.backend.payment.application.OwnedPaymentSnapshot;
 import com.flowpay.backend.payment.application.PaymentRefundApi;
 import com.flowpay.backend.refund.domain.Refund;
 import com.flowpay.backend.refund.domain.RefundFailure;
@@ -49,19 +48,19 @@ public class FinalizeRefundService {
         RefundProviderOutcome outcome = providerResult.outcome();
         switch (outcome) {
             case SUCCESS -> {
-                requireMatchingPayment(refund, command);
                 paymentRefundApi.completeRefund(
                         command.merchantInternalId(),
                         command.paymentPublicId(),
+                        refund.paymentIntentId(),
                         refund.amount()
                 );
                 refund.markSucceeded(providerResult.providerRefundId(), finalizedAt);
             }
             case DECLINED, TECHNICAL_FAILURE -> {
-                requireMatchingPayment(refund, command);
                 paymentRefundApi.releaseRefund(
                         command.merchantInternalId(),
                         command.paymentPublicId(),
+                        refund.paymentIntentId(),
                         refund.amount()
                 );
                 refund.markFailed(
@@ -75,19 +74,6 @@ public class FinalizeRefundService {
                     failure(providerResult),
                     finalizedAt
             );
-        }
-    }
-
-    private void requireMatchingPayment(
-            Refund refund,
-            FinalizeRefundCommand command
-    ) {
-        OwnedPaymentSnapshot payment = paymentRefundApi.requireOwnedPayment(
-                command.merchantInternalId(),
-                command.paymentPublicId()
-        );
-        if (payment.paymentInternalId() != refund.paymentIntentId()) {
-            throw notFound();
         }
     }
 

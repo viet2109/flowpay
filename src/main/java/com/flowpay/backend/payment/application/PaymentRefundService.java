@@ -92,9 +92,11 @@ public class PaymentRefundService implements PaymentRefundApi {
     public void completeRefund(
             long merchantInternalId,
             String paymentPublicId,
+            long expectedPaymentInternalId,
             Money amount
     ) {
         PaymentIntent payment = findOwnedPayment(merchantInternalId, paymentPublicId, true);
+        requireExpectedPayment(payment, expectedPaymentInternalId);
         payment.completeRefund(amount, clock.instant());
         paymentIntentRepository.save(payment);
     }
@@ -104,9 +106,11 @@ public class PaymentRefundService implements PaymentRefundApi {
     public void releaseRefund(
             long merchantInternalId,
             String paymentPublicId,
+            long expectedPaymentInternalId,
             Money amount
     ) {
         PaymentIntent payment = findOwnedPayment(merchantInternalId, paymentPublicId, true);
+        requireExpectedPayment(payment, expectedPaymentInternalId);
         payment.releaseRefund(amount, clock.instant());
         paymentIntentRepository.save(payment);
     }
@@ -152,6 +156,18 @@ public class PaymentRefundService implements PaymentRefundApi {
             );
         }
         return succeeded.getFirst();
+    }
+
+    private static void requireExpectedPayment(
+            PaymentIntent payment,
+            long expectedPaymentInternalId
+    ) {
+        if (expectedPaymentInternalId <= 0) {
+            throw new IllegalArgumentException("expectedPaymentInternalId must be positive");
+        }
+        if (payment.internalId() != expectedPaymentInternalId) {
+            throw paymentNotFound();
+        }
     }
 
     private static ApiException paymentNotFound() {

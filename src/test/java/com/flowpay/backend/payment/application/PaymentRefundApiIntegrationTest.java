@@ -172,6 +172,7 @@ class PaymentRefundApiIntegrationTest extends PostgresIntegrationTest {
         paymentRefundApi.completeRefund(
                 merchantId,
                 payment.publicId(),
+                payment.internalId(),
                 Money.of(400L, "USD")
         );
 
@@ -186,6 +187,7 @@ class PaymentRefundApiIntegrationTest extends PostgresIntegrationTest {
         paymentRefundApi.releaseRefund(
                 merchantId,
                 payment.publicId(),
+                payment.internalId(),
                 Money.of(200L, "USD")
         );
         assertCapacity(
@@ -199,6 +201,7 @@ class PaymentRefundApiIntegrationTest extends PostgresIntegrationTest {
         paymentRefundApi.completeRefund(
                 merchantId,
                 payment.publicId(),
+                payment.internalId(),
                 Money.of(400L, "USD")
         );
         assertCapacity(
@@ -224,6 +227,7 @@ class PaymentRefundApiIntegrationTest extends PostgresIntegrationTest {
         paymentRefundApi.completeRefund(
                 merchantId,
                 payment.publicId(),
+                payment.internalId(),
                 Money.of(1_000L, "USD")
         );
 
@@ -233,6 +237,44 @@ class PaymentRefundApiIntegrationTest extends PostgresIntegrationTest {
                 1_000L,
                 0L,
                 PaymentStatus.REFUNDED
+        );
+    }
+
+    @Test
+    void shouldRejectMismatchedExpectedPaymentBeforeConsumingReservation() {
+        long merchantId = insertMerchant("mrc_refund_expected_payment");
+        PaymentIntent reservedPayment = savePayment(
+                "pi_refund_expected_reserved",
+                merchantId,
+                PaymentStatus.SUCCEEDED
+        );
+        PaymentIntent differentPayment = savePayment(
+                "pi_refund_expected_different",
+                merchantId,
+                PaymentStatus.SUCCEEDED
+        );
+        saveSucceededTransaction(
+                reservedPayment,
+                1,
+                "provider_charge_expected_reserved"
+        );
+        paymentRefundApi.reserveRefund(merchantId, reservedPayment.publicId(), 300L);
+
+        assertThatThrownBy(() -> paymentRefundApi.completeRefund(
+                merchantId,
+                reservedPayment.publicId(),
+                differentPayment.internalId(),
+                Money.of(300L, "USD")
+        )).isInstanceOfSatisfying(ApiException.class, exception ->
+                assertThat(exception.code()).isEqualTo(ErrorCode.PAYMENT_NOT_FOUND)
+        );
+
+        assertCapacity(
+                reservedPayment.publicId(),
+                merchantId,
+                0L,
+                300L,
+                PaymentStatus.SUCCEEDED
         );
     }
 
