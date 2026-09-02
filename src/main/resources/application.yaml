@@ -48,6 +48,8 @@ flowpay:
       dead-letter-exchange: ${RABBITMQ_DEAD_LETTER_EXCHANGE:flowpay.events.dlx}
       ledger-dead-letter-queue: ${RABBITMQ_LEDGER_DLQ:flowpay.ledger.events.dlq}
       dead-letter-routing-key: ${RABBITMQ_LEDGER_DEAD_ROUTING_KEY:ledger.dead}
+    ledger-consumer:
+      enabled: ${LEDGER_EVENT_CONSUMER_ENABLED:true}
     outbox:
       publisher-confirm-timeout: ${OUTBOX_PUBLISHER_CONFIRM_TIMEOUT:5s}
       relay:

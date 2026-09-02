@@ -245,10 +245,10 @@ Completed tasks:
 - P6-T04 Transactional Outbox writer and persistence.
 - P6-T05 RabbitMQ topology and confirmed publisher.
 - P6-T06 Outbox relay and publication retry.
+- P6-T07 Ledger integration-event consumer.
 
 Remaining tasks:
 
-- P6-T07 Ledger integration-event consumer.
 - P6-T08 Payment success Outbox cutover.
 - P6-T09 Refund success Outbox cutover.
 - P6-T10 Consumer retry and dead-letter handling.

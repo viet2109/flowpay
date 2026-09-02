@@ -309,6 +309,19 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule ledgerEventConsumerMustNotAccessSourcePersistence = noClasses()
+            .that().resideInAPackage(
+                    "com.flowpay.backend.infrastructure.messaging.rabbit.."
+            )
+            .and().haveSimpleNameStartingWith("LedgerIntegrationEvent")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.flowpay.backend.payment.infrastructure..",
+                    "com.flowpay.backend.refund.infrastructure..",
+                    "com.flowpay.backend.merchant.infrastructure.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule topLevelPackagesMustBeFreeOfCycles = slices()
             .matching("com.flowpay.backend.(*)..")
             .should().beFreeOfCycles()

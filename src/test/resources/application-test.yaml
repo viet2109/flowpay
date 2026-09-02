@@ -19,6 +19,8 @@ management:
 
 flowpay:
   messaging:
+    ledger-consumer:
+      enabled: false
     outbox:
       relay:
         enabled: false
