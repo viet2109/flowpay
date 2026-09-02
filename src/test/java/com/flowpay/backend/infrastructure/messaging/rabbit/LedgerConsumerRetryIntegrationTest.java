@@ -117,6 +117,7 @@ class LedgerConsumerRetryIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void cleanState() {
+        dropLedgerEntryFailureTrigger();
         postingApi.reset();
         jdbcTemplate.update("""
                 TRUNCATE TABLE outbox_events, ledger_entries, ledger_transactions,
@@ -127,6 +128,7 @@ class LedgerConsumerRetryIntegrationTest extends PostgresIntegrationTest {
 
     @AfterEach
     void cleanQueues() {
+        dropLedgerEntryFailureTrigger();
         purgeQueues();
     }
 
@@ -242,6 +244,8 @@ class LedgerConsumerRetryIntegrationTest extends PostgresIntegrationTest {
                     LedgerPostingOutcome.ALREADY_POSTED
             );
             assertThat(countRows("ledger_transactions")).isOne();
+            assertThat(countRows("ledger_entries")).isEqualTo(2L);
+            assertThat(countUnbalancedTransactions()).isZero();
         });
         await().during(Duration.ofMillis(500))
                 .atMost(Duration.ofSeconds(2))
@@ -265,6 +269,24 @@ class LedgerConsumerRetryIntegrationTest extends PostgresIntegrationTest {
             assertThat(countRows("ledger_transactions")).isOne();
         });
         assertThat(queueMessageCount(properties.topology().ledgerDeadLetterQueue())).isZero();
+    }
+
+    @Test
+    void databaseFailureBeforeCommitShouldRollBackEveryLedgerRowAndDeadLetter() {
+        String eventId = "ievt_retry_database_rollback";
+        String paymentPublicId = "pi_retry_database_rollback";
+        installSecondEntryFailureTrigger();
+
+        publish(paymentEnvelope(eventId, paymentPublicId, 625_000L));
+
+        Message deadLetter = requireDeadLetter();
+        assertThat(deadLetter.getMessageProperties().getMessageId()).isEqualTo(eventId);
+        assertThat(postingApi.paymentAttemptCount(paymentPublicId))
+                .isEqualTo(MAX_ATTEMPTS);
+        assertThat(postingApi.transactionStates()).containsOnly(true);
+        assertThat(countRows("ledger_accounts")).isZero();
+        assertThat(countRows("ledger_transactions")).isZero();
+        assertThat(countRows("ledger_entries")).isZero();
     }
 
     private IntegrationEventEnvelope paymentEnvelope(
@@ -351,9 +373,50 @@ class LedgerConsumerRetryIntegrationTest extends PostgresIntegrationTest {
         return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
     }
 
+    private long countUnbalancedTransactions() {
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM (
+                    SELECT ledger_transaction.id
+                    FROM ledger_transactions ledger_transaction
+                    JOIN ledger_entries entry
+                      ON entry.ledger_transaction_id = ledger_transaction.id
+                    GROUP BY ledger_transaction.id
+                    HAVING SUM(CASE entry.direction
+                               WHEN 'DEBIT' THEN entry.amount_minor
+                               ELSE -entry.amount_minor END) <> 0
+                ) unbalanced
+                """, Long.class);
+    }
+
     private void purgeQueues() {
         rabbitAdmin.purgeQueue(properties.topology().ledgerQueue(), true);
         rabbitAdmin.purgeQueue(properties.topology().ledgerDeadLetterQueue(), true);
+    }
+
+    private void installSecondEntryFailureTrigger() {
+        jdbcTemplate.execute("""
+                CREATE OR REPLACE FUNCTION fail_p6_t11_second_entry() RETURNS trigger AS $$
+                BEGIN
+                    IF NEW.entry_no = 2 THEN
+                        RAISE EXCEPTION 'forced consumer Ledger transaction failure';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$ LANGUAGE plpgsql
+                """);
+        jdbcTemplate.execute("""
+                CREATE TRIGGER fail_p6_t11_second_entry_trigger
+                BEFORE INSERT ON ledger_entries
+                FOR EACH ROW EXECUTE FUNCTION fail_p6_t11_second_entry()
+                """);
+    }
+
+    private void dropLedgerEntryFailureTrigger() {
+        jdbcTemplate.execute("""
+                DROP TRIGGER IF EXISTS fail_p6_t11_second_entry_trigger ON ledger_entries
+                """);
+        jdbcTemplate.execute("DROP FUNCTION IF EXISTS fail_p6_t11_second_entry()");
     }
 
     private static void assertBoundedBackoff(List<Long> attemptTimes) {

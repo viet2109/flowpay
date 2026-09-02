@@ -249,10 +249,10 @@ Completed tasks:
 - P6-T08 Payment success Outbox cutover.
 - P6-T09 Refund success Outbox cutover.
 - P6-T10 Consumer retry and dead-letter handling.
+- P6-T11 Relay and consumer failure/concurrency hardening.
 
 Remaining tasks:
 
-- P6-T11 Relay and consumer failure/concurrency hardening.
 - P6-T12 End-to-end PostgreSQL and RabbitMQ verification.
 - P6-T13 Architecture, data-safety, and regression tests.
 - P6-T14 Quality gate and documentation freeze.

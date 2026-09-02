@@ -2,6 +2,7 @@ package com.flowpay.backend.infrastructure.messaging.rabbit;
 
 import com.flowpay.backend.infrastructure.messaging.FlowPayMessagingProperties;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationResult;
+import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationStatus;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventTransportPublisher;
 import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvelope;
 import com.flowpay.backend.infrastructure.messaging.outbox.OutboxEvent;
@@ -9,6 +10,7 @@ import com.flowpay.backend.infrastructure.messaging.outbox.OutboxRepository;
 import com.flowpay.backend.infrastructure.messaging.outbox.relay.OutboxRelayBatchResult;
 import com.flowpay.backend.infrastructure.messaging.outbox.relay.OutboxRelayBackoffPolicy;
 import com.flowpay.backend.infrastructure.messaging.outbox.relay.OutboxRelayFailureSummary;
+import com.flowpay.backend.infrastructure.messaging.outbox.relay.OutboxRelayPersistenceService;
 import com.flowpay.backend.infrastructure.messaging.outbox.relay.OutboxRelayService;
 import com.flowpay.backend.payment.application.event.PaymentSucceededEventV1;
 import com.flowpay.backend.testing.PostgresIntegrationTest;
@@ -44,6 +46,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -65,6 +68,9 @@ class OutboxRelayIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private OutboxRelayBackoffPolicy backoffPolicy;
+
+    @Autowired
+    private OutboxRelayPersistenceService persistenceService;
 
     @Autowired
     private OutboxRepository outboxRepository;
@@ -249,6 +255,61 @@ class OutboxRelayIntegrationTest extends PostgresIntegrationTest {
         assertThat(recordingPublisher.transactionStates()).containsOnly(false);
     }
 
+    @Test
+    void lostConfirmOutcomeShouldRemainRetryableAndAllowDuplicatePublication() {
+        String eventId = "ievt_relay_confirm_ambiguous";
+        save(pending(eventId, PaymentSucceededEventV1.EVENT_TYPE, NOW));
+        recordingPublisher.reportConfirmedAsTimeoutOnce(eventId);
+
+        OutboxRelayBatchResult ambiguous = relayService.relayDueEvents();
+
+        Duration retryDelay = backoffPolicy.delayAfterFailure(eventId, 0);
+        assertThat(ambiguous).isEqualTo(new OutboxRelayBatchResult(1, 0, 1));
+        assertFailed(eventId, 1, NOW.plus(retryDelay));
+        assertThat(row(eventId).lastError())
+                .isEqualTo("RabbitMQ publication failed: CONFIRM_TIMEOUT");
+        assertThat(receiveLedgerMessage().getMessageProperties().getMessageId())
+                .isEqualTo(eventId);
+
+        clock.advance(retryDelay);
+        assertThat(relayService.relayDueEvents())
+                .isEqualTo(new OutboxRelayBatchResult(1, 1, 0));
+
+        assertPublished(eventId, NOW.plus(retryDelay));
+        assertThat(row(eventId).retryCount()).isOne();
+        assertThat(receiveLedgerMessage().getMessageProperties().getMessageId())
+                .isEqualTo(eventId);
+    }
+
+    @Test
+    void publishedStateShouldWinBothLateFailureAndEarlierFailureTransitions() {
+        String publishedFirst = "ievt_relay_published_first";
+        String failedFirst = "ievt_relay_failed_first";
+        save(pending(publishedFirst, PaymentSucceededEventV1.EVENT_TYPE, NOW));
+        save(pending(failedFirst, PaymentSucceededEventV1.EVENT_TYPE, NOW));
+
+        assertThat(persistenceService.markPublished(publishedFirst, NOW)).isTrue();
+        assertThat(persistenceService.recordFailure(
+                publishedFirst,
+                NOW.plusSeconds(1),
+                "late failure"
+        )).isFalse();
+        assertPublished(publishedFirst, NOW);
+        assertThat(row(publishedFirst).retryCount()).isZero();
+
+        assertThat(persistenceService.recordFailure(
+                failedFirst,
+                NOW.plusSeconds(1),
+                "temporary failure"
+        )).isTrue();
+        assertThat(persistenceService.markPublished(
+                failedFirst,
+                NOW.plusSeconds(2)
+        )).isTrue();
+        assertPublished(failedFirst, NOW.plusSeconds(2));
+        assertThat(row(failedFirst).retryCount()).isOne();
+    }
+
     private void save(OutboxEvent event) {
         new TransactionTemplate(transactionManager).executeWithoutResult(
                 status -> outboxRepository.save(event)
@@ -311,9 +372,11 @@ class OutboxRelayIntegrationTest extends PostgresIntegrationTest {
         assertThat(row.publishedAt()).isNull();
         assertThat(row.lastError()).isEqualTo(
                 "RabbitMQ publication failed: "
-                        + (eventId.equals("ievt_relay_recovery")
-                        ? "TRANSPORT_FAILURE"
-                        : "UNROUTABLE")
+                        + switch (eventId) {
+                            case "ievt_relay_recovery" -> "TRANSPORT_FAILURE";
+                            case "ievt_relay_confirm_ambiguous" -> "CONFIRM_TIMEOUT";
+                            default -> "UNROUTABLE";
+                        }
         );
     }
 
@@ -397,6 +460,8 @@ class OutboxRelayIntegrationTest extends PostgresIntegrationTest {
         private final ConfirmedRabbitIntegrationEventPublisher delegate;
         private final List<String> eventIds = new CopyOnWriteArrayList<>();
         private final List<Boolean> transactionStates = new CopyOnWriteArrayList<>();
+        private final AtomicReference<String> ambiguousEventId = new AtomicReference<>();
+        private final AtomicInteger ambiguousResultsRemaining = new AtomicInteger();
 
         private RecordingPublisher(ConfirmedRabbitIntegrationEventPublisher delegate) {
             this.delegate = delegate;
@@ -415,7 +480,21 @@ class OutboxRelayIntegrationTest extends PostgresIntegrationTest {
                         "amqp://admin:password@broker/vhost\nAuthorization: secret"
                 );
             }
-            return delegate.publish(envelope);
+            IntegrationEventPublicationResult result = delegate.publish(envelope);
+            if (result.confirmed()
+                    && envelope.eventId().equals(ambiguousEventId.get())
+                    && ambiguousResultsRemaining.getAndUpdate(value -> Math.max(0, value - 1))
+                    > 0) {
+                return IntegrationEventPublicationResult.of(
+                        IntegrationEventPublicationStatus.CONFIRM_TIMEOUT
+                );
+            }
+            return result;
+        }
+
+        void reportConfirmedAsTimeoutOnce(String eventId) {
+            ambiguousEventId.set(eventId);
+            ambiguousResultsRemaining.set(1);
         }
 
         List<String> eventIds() {
@@ -429,6 +508,8 @@ class OutboxRelayIntegrationTest extends PostgresIntegrationTest {
         void reset() {
             eventIds.clear();
             transactionStates.clear();
+            ambiguousEventId.set(null);
+            ambiguousResultsRemaining.set(0);
         }
     }
 
