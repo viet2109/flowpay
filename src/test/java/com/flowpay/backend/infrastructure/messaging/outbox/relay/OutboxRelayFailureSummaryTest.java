@@ -26,8 +26,18 @@ class OutboxRelayFailureSummaryTest {
 
     @Test
     void shouldIgnoreUnsafeExceptionMessageAndStackTrace() {
+        String rawApiKey = "fp_live_sensitive-api-key";
+        String rawIdempotencyKey = "checkout-sensitive-idempotency-key";
+        String rabbitCredential = "amqp://rabbit-user:rabbit-password@broker/vhost";
+        String databaseCredential = "jdbc:postgresql://db/flowpay?user=db-user&password=db-password";
         RuntimeException unsafe = new IllegalStateException(
-                "amqp://admin:super-secret@broker/vhost\nAuthorization: Bearer token"
+                rabbitCredential
+                        + "\n"
+                        + databaseCredential
+                        + "\nAuthorization: Bearer "
+                        + rawApiKey
+                        + "\nIdempotency-Key: "
+                        + rawIdempotencyKey
                         + "x".repeat(1_000)
         );
 
@@ -42,6 +52,11 @@ class OutboxRelayFailureSummaryTest {
                         "Authorization",
                         "Bearer",
                         "amqp://",
+                        "jdbc:postgresql",
+                        rawApiKey,
+                        rawIdempotencyKey,
+                        "rabbit-password",
+                        "db-password",
                         "\n"
                 )
                 .hasSizeLessThanOrEqualTo(OutboxRelayFailureSummary.MAX_LENGTH);

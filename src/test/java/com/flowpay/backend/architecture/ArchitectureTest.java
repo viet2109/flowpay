@@ -1,5 +1,6 @@
 package com.flowpay.backend.architecture;
 
+import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
@@ -9,7 +10,10 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
-@AnalyzeClasses(packages = "com.flowpay.backend")
+@AnalyzeClasses(
+        packages = "com.flowpay.backend",
+        importOptions = ImportOption.DoNotIncludeTests.class
+)
 class ArchitectureTest {
 
     private static final String[] BUSINESS_MODULES = {
@@ -303,6 +307,47 @@ class ArchitectureTest {
             .that().resideInAnyPackage(BUSINESS_MODULES)
             .should().dependOnClassesThat().resideInAPackage(
                     "org.springframework.amqp.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule businessModulesMustNotDependOnMessagingInfrastructure = noClasses()
+            .that().resideInAnyPackage(BUSINESS_MODULES)
+            .should().dependOnClassesThat().resideInAPackage(
+                    "com.flowpay.backend.infrastructure.messaging.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule amqpTransportMustRemainInTopLevelMessagingInfrastructure = noClasses()
+            .that().resideOutsideOfPackage(
+                    "com.flowpay.backend.infrastructure.messaging.."
+            )
+            .should().dependOnClassesThat().resideInAPackage(
+                    "org.springframework.amqp.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule messagingMustNotDependOnSourceImplementationDetails = noClasses()
+            .that().resideInAPackage(
+                    "com.flowpay.backend.infrastructure.messaging.."
+            )
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.flowpay.backend.payment.api..",
+                    "com.flowpay.backend.payment.domain..",
+                    "com.flowpay.backend.payment.infrastructure..",
+                    "com.flowpay.backend.refund.api..",
+                    "com.flowpay.backend.refund.domain..",
+                    "com.flowpay.backend.refund.infrastructure.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule ledgerMustNotDependOnMessagingInfrastructure = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.ledger..")
+            .should().dependOnClassesThat().resideInAPackage(
+                    "com.flowpay.backend.infrastructure.messaging.."
             )
             .allowEmptyShould(true);
 

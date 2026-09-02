@@ -26,6 +26,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -102,8 +103,17 @@ class TransactionalOutboxEventPublisherIntegrationTest extends PostgresIntegrati
                   "occurredAt": "2026-09-01T11:00:00Z"
                 }
                 """));
-        assertThat(event.payload())
-                .doesNotContain("PaymentSucceededEventV1", "@class", "__TypeId__");
+        assertSafePayload(
+                payload,
+                event.payload(),
+                Set.of(
+                        "merchantInternalId",
+                        "paymentPublicId",
+                        "amountMinor",
+                        "currency",
+                        "occurredAt"
+                )
+        );
 
         IntegrationEventEnvelope envelope = envelopeMapper.from(event);
         assertThat(envelope.eventId()).isEqualTo(event.eventId());
@@ -140,7 +150,8 @@ class TransactionalOutboxEventPublisherIntegrationTest extends PostgresIntegrati
                 .orElseThrow();
         assertThat(refund.aggregateType()).isEqualTo("REFUND");
         assertThat(refund.aggregateId()).isEqualTo("re_outbox_refund");
-        assertThat(objectMapper.readTree(refund.payload())).isEqualTo(objectMapper.readTree("""
+        JsonNode payload = objectMapper.readTree(refund.payload());
+        assertThat(payload).isEqualTo(objectMapper.readTree("""
                 {
                   "merchantInternalId": 15,
                   "refundPublicId": "re_outbox_refund",
@@ -150,8 +161,18 @@ class TransactionalOutboxEventPublisherIntegrationTest extends PostgresIntegrati
                   "occurredAt": "2026-09-01T11:05:00Z"
                 }
                 """));
-        assertThat(refund.payload())
-                .doesNotContain("RefundSucceededEventV1", "@class", "__TypeId__");
+        assertSafePayload(
+                payload,
+                refund.payload(),
+                Set.of(
+                        "merchantInternalId",
+                        "refundPublicId",
+                        "paymentPublicId",
+                        "amountMinor",
+                        "currency",
+                        "occurredAt"
+                )
+        );
     }
 
     @Test
@@ -272,6 +293,37 @@ class TransactionalOutboxEventPublisherIntegrationTest extends PostgresIntegrati
                 "VND",
                 PAYMENT_OCCURRED_AT
         );
+    }
+
+    private static void assertSafePayload(
+            JsonNode payload,
+            String serializedPayload,
+            Set<String> allowedFields
+    ) {
+        assertThat(payload.propertyNames()).containsExactlyInAnyOrderElementsOf(
+                allowedFields
+        );
+        assertThat(serializedPayload)
+                .doesNotContainIgnoringCase(
+                        "authorization",
+                        "idempotency-key",
+                        "idempotencyKey",
+                        "apiKey",
+                        "password",
+                        "credential",
+                        "secret",
+                        "requestHash",
+                        "keyHash",
+                        "ciphertext",
+                        "version",
+                        "providerResponse",
+                        "rawResponse",
+                        "PaymentIntentEntity",
+                        "PaymentTransactionEntity",
+                        "RefundEntity",
+                        "@class",
+                        "__TypeId__"
+                );
     }
 
     private static OutboxEvent pending(

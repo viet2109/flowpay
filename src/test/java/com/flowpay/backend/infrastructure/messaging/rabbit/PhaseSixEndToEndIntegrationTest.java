@@ -168,6 +168,12 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(paymentTransactionStatus(paymentId)).isEqualTo("SUCCEEDED");
         assertThat(countOutbox(PaymentSucceededEventV1.EVENT_TYPE, paymentId)).isOne();
         assertThat(outboxStatus(paymentId)).isEqualTo("PENDING");
+        assertOutboxPayloadIsSafe(
+                paymentId,
+                key.rawKey(),
+                "payment-create-success",
+                "payment-confirm-success"
+        );
         assertThat(countRows("ledger_transactions")).isZero();
 
         JsonNode confirmationReplay = confirmPayment(
@@ -197,6 +203,11 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(partialRefund.path("status").stringValue()).isEqualTo("SUCCEEDED");
         assertThat(paymentState(paymentId)).isEqualTo("PARTIALLY_REFUNDED:300000:0");
         assertThat(countOutbox(RefundSucceededEventV1.EVENT_TYPE, partialRefundId)).isOne();
+        assertOutboxPayloadIsSafe(
+                partialRefundId,
+                key.rawKey(),
+                "refund-partial"
+        );
         assertThat(countRows("ledger_transactions")).isOne();
 
         JsonNode partialReplay = createRefund(
@@ -541,6 +552,40 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
                 String.class,
                 aggregateId
         );
+    }
+
+    private void assertOutboxPayloadIsSafe(
+            String aggregateId,
+            String... sensitiveValues
+    ) throws Exception {
+        String payload = jdbcTemplate.queryForObject(
+                "SELECT payload::text FROM outbox_events WHERE aggregate_id = ?",
+                String.class,
+                aggregateId
+        );
+        JsonNode json = objectMapper.readTree(payload);
+        assertThat(json.propertyNames()).allMatch(field ->
+                !field.toLowerCase(java.util.Locale.ROOT).matches(
+                        ".*(authorization|idempotency|api.?key|password|credential|secret|"
+                                + "hash|cipher|version|provider.?response|raw.?response).*"
+                )
+        );
+        assertThat(payload).doesNotContainIgnoringCase(
+                "Authorization",
+                "Idempotency-Key",
+                "requestHash",
+                "keyHash",
+                "password",
+                "credential",
+                "ciphertext",
+                "version",
+                "providerResponse",
+                "rawResponse",
+                "PaymentIntentEntity",
+                "PaymentTransactionEntity",
+                "RefundEntity"
+        );
+        assertThat(payload).doesNotContain(sensitiveValues);
     }
 
     private long countOutboxStatus(String status) {

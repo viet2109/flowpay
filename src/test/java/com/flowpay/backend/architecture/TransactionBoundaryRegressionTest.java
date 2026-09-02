@@ -2,8 +2,11 @@ package com.flowpay.backend.architecture;
 
 import com.flowpay.backend.idempotency.application.IdempotencyCompletionCommand;
 import com.flowpay.backend.idempotency.application.IdempotencyCompletionService;
+import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvelope;
+import com.flowpay.backend.infrastructure.messaging.outbox.TransactionalOutboxEventPublisher;
 import com.flowpay.backend.infrastructure.messaging.outbox.relay.OutboxRelayPersistenceService;
 import com.flowpay.backend.infrastructure.messaging.outbox.relay.OutboxRelayService;
+import com.flowpay.backend.infrastructure.messaging.rabbit.ConfirmedRabbitIntegrationEventPublisher;
 import com.flowpay.backend.infrastructure.messaging.rabbit.LedgerIntegrationEventHandler;
 import com.flowpay.backend.ledger.application.LedgerPostingService;
 import com.flowpay.backend.ledger.application.PostPaymentSucceededCommand;
@@ -124,6 +127,12 @@ class TransactionBoundaryRegressionTest {
                 java.time.Instant.class,
                 String.class
         );
+        assertMandatory(TransactionalOutboxEventPublisher.class);
+        assertNotTransactional(
+                ConfirmedRabbitIntegrationEventPublisher.class,
+                "publish",
+                IntegrationEventEnvelope.class
+        );
     }
 
     @Test
@@ -184,6 +193,12 @@ class TransactionBoundaryRegressionTest {
         Method method = type.getDeclaredMethod(methodName, parameterType);
         assertThat(method.getAnnotation(Transactional.class).propagation())
                 .as("%s.%s propagation", type.getSimpleName(), methodName)
+                .isEqualTo(Propagation.MANDATORY);
+    }
+
+    private static void assertMandatory(Class<?> type) {
+        assertThat(type.getAnnotation(Transactional.class).propagation())
+                .as("%s propagation", type.getSimpleName())
                 .isEqualTo(Propagation.MANDATORY);
     }
 
