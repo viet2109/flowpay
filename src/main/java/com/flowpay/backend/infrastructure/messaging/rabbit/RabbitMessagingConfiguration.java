@@ -11,6 +11,11 @@ import org.springframework.amqp.core.ExchangeBuilder;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.retry.RejectAndDontRequeueRecoverer;
+import org.springframework.boot.amqp.autoconfigure.SimpleRabbitListenerContainerFactoryConfigurer;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +25,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @EnableConfigurationProperties(FlowPayMessagingProperties.class)
 public class RabbitMessagingConfiguration {
+
+    static final String LEDGER_LISTENER_CONTAINER_FACTORY =
+            "ledgerRabbitListenerContainerFactory";
 
     @Bean
     Declarables flowPayEventTopology(FlowPayMessagingProperties properties) {
@@ -59,5 +67,28 @@ public class RabbitMessagingConfiguration {
                 ledgerDeadLetterQueue,
                 deadLetterBinding
         );
+    }
+
+    @Bean(name = LEDGER_LISTENER_CONTAINER_FACTORY)
+    SimpleRabbitListenerContainerFactory ledgerRabbitListenerContainerFactory(
+            SimpleRabbitListenerContainerFactoryConfigurer configurer,
+            ConnectionFactory connectionFactory,
+            FlowPayMessagingProperties properties
+    ) {
+        FlowPayMessagingProperties.Retry retry = properties.ledgerConsumer().retry();
+        SimpleRabbitListenerContainerFactory factory =
+                new SimpleRabbitListenerContainerFactory();
+        configurer.configure(factory, connectionFactory);
+        factory.setDefaultRequeueRejected(false);
+        factory.setAdviceChain(RetryInterceptorBuilder.stateless()
+                .maxRetries(retry.maxAttempts() - 1)
+                .backOffOptions(
+                        retry.initialInterval().toMillis(),
+                        retry.multiplier(),
+                        retry.maxInterval().toMillis()
+                )
+                .recoverer(new RejectAndDontRequeueRecoverer())
+                .build());
+        return factory;
     }
 }

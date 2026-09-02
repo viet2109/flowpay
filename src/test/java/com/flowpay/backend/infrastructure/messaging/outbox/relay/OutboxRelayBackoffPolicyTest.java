@@ -83,6 +83,15 @@ class OutboxRelayBackoffPolicyTest {
                         "flowpay.ledger.events.dlq",
                         "ledger.dead"
                 ),
+                new FlowPayMessagingProperties.LedgerConsumer(
+                        true,
+                        new FlowPayMessagingProperties.Retry(
+                                3,
+                                Duration.ofMillis(500),
+                                2.0,
+                                Duration.ofSeconds(5)
+                        )
+                ),
                 new FlowPayMessagingProperties.Outbox(
                         Duration.ofSeconds(5),
                         new FlowPayMessagingProperties.Relay(

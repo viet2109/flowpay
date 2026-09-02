@@ -21,7 +21,8 @@ public class LedgerIntegrationEventListener {
 
     @RabbitListener(
             id = "flowpayLedgerIntegrationEventListener",
-            queues = "${flowpay.messaging.topology.ledger-queue}"
+            queues = "${flowpay.messaging.topology.ledger-queue}",
+            containerFactory = RabbitMessagingConfiguration.LEDGER_LISTENER_CONTAINER_FACTORY
     )
     public void consume(Message message) {
         eventDispatcher.dispatch(envelopeParser.parse(message));

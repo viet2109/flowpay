@@ -31,6 +31,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -137,6 +138,14 @@ class RabbitMessagingIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(rabbitAdmin.getQueueProperties(names.ledgerQueue())).isNotNull();
         assertThat(rabbitAdmin.getQueueProperties(names.ledgerDeadLetterQueue())).isNotNull();
+        assertThat(properties.ledgerConsumer().retry()).isEqualTo(
+                new FlowPayMessagingProperties.Retry(
+                        3,
+                        Duration.ofMillis(500),
+                        2.0,
+                        Duration.ofSeconds(5)
+                )
+        );
     }
 
     @Test

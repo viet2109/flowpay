@@ -467,11 +467,12 @@ persistence, JPA, or infrastructure. Phase 6 replaces this direct trigger with
 the transactional outbox and an at-least-once Ledger consumer while reusing the
 same duplicate-safe posting API.
 
-No provider call is moved into a database transaction. If Ledger persistence
-fails after an external provider has already returned success, the local
-financial finalization rolls back while the external effect may remain. The
-local operation and Idempotency record remain processing; automatic retry or
-reconciliation of that state is outside Phase 5.
+No provider call is moved into a database transaction. During the Phase 5
+transitional path, Ledger persistence failure after an external provider
+success rolled back the local financial finalization. After the Phase 6
+cutover, source finalization and its required Outbox row commit atomically and
+independently of Ledger consumption; a later Ledger failure follows bounded
+consumer retry and dead-letter handling without rolling back the source.
 
 Business modules do not publish RabbitMQ messages directly.
 
@@ -509,10 +510,18 @@ which reuses the existing `LedgerPostingApi`. Ledger business-reference
 uniqueness absorbs equivalent duplicate delivery. No generic exactly-once,
 Inbox, distributed lock, or PostgreSQL/RabbitMQ XA boundary is introduced.
 
-Until the Payment and Refund cutover tasks are completed, the Phase 5 direct
-Ledger calls remain the operational path. The cutover removes those production
-dependencies only after the Outbox writer, confirmed publisher, relay, and
-Ledger consumer are independently verified.
+The Ledger listener applies bounded infrastructure retry with three total
+attempts, exponential delays starting at 500 milliseconds, a multiplier of two,
+and a five-second cap. After exhaustion it rejects without requeue so the
+existing dead-letter exchange routes the message to
+`flowpay.ledger.events.dlq`. Equivalent `ALREADY_POSTED` duplicates are
+acknowledged immediately. Consumer failure never changes a source Outbox row
+that the relay has already marked `PUBLISHED`; DLQ replay is an explicit future
+operation rather than an automatic loop.
+
+The Payment and Refund cutovers are complete. Their production success paths no
+longer call Ledger directly; the verified Outbox writer, confirmed publisher,
+relay, and Ledger consumer own eventual Ledger posting.
 
 ## 13. Synchronous query versus asynchronous side effect
 
@@ -533,10 +542,9 @@ payment.succeeded.v1
    +--> Webhook
 ```
 
-Outside the explicit Phase 5 local-atomicity exception above, Payment should not
-synchronously call Ledger or Webhook services inside the payment transaction.
-Webhook remains event-driven only, and Phase 6 removes the temporary direct
-Ledger trigger.
+Payment and Refund do not synchronously call Ledger or Webhook services inside
+their finalization transactions. Webhook remains event-driven only, and the
+temporary Phase 5 direct Ledger trigger has been removed.
 
 ## 14. Persistence
 

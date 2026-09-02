@@ -8,11 +8,16 @@ import java.util.Objects;
 @ConfigurationProperties(prefix = "flowpay.messaging")
 public record FlowPayMessagingProperties(
         Topology topology,
+        LedgerConsumer ledgerConsumer,
         Outbox outbox
 ) {
 
     public FlowPayMessagingProperties {
         topology = Objects.requireNonNull(topology, "topology must not be null");
+        ledgerConsumer = Objects.requireNonNull(
+                ledgerConsumer,
+                "ledgerConsumer must not be null"
+        );
         outbox = Objects.requireNonNull(outbox, "outbox must not be null");
     }
 
@@ -47,6 +52,50 @@ public record FlowPayMessagingProperties(
             if (ledgerQueue.equals(ledgerDeadLetterQueue)) {
                 throw new IllegalArgumentException(
                         "topology queues must use distinct names"
+                );
+            }
+        }
+    }
+
+    public record LedgerConsumer(
+            boolean enabled,
+            Retry retry
+    ) {
+
+        public LedgerConsumer {
+            retry = Objects.requireNonNull(retry, "ledgerConsumer.retry must not be null");
+        }
+    }
+
+    public record Retry(
+            int maxAttempts,
+            Duration initialInterval,
+            double multiplier,
+            Duration maxInterval
+    ) {
+
+        public Retry {
+            if (maxAttempts <= 0) {
+                throw new IllegalArgumentException(
+                        "ledgerConsumer.retry.maxAttempts must be positive"
+                );
+            }
+            initialInterval = requirePositive(
+                    initialInterval,
+                    "ledgerConsumer.retry.initialInterval"
+            );
+            if (!Double.isFinite(multiplier) || multiplier < 1.0) {
+                throw new IllegalArgumentException(
+                        "ledgerConsumer.retry.multiplier must be finite and at least 1"
+                );
+            }
+            maxInterval = requirePositive(
+                    maxInterval,
+                    "ledgerConsumer.retry.maxInterval"
+            );
+            if (maxInterval.compareTo(initialInterval) < 0) {
+                throw new IllegalArgumentException(
+                        "ledgerConsumer.retry.maxInterval must not be less than initialInterval"
                 );
             }
         }

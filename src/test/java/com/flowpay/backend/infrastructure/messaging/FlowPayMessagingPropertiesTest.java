@@ -26,6 +26,14 @@ class FlowPayMessagingPropertiesTest {
         assertThat(properties.outbox().publisherConfirmTimeout())
                 .isEqualTo(Duration.ofSeconds(5));
         assertThat(properties.outbox().relay().batchSize()).isEqualTo(100);
+        assertThat(properties.ledgerConsumer().retry()).isEqualTo(
+                new FlowPayMessagingProperties.Retry(
+                        3,
+                        Duration.ofMillis(500),
+                        2.0,
+                        Duration.ofSeconds(5)
+                )
+        );
     }
 
     @Test
@@ -56,6 +64,30 @@ class FlowPayMessagingPropertiesTest {
                 Duration.ofSeconds(2),
                 Duration.ofSeconds(1)
         )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new FlowPayMessagingProperties.Retry(
+                0,
+                Duration.ofMillis(500),
+                2.0,
+                Duration.ofSeconds(5)
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new FlowPayMessagingProperties.Retry(
+                3,
+                Duration.ZERO,
+                2.0,
+                Duration.ofSeconds(5)
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new FlowPayMessagingProperties.Retry(
+                3,
+                Duration.ofMillis(500),
+                0.5,
+                Duration.ofSeconds(5)
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new FlowPayMessagingProperties.Retry(
+                3,
+                Duration.ofSeconds(2),
+                2.0,
+                Duration.ofSeconds(1)
+        )).isInstanceOf(IllegalArgumentException.class);
     }
 
     private static FlowPayMessagingProperties properties(
@@ -73,6 +105,15 @@ class FlowPayMessagingPropertiesTest {
                         deadLetterExchange,
                         deadLetterQueue,
                         deadLetterRoutingKey
+                ),
+                new FlowPayMessagingProperties.LedgerConsumer(
+                        true,
+                        new FlowPayMessagingProperties.Retry(
+                                3,
+                                Duration.ofMillis(500),
+                                2.0,
+                                Duration.ofSeconds(5)
+                        )
                 ),
                 new FlowPayMessagingProperties.Outbox(
                         timeout,

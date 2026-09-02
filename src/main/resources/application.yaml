@@ -50,6 +50,11 @@ flowpay:
       dead-letter-routing-key: ${RABBITMQ_LEDGER_DEAD_ROUTING_KEY:ledger.dead}
     ledger-consumer:
       enabled: ${LEDGER_EVENT_CONSUMER_ENABLED:true}
+      retry:
+        max-attempts: ${LEDGER_EVENT_CONSUMER_RETRY_MAX_ATTEMPTS:3}
+        initial-interval: ${LEDGER_EVENT_CONSUMER_RETRY_INITIAL_INTERVAL:500ms}
+        multiplier: ${LEDGER_EVENT_CONSUMER_RETRY_MULTIPLIER:2.0}
+        max-interval: ${LEDGER_EVENT_CONSUMER_RETRY_MAX_INTERVAL:5s}
     outbox:
       publisher-confirm-timeout: ${OUTBOX_PUBLISHER_CONFIRM_TIMEOUT:5s}
       relay:
