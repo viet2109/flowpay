@@ -3,7 +3,6 @@ package com.flowpay.backend.refund.application;
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.common.money.Money;
-import com.flowpay.backend.ledger.application.LedgerPostingException;
 import com.flowpay.backend.refund.domain.Refund;
 import com.flowpay.backend.refund.domain.RefundProviderOutcome;
 import com.flowpay.backend.refund.domain.RefundStatus;
@@ -21,8 +20,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -33,7 +32,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.within;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 @SpringBootTest
@@ -58,8 +56,8 @@ class FinalizeRefundIntegrationTest extends PostgresIntegrationTest {
     void cleanData() {
         dropFailureTriggers();
         jdbcTemplate.update("""
-                TRUNCATE TABLE ledger_entries, ledger_transactions, ledger_accounts,
-                    refunds, idempotency_records, payment_transactions,
+                TRUNCATE TABLE outbox_events, ledger_entries, ledger_transactions,
+                    ledger_accounts, refunds, idempotency_records, payment_transactions,
                     payment_intents, merchant_members, merchant_api_keys, refresh_tokens,
                     merchants, users RESTART IDENTITY CASCADE
                 """);
@@ -91,7 +89,7 @@ class FinalizeRefundIntegrationTest extends PostgresIntegrationTest {
         assertThat(finalized.completedAt()).isNotNull();
         assertRefund(fixture, RefundStatus.SUCCEEDED, "provider_refund_partial", null);
         assertCapacity(fixture, 400L, 0L, "PARTIALLY_REFUNDED");
-        assertRefundPosting(fixture, 400L, finalized.completedAt());
+        assertRefundSuccessOutbox(fixture, 400L, finalized.completedAt());
     }
 
     @Test
@@ -105,7 +103,7 @@ class FinalizeRefundIntegrationTest extends PostgresIntegrationTest {
 
         assertRefund(fixture, RefundStatus.SUCCEEDED, "provider_refund_exact", null);
         assertCapacity(fixture, 1_000L, 0L, "REFUNDED");
-        assertRefundPosting(fixture, 1_000L, finalized.completedAt());
+        assertRefundSuccessOutbox(fixture, 1_000L, finalized.completedAt());
     }
 
     @ParameterizedTest
@@ -139,6 +137,7 @@ class FinalizeRefundIntegrationTest extends PostgresIntegrationTest {
         );
         assertRefund(fixture, RefundStatus.FAILED, null, outcome.name());
         assertCapacity(fixture, 0L, 0L, "SUCCEEDED");
+        assertThat(countRefundEvents()).isZero();
         assertNoLedgerRows();
     }
 
@@ -166,6 +165,7 @@ class FinalizeRefundIntegrationTest extends PostgresIntegrationTest {
                 "PROVIDER_TIMEOUT"
         );
         assertCapacity(fixture, 0L, 275L, "SUCCEEDED");
+        assertThat(countRefundEvents()).isZero();
         assertNoLedgerRows();
     }
 
@@ -184,7 +184,7 @@ class FinalizeRefundIntegrationTest extends PostgresIntegrationTest {
 
         assertRefund(fixture, RefundStatus.SUCCEEDED, "provider_refund_terminal", null);
         assertCapacity(fixture, 300L, 0L, "PARTIALLY_REFUNDED");
-        assertThat(countRefundPostings()).isEqualTo(1);
+        assertThat(countRefundEvents()).isEqualTo(1);
     }
 
     @Test
@@ -219,7 +219,7 @@ class FinalizeRefundIntegrationTest extends PostgresIntegrationTest {
                 null
         );
         assertCapacity(fixture, 450L, 0L, "PARTIALLY_REFUNDED");
-        assertThat(countRefundPostings()).isEqualTo(1);
+        assertThat(countRefundEvents()).isEqualTo(1);
     }
 
     @Test
@@ -234,6 +234,7 @@ class FinalizeRefundIntegrationTest extends PostgresIntegrationTest {
 
         assertRefund(fixture, RefundStatus.PROCESSING, null, null);
         assertCapacity(fixture, 0L, 325L, "SUCCEEDED");
+        assertThat(countRefundEvents()).isZero();
         assertNoLedgerRows();
     }
 
@@ -249,11 +250,12 @@ class FinalizeRefundIntegrationTest extends PostgresIntegrationTest {
 
         assertRefund(fixture, RefundStatus.PROCESSING, null, null);
         assertCapacity(fixture, 0L, 325L, "SUCCEEDED");
+        assertThat(countRefundEvents()).isZero();
         assertNoLedgerRows();
     }
 
     @Test
-    void distinctSuccessfulRefundsShouldCreateOnePostingForEachReference() {
+    void distinctSuccessfulRefundsShouldCreateOneEventForEachReference() {
         RefundFixture first = insertProcessingRefund("sequential_first", 1_000L, 200L);
         jdbcTemplate.update(
                 "UPDATE payment_intents SET refund_reserved_minor = 500 WHERE id = ?",
@@ -269,32 +271,33 @@ class FinalizeRefundIntegrationTest extends PostgresIntegrationTest {
         service.finalizeRefund(command(second, success("provider_refund_second")));
 
         assertCapacity(first, 500L, 0L, "PARTIALLY_REFUNDED");
-        assertThat(countRefundPostings()).isEqualTo(2);
+        assertThat(countRefundEvents()).isEqualTo(2);
         assertThat(jdbcTemplate.queryForList("""
-                SELECT reference_id
-                FROM ledger_transactions
-                WHERE posting_type = 'REFUND_SUCCEEDED'
-                ORDER BY reference_id
+                SELECT aggregate_id
+                FROM outbox_events
+                WHERE event_type = 'refund.succeeded.v1'
+                ORDER BY aggregate_id
                 """, String.class)).containsExactly(
                 first.refundPublicId(),
                 second.refundPublicId()
         );
-        assertThat(countRows("ledger_entries")).isEqualTo(4);
+        assertNoLedgerRows();
     }
 
     @Test
-    void ledgerFailureShouldRollbackRefundAndPaymentCompletionAtomically() {
-        RefundFixture fixture = insertProcessingRefund("ledger_failure", 1_000L, 325L);
-        createLedgerInsertFailureTrigger();
+    void outboxFailureShouldRollbackRefundAndPaymentCompletionAtomically() {
+        RefundFixture fixture = insertProcessingRefund("outbox_failure", 1_000L, 325L);
+        createOutboxInsertFailureTrigger();
 
         assertThatThrownBy(() -> service.finalizeRefund(command(
                 fixture,
-                success("provider_ledger_failure")
-        ))).isInstanceOf(LedgerPostingException.class)
-                .hasMessage("Ledger posting could not be completed safely");
+                success("provider_outbox_failure")
+        ))).isInstanceOf(RuntimeException.class)
+                .hasRootCauseInstanceOf(java.sql.SQLException.class);
 
         assertRefund(fixture, RefundStatus.PROCESSING, null, null);
         assertCapacity(fixture, 0L, 325L, "SUCCEEDED");
+        assertThat(countRefundEvents()).isZero();
         assertNoLedgerRows();
     }
 
@@ -529,41 +532,62 @@ class FinalizeRefundIntegrationTest extends PostgresIntegrationTest {
         assertThat(((String) payment.get("currency")).trim()).isEqualTo("USD");
     }
 
-    private void assertRefundPosting(
+    private void assertRefundSuccessOutbox(
             RefundFixture fixture,
             long expectedAmount,
             Instant expectedOccurredAt
     ) {
-        Map<String, Object> transaction = jdbcTemplate.queryForMap("""
-                SELECT posting_type, reference_type, reference_id, currency, occurred_at
-                FROM ledger_transactions
-                WHERE posting_type = 'REFUND_SUCCEEDED'
-                  AND reference_id = ?
+        Map<String, Object> event = jdbcTemplate.queryForMap("""
+                SELECT event_id, aggregate_type, aggregate_id, event_type, status,
+                    payload ->> 'merchantInternalId' AS merchant_internal_id,
+                    payload ->> 'refundPublicId' AS refund_public_id,
+                    payload ->> 'paymentPublicId' AS payment_public_id,
+                    payload ->> 'amountMinor' AS amount_minor,
+                    payload ->> 'currency' AS currency,
+                    payload ->> 'occurredAt' AS payload_occurred_at
+                FROM outbox_events
+                WHERE event_type = 'refund.succeeded.v1'
+                  AND aggregate_id = ?
                 """, fixture.refundPublicId());
-        assertThat(transaction.get("posting_type")).isEqualTo("REFUND_SUCCEEDED");
-        assertThat(transaction.get("reference_type")).isEqualTo("REFUND");
-        assertThat(transaction.get("reference_id")).isEqualTo(fixture.refundPublicId());
-        assertThat(((String) transaction.get("currency")).trim()).isEqualTo("USD");
-        assertThat(((java.sql.Timestamp) transaction.get("occurred_at")).toInstant())
-                .isCloseTo(expectedOccurredAt, within(1, ChronoUnit.MICROS));
-
+        assertThat(event.get("event_id")).asString().startsWith("ievt_");
+        assertThat(event.get("aggregate_type")).isEqualTo("REFUND");
+        assertThat(event.get("aggregate_id")).isEqualTo(fixture.refundPublicId());
+        assertThat(event.get("event_type")).isEqualTo("refund.succeeded.v1");
+        assertThat(event.get("status")).isEqualTo("PENDING");
+        assertThat(event.get("merchant_internal_id"))
+                .isEqualTo(Long.toString(fixture.merchantId()));
+        assertThat(event.get("refund_public_id")).isEqualTo(fixture.refundPublicId());
+        assertThat(event.get("payment_public_id")).isEqualTo(fixture.paymentPublicId());
+        assertThat(event.get("amount_minor")).isEqualTo(Long.toString(expectedAmount));
+        assertThat(event.get("currency")).isEqualTo("USD");
+        assertThat(Instant.parse((String) event.get("payload_occurred_at")))
+                .isEqualTo(expectedOccurredAt);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT occurred_at
+                FROM outbox_events
+                WHERE aggregate_id = ?
+                """, OffsetDateTime.class, fixture.refundPublicId()).toInstant())
+                .isEqualTo(expectedOccurredAt);
         assertThat(jdbcTemplate.queryForList("""
-                SELECT a.account_type || ':' || e.direction || ':' || e.amount_minor
-                FROM ledger_entries e
-                JOIN ledger_transactions t ON t.id = e.ledger_transaction_id
-                JOIN ledger_accounts a ON a.id = e.ledger_account_id
-                WHERE t.posting_type = 'REFUND_SUCCEEDED'
-                  AND t.reference_id = ?
-                ORDER BY e.entry_no
+                SELECT jsonb_object_keys(payload)
+                FROM outbox_events
+                WHERE aggregate_id = ?
+                ORDER BY jsonb_object_keys(payload)
                 """, String.class, fixture.refundPublicId())).containsExactly(
-                "MERCHANT_PAYABLE:DEBIT:" + expectedAmount,
-                "SYSTEM_CLEARING:CREDIT:" + expectedAmount
+                "amountMinor",
+                "currency",
+                "merchantInternalId",
+                "occurredAt",
+                "paymentPublicId",
+                "refundPublicId"
         );
+        assertNoLedgerRows();
     }
 
-    private int countRefundPostings() {
+    private int countRefundEvents() {
         return jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ledger_transactions WHERE posting_type = 'REFUND_SUCCEEDED'",
+                "SELECT COUNT(*) FROM outbox_events "
+                        + "WHERE event_type = 'refund.succeeded.v1'",
                 Integer.class
         );
     }
@@ -608,21 +632,21 @@ class FinalizeRefundIntegrationTest extends PostgresIntegrationTest {
                 """);
     }
 
-    private void createLedgerInsertFailureTrigger() {
+    private void createOutboxInsertFailureTrigger() {
         jdbcTemplate.execute("""
-                CREATE OR REPLACE FUNCTION fail_refund_ledger_insert() RETURNS trigger AS $$
+                CREATE OR REPLACE FUNCTION fail_refund_outbox_insert() RETURNS trigger AS $$
                 BEGIN
-                    IF NEW.posting_type = 'REFUND_SUCCEEDED' THEN
-                        RAISE EXCEPTION 'forced refund ledger insert failure';
+                    IF NEW.event_type = 'refund.succeeded.v1' THEN
+                        RAISE EXCEPTION 'forced refund Outbox insert failure';
                     END IF;
                     RETURN NEW;
                 END;
                 $$ LANGUAGE plpgsql
                 """);
         jdbcTemplate.execute("""
-                CREATE TRIGGER fail_refund_ledger_insert_trigger
-                BEFORE INSERT ON ledger_transactions
-                FOR EACH ROW EXECUTE FUNCTION fail_refund_ledger_insert()
+                CREATE TRIGGER fail_refund_outbox_insert_trigger
+                BEFORE INSERT ON outbox_events
+                FOR EACH ROW EXECUTE FUNCTION fail_refund_outbox_insert()
                 """);
     }
 
@@ -634,9 +658,9 @@ class FinalizeRefundIntegrationTest extends PostgresIntegrationTest {
         );
         jdbcTemplate.execute("DROP FUNCTION IF EXISTS fail_payment_update()");
         jdbcTemplate.execute(
-                "DROP TRIGGER IF EXISTS fail_refund_ledger_insert_trigger ON ledger_transactions"
+                "DROP TRIGGER IF EXISTS fail_refund_outbox_insert_trigger ON outbox_events"
         );
-        jdbcTemplate.execute("DROP FUNCTION IF EXISTS fail_refund_ledger_insert()");
+        jdbcTemplate.execute("DROP FUNCTION IF EXISTS fail_refund_outbox_insert()");
     }
 
     private static java.time.OffsetDateTime utc(Instant value) {

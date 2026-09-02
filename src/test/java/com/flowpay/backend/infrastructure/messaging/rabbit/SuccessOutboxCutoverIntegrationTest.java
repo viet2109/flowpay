@@ -15,6 +15,15 @@ import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
 import com.flowpay.backend.payment.domain.PaymentTransactionStatus;
 import com.flowpay.backend.payment.domain.ProviderOutcome;
+import com.flowpay.backend.refund.application.FinalizeRefundCommand;
+import com.flowpay.backend.refund.application.FinalizeRefundService;
+import com.flowpay.backend.refund.application.FinalizedRefund;
+import com.flowpay.backend.refund.application.RefundProviderResult;
+import com.flowpay.backend.refund.application.RefundRepository;
+import com.flowpay.backend.refund.domain.Refund;
+import com.flowpay.backend.refund.domain.RefundProviderOutcome;
+import com.flowpay.backend.refund.domain.RefundReason;
+import com.flowpay.backend.refund.domain.RefundStatus;
 import com.flowpay.backend.testing.PostgresIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,9 +54,9 @@ import static org.awaitility.Awaitility.await;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Import(PaymentSuccessOutboxCutoverIntegrationTest.ClockConfiguration.class)
+@Import(SuccessOutboxCutoverIntegrationTest.ClockConfiguration.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class PaymentSuccessOutboxCutoverIntegrationTest extends PostgresIntegrationTest {
+class SuccessOutboxCutoverIntegrationTest extends PostgresIntegrationTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-09-02T10:00:00Z");
     private static final Instant STARTED_AT = Instant.parse("2026-09-02T10:00:05Z");
@@ -65,6 +74,12 @@ class PaymentSuccessOutboxCutoverIntegrationTest extends PostgresIntegrationTest
 
     @Autowired
     private PaymentTransactionRepository paymentTransactionRepository;
+
+    @Autowired
+    private FinalizeRefundService refundFinalizationService;
+
+    @Autowired
+    private RefundRepository refundRepository;
 
     @Autowired
     private OutboxRelayService relayService;
@@ -95,7 +110,7 @@ class PaymentSuccessOutboxCutoverIntegrationTest extends PostgresIntegrationTest
     void cleanState() {
         jdbcTemplate.update("""
                 TRUNCATE TABLE outbox_events, ledger_entries, ledger_transactions,
-                    ledger_accounts, payment_transactions, payment_intents,
+                    ledger_accounts, refunds, payment_transactions, payment_intents,
                     merchant_members, merchant_api_keys, refresh_tokens, merchants, users
                 RESTART IDENTITY CASCADE
                 """);
@@ -144,7 +159,8 @@ class PaymentSuccessOutboxCutoverIntegrationTest extends PostgresIntegrationTest
         assertThat(committedTransaction.status())
                 .isEqualTo(PaymentTransactionStatus.SUCCEEDED);
         assertThat(countRows("outbox_events")).isEqualTo(1L);
-        assertThat(outboxStatus(prepared.payment().publicId())).isEqualTo("PENDING");
+        assertThat(outboxStatus("payment.succeeded.v1", prepared.payment().publicId()))
+                .isEqualTo("PENDING");
         assertThat(countRows("ledger_transactions")).isZero();
         assertThat(countRows("ledger_entries")).isZero();
 
@@ -152,7 +168,7 @@ class PaymentSuccessOutboxCutoverIntegrationTest extends PostgresIntegrationTest
 
         assertThat(relayResult).isEqualTo(new OutboxRelayBatchResult(1, 1, 0));
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
-            assertThat(outboxStatus(prepared.payment().publicId()))
+            assertThat(outboxStatus("payment.succeeded.v1", prepared.payment().publicId()))
                     .isEqualTo("PUBLISHED");
             assertThat(countRows("ledger_transactions")).isEqualTo(1L);
             assertThat(countRows("ledger_entries")).isEqualTo(2L);
@@ -182,6 +198,78 @@ class PaymentSuccessOutboxCutoverIntegrationTest extends PostgresIntegrationTest
                 "2:CREDIT:750000:MERCHANT_PAYABLE:"
                         + prepared.payment().merchantId()
                         + ":VND"
+        );
+    }
+
+    @Test
+    void shouldCommitRefundAndOutboxBeforeEventualLedgerPosting() {
+        PreparedRefund prepared = insertProcessingRefund();
+
+        FinalizedRefund result = refundFinalizationService.finalizeRefund(
+                new FinalizeRefundCommand(
+                        prepared.merchantId(),
+                        prepared.refundPublicId(),
+                        prepared.paymentPublicId(),
+                        new RefundProviderResult(
+                                "SIMULATOR",
+                                RefundProviderOutcome.SUCCESS,
+                                "sim_refund_cutover_success",
+                                null,
+                                null
+                        )
+                )
+        );
+
+        Refund committedRefund = refundRepository
+                .findByPublicIdAndMerchantId(
+                        prepared.refundPublicId(),
+                        prepared.merchantId()
+                )
+                .orElseThrow();
+        assertThat(result.status()).isEqualTo(RefundStatus.SUCCEEDED);
+        assertThat(committedRefund.status()).isEqualTo(RefundStatus.SUCCEEDED);
+        assertThat(paymentCapacity(prepared.paymentPublicId()))
+                .isEqualTo("PARTIALLY_REFUNDED:300000:0");
+        assertThat(countRows("outbox_events")).isEqualTo(1L);
+        assertThat(outboxStatus("refund.succeeded.v1", prepared.refundPublicId()))
+                .isEqualTo("PENDING");
+        assertThat(countRows("ledger_transactions")).isZero();
+        assertThat(countRows("ledger_entries")).isZero();
+
+        OutboxRelayBatchResult relayResult = relayService.relayDueEvents();
+
+        assertThat(relayResult).isEqualTo(new OutboxRelayBatchResult(1, 1, 0));
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            assertThat(outboxStatus("refund.succeeded.v1", prepared.refundPublicId()))
+                    .isEqualTo("PUBLISHED");
+            assertThat(countRows("ledger_transactions")).isEqualTo(1L);
+            assertThat(countRows("ledger_entries")).isEqualTo(2L);
+        });
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT posting_type || ':' || reference_type || ':' || reference_id
+                    || ':' || TRIM(currency)
+                FROM ledger_transactions
+                """, String.class)).isEqualTo(
+                "REFUND_SUCCEEDED:REFUND:re_cutover_success:VND"
+        );
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT occurred_at
+                FROM ledger_transactions
+                WHERE reference_id = ?
+                """, OffsetDateTime.class, prepared.refundPublicId()).toInstant())
+                .isEqualTo(committedRefund.completedAt());
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT e.entry_no || ':' || e.direction || ':' || e.amount_minor
+                    || ':' || a.account_type || ':'
+                    || COALESCE(a.owner_id::text, '<null>') || ':' || TRIM(a.currency)
+                FROM ledger_entries e
+                JOIN ledger_accounts a ON a.id = e.ledger_account_id
+                ORDER BY e.entry_no
+                """, String.class)).containsExactly(
+                "1:DEBIT:300000:MERCHANT_PAYABLE:"
+                        + prepared.merchantId()
+                        + ":VND",
+                "2:CREDIT:300000:SYSTEM_CLEARING:<null>:VND"
         );
     }
 
@@ -224,12 +312,72 @@ class PaymentSuccessOutboxCutoverIntegrationTest extends PostgresIntegrationTest
         return java.util.Objects.requireNonNull(merchantId);
     }
 
-    private String outboxStatus(String paymentPublicId) {
+    private PreparedRefund insertProcessingRefund() {
+        long merchantId = insertMerchant("mrc_refund_cutover_success");
+        Long paymentInternalId = jdbcTemplate.queryForObject("""
+                INSERT INTO payment_intents (
+                    public_id, merchant_id, merchant_order_id, description,
+                    amount_minor, currency, status, refunded_amount_minor,
+                    refund_reserved_minor, created_at, updated_at, version
+                )
+                VALUES ('pi_refund_cutover_success', ?, 'ORDER-REFUND-CUTOVER',
+                    'Refund Outbox cutover', 1000000, 'VND', 'SUCCEEDED',
+                    0, 300000, ?, ?, 0)
+                RETURNING id
+                """,
+                Long.class,
+                merchantId,
+                CREATED_AT.atOffset(ZoneOffset.UTC),
+                STARTED_AT.atOffset(ZoneOffset.UTC)
+        );
+        Refund refund = Refund.create(
+                "re_cutover_success",
+                merchantId,
+                java.util.Objects.requireNonNull(paymentInternalId),
+                Money.of(300_000L, "VND"),
+                RefundReason.of("Customer request"),
+                "SIMULATOR",
+                CREATED_AT
+        );
+        refund.startProcessing(STARTED_AT);
+        Refund processingRefund = refundRepository.save(refund);
+        return new PreparedRefund(
+                merchantId,
+                "pi_refund_cutover_success",
+                processingRefund.publicId()
+        );
+    }
+
+    private long insertMerchant(String publicId) {
+        Long merchantId = jdbcTemplate.queryForObject("""
+                INSERT INTO merchants (
+                    public_id, name, status, created_at, updated_at, version
+                )
+                VALUES (?, 'Refund Cutover Store', 'ACTIVE', ?, ?, 0)
+                RETURNING id
+                """,
+                Long.class,
+                publicId,
+                CREATED_AT.atOffset(ZoneOffset.UTC),
+                CREATED_AT.atOffset(ZoneOffset.UTC)
+        );
+        return java.util.Objects.requireNonNull(merchantId);
+    }
+
+    private String outboxStatus(String eventType, String aggregateId) {
         return jdbcTemplate.queryForObject("""
                 SELECT status
                 FROM outbox_events
-                WHERE event_type = 'payment.succeeded.v1'
+                WHERE event_type = ?
                   AND aggregate_id = ?
+                """, String.class, eventType, aggregateId);
+    }
+
+    private String paymentCapacity(String paymentPublicId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT status || ':' || refunded_amount_minor || ':' || refund_reserved_minor
+                FROM payment_intents
+                WHERE public_id = ?
                 """, String.class, paymentPublicId);
     }
 
@@ -240,6 +388,13 @@ class PaymentSuccessOutboxCutoverIntegrationTest extends PostgresIntegrationTest
     private record PreparedPayment(
             PaymentIntent payment,
             PaymentTransaction transaction
+    ) {
+    }
+
+    private record PreparedRefund(
+            long merchantId,
+            String paymentPublicId,
+            String refundPublicId
     ) {
     }
 
