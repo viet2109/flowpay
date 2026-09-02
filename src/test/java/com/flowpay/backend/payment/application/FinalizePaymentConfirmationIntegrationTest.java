@@ -1,7 +1,6 @@
 package com.flowpay.backend.payment.application;
 
 import com.flowpay.backend.common.money.Money;
-import com.flowpay.backend.ledger.application.LedgerPostingException;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
@@ -21,6 +20,7 @@ import org.springframework.test.context.ActiveProfiles;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,9 +47,10 @@ class FinalizePaymentConfirmationIntegrationTest extends PostgresIntegrationTest
 
     @BeforeEach
     void cleanData() {
-        dropLedgerFailureTrigger();
+        dropOutboxFailureTrigger();
         jdbcTemplate.update(
-                "TRUNCATE TABLE ledger_entries, ledger_transactions, ledger_accounts, "
+                "TRUNCATE TABLE outbox_events, ledger_entries, ledger_transactions, "
+                        + "ledger_accounts, "
                         + "payment_transactions, payment_intents, merchant_members, "
                         + "merchant_api_keys, refresh_tokens, merchants, users "
                         + "RESTART IDENTITY CASCADE"
@@ -106,8 +107,9 @@ class FinalizePaymentConfirmationIntegrationTest extends PostgresIntegrationTest
                 transaction.failureMessage()
         ));
         if (providerResult.outcome() == ProviderOutcome.SUCCESS) {
-            assertPaymentLedgerPosting(payment, transaction.completedAt());
+            assertPaymentSuccessOutbox(payment, transaction.completedAt());
         } else {
+            assertThat(countRows("outbox_events")).isZero();
             assertThat(countRows("ledger_transactions")).isZero();
             assertThat(countRows("ledger_entries")).isZero();
             assertThat(countRows("ledger_accounts")).isZero();
@@ -115,9 +117,9 @@ class FinalizePaymentConfirmationIntegrationTest extends PostgresIntegrationTest
     }
 
     @Test
-    void shouldRollbackPaymentTransactionAndLedgerWhenPostingPersistenceFails() {
-        PreparedState prepared = insertProcessingConfirmation("ledger_rollback");
-        installLedgerFailureTrigger();
+    void shouldRollbackPaymentAndTransactionWhenOutboxPersistenceFails() {
+        PreparedState prepared = insertProcessingConfirmation("outbox_rollback");
+        installOutboxFailureTrigger();
 
         try {
             assertThatThrownBy(() -> service.finalizeConfirmation(
@@ -126,10 +128,10 @@ class FinalizePaymentConfirmationIntegrationTest extends PostgresIntegrationTest
                             prepared.transaction().publicId(),
                             result(ProviderOutcome.SUCCESS, "sim_rollback", null, null)
                     )
-            )).isInstanceOf(LedgerPostingException.class)
-                    .hasMessage("Ledger posting could not be completed safely");
+            )).isInstanceOf(RuntimeException.class)
+                    .hasRootCauseInstanceOf(java.sql.SQLException.class);
         } finally {
-            dropLedgerFailureTrigger();
+            dropOutboxFailureTrigger();
         }
 
         PaymentIntent payment = paymentIntentRepository
@@ -142,6 +144,7 @@ class FinalizePaymentConfirmationIntegrationTest extends PostgresIntegrationTest
         assertThat(payment.updatedAt()).isEqualTo(STARTED_AT);
         assertThat(transaction.status()).isEqualTo(PaymentTransactionStatus.PROCESSING);
         assertThat(transaction.completedAt()).isNull();
+        assertThat(countRows("outbox_events")).isZero();
         assertThat(countRows("ledger_transactions")).isZero();
         assertThat(countRows("ledger_entries")).isZero();
         assertThat(countRows("ledger_accounts")).isZero();
@@ -187,69 +190,75 @@ class FinalizePaymentConfirmationIntegrationTest extends PostgresIntegrationTest
         return id;
     }
 
-    private void assertPaymentLedgerPosting(PaymentIntent payment, Instant completedAt) {
-        assertThat(jdbcTemplate.queryForObject("""
-                SELECT posting_type || ':' || reference_type || ':' || reference_id
-                    || ':' || TRIM(currency) || ':' || description
-                FROM ledger_transactions
-                """, String.class)).isEqualTo(
-                "PAYMENT_SUCCEEDED:PAYMENT_INTENT:"
-                        + payment.publicId()
-                        + ":VND:Payment succeeded"
-        );
-        assertThat(jdbcTemplate.queryForObject("""
-                SELECT occurred_at
-                FROM ledger_transactions
-                WHERE reference_id = ?
-                """, OffsetDateTime.class, payment.publicId()).toInstant()).isEqualTo(completedAt);
-        assertThat(jdbcTemplate.queryForList("""
-                SELECT e.entry_no || ':' || e.direction || ':' || e.amount_minor
-                    || ':' || a.account_type || ':' || a.owner_type || ':'
-                    || COALESCE(a.owner_id::text, '<null>') || ':' || TRIM(a.currency)
-                FROM ledger_entries e
-                JOIN ledger_accounts a ON a.id = e.ledger_account_id
-                ORDER BY e.entry_no
-                """, String.class)).containsExactly(
-                "1:DEBIT:50000:SYSTEM_CLEARING:SYSTEM:<null>:VND",
-                "2:CREDIT:50000:MERCHANT_PAYABLE:MERCHANT:"
-                        + payment.merchantId()
-                        + ":VND"
-        );
-        assertThat(jdbcTemplate.queryForList(
-                "SELECT public_id FROM ledger_accounts ORDER BY account_type",
-                String.class
-        )).allSatisfy(publicId -> assertThat(publicId).startsWith("la_"));
+    private void assertPaymentSuccessOutbox(PaymentIntent payment, Instant completedAt) {
+        assertThat(countRows("outbox_events")).isEqualTo(1L);
+        Map<String, Object> event = jdbcTemplate.queryForMap("""
+                SELECT event_id, aggregate_type, aggregate_id, event_type, status,
+                    payload ->> 'merchantInternalId' AS merchant_internal_id,
+                    payload ->> 'paymentPublicId' AS payment_public_id,
+                    payload ->> 'amountMinor' AS amount_minor,
+                    payload ->> 'currency' AS currency,
+                    payload ->> 'occurredAt' AS payload_occurred_at
+                FROM outbox_events
+                """);
+        assertThat(event.get("event_id")).asString().startsWith("ievt_");
+        assertThat(event.get("aggregate_type")).isEqualTo("PAYMENT_INTENT");
+        assertThat(event.get("aggregate_id")).isEqualTo(payment.publicId());
+        assertThat(event.get("event_type")).isEqualTo("payment.succeeded.v1");
+        assertThat(event.get("status")).isEqualTo("PENDING");
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT public_id FROM ledger_transactions",
-                String.class
-        )).startsWith("ltxn_");
+                "SELECT occurred_at FROM outbox_events",
+                OffsetDateTime.class
+        ).toInstant()).isEqualTo(completedAt);
+        assertThat(event.get("merchant_internal_id")).isEqualTo(
+                Long.toString(payment.merchantId())
+        );
+        assertThat(event.get("payment_public_id")).isEqualTo(payment.publicId());
+        assertThat(event.get("amount_minor")).isEqualTo("50000");
+        assertThat(event.get("currency")).isEqualTo("VND");
+        assertThat(Instant.parse((String) event.get("payload_occurred_at")))
+                .isEqualTo(completedAt);
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT jsonb_object_keys(payload)
+                FROM outbox_events
+                ORDER BY jsonb_object_keys(payload)
+                """, String.class)).containsExactly(
+                "amountMinor",
+                "currency",
+                "merchantInternalId",
+                "occurredAt",
+                "paymentPublicId"
+        );
+        assertThat(countRows("ledger_transactions")).isZero();
+        assertThat(countRows("ledger_entries")).isZero();
+        assertThat(countRows("ledger_accounts")).isZero();
     }
 
-    private void installLedgerFailureTrigger() {
+    private void installOutboxFailureTrigger() {
         jdbcTemplate.execute("""
-                CREATE OR REPLACE FUNCTION fail_payment_ledger_posting()
+                CREATE OR REPLACE FUNCTION fail_payment_outbox_insert()
                 RETURNS trigger AS $$
                 BEGIN
-                    IF NEW.posting_type = 'PAYMENT_SUCCEEDED' THEN
-                        RAISE EXCEPTION 'simulated Ledger persistence failure';
+                    IF NEW.event_type = 'payment.succeeded.v1' THEN
+                        RAISE EXCEPTION 'simulated Outbox persistence failure';
                     END IF;
                     RETURN NEW;
                 END;
                 $$ LANGUAGE plpgsql
                 """);
         jdbcTemplate.execute("""
-                CREATE TRIGGER fail_payment_ledger_posting_trigger
-                BEFORE INSERT ON ledger_transactions
-                FOR EACH ROW EXECUTE FUNCTION fail_payment_ledger_posting()
+                CREATE TRIGGER fail_payment_outbox_insert_trigger
+                BEFORE INSERT ON outbox_events
+                FOR EACH ROW EXECUTE FUNCTION fail_payment_outbox_insert()
                 """);
     }
 
-    private void dropLedgerFailureTrigger() {
+    private void dropOutboxFailureTrigger() {
         jdbcTemplate.execute("""
-                DROP TRIGGER IF EXISTS fail_payment_ledger_posting_trigger
-                ON ledger_transactions
+                DROP TRIGGER IF EXISTS fail_payment_outbox_insert_trigger
+                ON outbox_events
                 """);
-        jdbcTemplate.execute("DROP FUNCTION IF EXISTS fail_payment_ledger_posting()");
+        jdbcTemplate.execute("DROP FUNCTION IF EXISTS fail_payment_outbox_insert()");
     }
 
     private long countRows(String table) {

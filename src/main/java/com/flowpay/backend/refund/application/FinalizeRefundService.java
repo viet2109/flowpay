@@ -2,9 +2,9 @@ package com.flowpay.backend.refund.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
-import com.flowpay.backend.ledger.application.LedgerPostingApi;
-import com.flowpay.backend.ledger.application.PostRefundSucceededCommand;
 import com.flowpay.backend.payment.application.PaymentRefundApi;
+import com.flowpay.backend.refund.application.event.RefundIntegrationEventPublisher;
+import com.flowpay.backend.refund.application.event.RefundSucceededEventV1;
 import com.flowpay.backend.refund.domain.Refund;
 import com.flowpay.backend.refund.domain.RefundFailure;
 import com.flowpay.backend.refund.domain.RefundProviderOutcome;
@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -25,7 +26,7 @@ public class FinalizeRefundService {
 
     private final RefundRepository refundRepository;
     private final PaymentRefundApi paymentRefundApi;
-    private final LedgerPostingApi ledgerPostingApi;
+    private final RefundIntegrationEventPublisher eventPublisher;
     private final Clock clock;
 
     @Transactional
@@ -36,21 +37,27 @@ public class FinalizeRefundService {
         ).orElseThrow(FinalizeRefundService::notFound);
         requireFinalizable(refund, command.providerResult());
 
-        Instant finalizedAt = clock.instant();
+        Instant finalizedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
         applyOutcome(refund, command, finalizedAt);
         Refund saved = refundRepository.save(refund);
-        postSuccessfulRefund(saved, finalizedAt);
+        publishSuccessfulRefund(saved, command.paymentPublicId(), finalizedAt);
         return toResult(saved, command.paymentPublicId());
     }
 
-    private void postSuccessfulRefund(Refund refund, Instant finalizedAt) {
+    private void publishSuccessfulRefund(
+            Refund refund,
+            String paymentPublicId,
+            Instant finalizedAt
+    ) {
         if (refund.status() != RefundStatus.SUCCEEDED) {
             return;
         }
-        ledgerPostingApi.postRefundSucceeded(new PostRefundSucceededCommand(
+        eventPublisher.publish(new RefundSucceededEventV1(
                 refund.merchantId(),
                 refund.publicId(),
-                refund.amount(),
+                paymentPublicId,
+                refund.amount().amountMinor(),
+                refund.amount().currency().getCurrencyCode(),
                 finalizedAt
         ));
     }

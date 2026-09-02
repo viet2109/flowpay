@@ -1,5 +1,9 @@
 package com.flowpay.backend;
 
+import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvelopeMapper;
+import com.flowpay.backend.infrastructure.messaging.outbox.OutboxEvent;
+import com.flowpay.backend.infrastructure.messaging.outbox.OutboxRepository;
+import com.flowpay.backend.infrastructure.messaging.rabbit.LedgerIntegrationEventDispatcher;
 import com.flowpay.backend.ledger.application.LedgerPostingException;
 import com.flowpay.backend.ledger.application.LedgerPostingOutcome;
 import com.flowpay.backend.ledger.application.LedgerPostingResult;
@@ -53,14 +57,23 @@ class PhaseFiveLedgerAccountingIntegrationTest extends PostgresIntegrationTest {
     private LedgerReversalService reversalService;
 
     @Autowired
+    private OutboxRepository outboxRepository;
+
+    @Autowired
+    private IntegrationEventEnvelopeMapper envelopeMapper;
+
+    @Autowired
+    private LedgerIntegrationEventDispatcher eventDispatcher;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void cleanData() {
         dropEntryFailureTrigger();
         jdbcTemplate.update("""
-                TRUNCATE TABLE ledger_entries, ledger_transactions, ledger_accounts,
-                    refunds, idempotency_records, payment_transactions,
+                TRUNCATE TABLE outbox_events, ledger_entries, ledger_transactions,
+                    ledger_accounts, refunds, idempotency_records, payment_transactions,
                     payment_intents, merchant_members, merchant_api_keys, refresh_tokens,
                     merchants, users RESTART IDENTITY CASCADE
                 """);
@@ -72,14 +85,14 @@ class PhaseFiveLedgerAccountingIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void shouldPostExactPaymentAccountingOnCleanV001ThroughV008Schema() {
+    void shouldPostExactPaymentAccountingOnCleanV001ThroughV009Schema() {
         assertThat(jdbcTemplate.queryForList("""
                 SELECT version
                 FROM flyway_schema_history
                 WHERE success = true
                 ORDER BY installed_rank
                 """, String.class)).containsExactly(
-                "001", "002", "003", "004", "005", "006", "007", "008"
+                "001", "002", "003", "004", "005", "006", "007", "008", "009"
         );
 
         long merchantId = insertMerchant("mrc_accounting_payment");
@@ -246,7 +259,7 @@ class PhaseFiveLedgerAccountingIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void paymentLedgerEntryFailureShouldRollbackSuccessAndEveryLedgerRow() {
+    void paymentLedgerEntryFailureShouldNotRollbackCommittedSourceAndOutbox() {
         long merchantId = insertMerchant("mrc_payment_atomicity");
         PaymentFixture payment = insertProcessingPayment(
                 merchantId,
@@ -256,17 +269,20 @@ class PhaseFiveLedgerAccountingIntegrationTest extends PostgresIntegrationTest {
         );
         installSecondEntryFailureTrigger();
 
-        assertThatThrownBy(() -> finalizePayment(payment, ProviderOutcome.SUCCESS))
+        finalizePaymentSourceOnly(payment, ProviderOutcome.SUCCESS);
+
+        assertThatThrownBy(() -> dispatchOutbox(payment.publicId()))
                 .isInstanceOf(LedgerPostingException.class)
                 .hasMessage("Ledger posting could not be completed safely");
 
-        assertThat(paymentStatus(payment)).isEqualTo("PROCESSING");
-        assertThat(paymentTransactionStatus(payment)).isEqualTo("PROCESSING");
+        assertThat(paymentStatus(payment)).isEqualTo("SUCCEEDED");
+        assertThat(paymentTransactionStatus(payment)).isEqualTo("SUCCEEDED");
+        assertThat(countRows("outbox_events")).isEqualTo(1L);
         assertNoLedgerRows();
     }
 
     @Test
-    void refundLedgerEntryFailureShouldRollbackRefundAndPaymentCompletion() {
+    void refundLedgerEntryFailureShouldNotRollbackCommittedSourceAndOutbox() {
         long merchantId = insertMerchant("mrc_refund_atomicity");
         PaymentFixture payment = insertProcessingPayment(
                 merchantId,
@@ -279,15 +295,18 @@ class PhaseFiveLedgerAccountingIntegrationTest extends PostgresIntegrationTest {
         assertPaymentState(payment, "SUCCEEDED", 0L, 325L);
         installSecondEntryFailureTrigger();
 
-        assertThatThrownBy(() -> finalizeRefund(refund, RefundProviderOutcome.SUCCESS))
+        finalizeRefundSourceOnly(refund, RefundProviderOutcome.SUCCESS);
+
+        assertThatThrownBy(() -> dispatchOutbox(refund.publicId()))
                 .isInstanceOf(LedgerPostingException.class)
                 .hasMessage("Ledger posting could not be completed safely");
 
-        assertPaymentState(payment, "SUCCEEDED", 0L, 325L);
-        assertRefundState(refund, "PROCESSING", null);
+        assertPaymentState(payment, "PARTIALLY_REFUNDED", 325L, 0L);
+        assertRefundState(refund, "SUCCEEDED", "provider_refund_atomicity");
         assertThat(countPosting("REFUND_SUCCEEDED", refund.publicId())).isZero();
         assertThat(countRows("ledger_transactions")).isEqualTo(1L);
         assertThat(countRows("ledger_entries")).isEqualTo(2L);
+        assertThat(countRows("outbox_events")).isEqualTo(2L);
         assertEveryPostingBalanced();
     }
 
@@ -383,11 +402,29 @@ class PhaseFiveLedgerAccountingIntegrationTest extends PostgresIntegrationTest {
     }
 
     private void finalizePayment(PaymentFixture payment, ProviderOutcome outcome) {
+        finalizePaymentSourceOnly(payment, outcome);
+        if (outcome == ProviderOutcome.SUCCESS) {
+            dispatchOutbox(payment.publicId());
+        }
+    }
+
+    private void finalizePaymentSourceOnly(PaymentFixture payment, ProviderOutcome outcome) {
         paymentFinalization.finalizeConfirmation(new FinalizePaymentConfirmationCommand(
                 payment.publicId(),
                 payment.transactionPublicId(),
                 paymentResult(outcome, payment.publicId())
         ));
+    }
+
+    private void dispatchOutbox(String aggregateId) {
+        OutboxEvent event = outboxRepository.findDueUnpublished(
+                        Instant.now().plusSeconds(60),
+                        100
+                ).stream()
+                .filter(candidate -> candidate.aggregateId().equals(aggregateId))
+                .findFirst()
+                .orElseThrow();
+        eventDispatcher.dispatch(envelopeMapper.from(event));
     }
 
     private RefundFixture prepareRefund(
@@ -421,6 +458,16 @@ class PhaseFiveLedgerAccountingIntegrationTest extends PostgresIntegrationTest {
     }
 
     private void finalizeRefund(RefundFixture refund, RefundProviderOutcome outcome) {
+        finalizeRefundSourceOnly(refund, outcome);
+        if (outcome == RefundProviderOutcome.SUCCESS) {
+            dispatchOutbox(refund.publicId());
+        }
+    }
+
+    private void finalizeRefundSourceOnly(
+            RefundFixture refund,
+            RefundProviderOutcome outcome
+    ) {
         refundFinalization.finalizeRefund(new FinalizeRefundCommand(
                 refund.payment().merchantId(),
                 refund.publicId(),

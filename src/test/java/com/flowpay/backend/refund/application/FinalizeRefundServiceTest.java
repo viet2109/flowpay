@@ -1,9 +1,9 @@
 package com.flowpay.backend.refund.application;
 
 import com.flowpay.backend.common.money.Money;
-import com.flowpay.backend.ledger.application.LedgerPostingApi;
-import com.flowpay.backend.ledger.application.PostRefundSucceededCommand;
 import com.flowpay.backend.payment.application.PaymentRefundApi;
+import com.flowpay.backend.refund.application.event.RefundIntegrationEventPublisher;
+import com.flowpay.backend.refund.application.event.RefundSucceededEventV1;
 import com.flowpay.backend.refund.domain.Refund;
 import com.flowpay.backend.refund.domain.RefundProviderOutcome;
 import com.flowpay.backend.refund.domain.RefundReason;
@@ -47,7 +47,7 @@ class FinalizeRefundServiceTest {
     private PaymentRefundApi paymentRefundApi;
 
     @Mock
-    private LedgerPostingApi ledgerPostingApi;
+    private RefundIntegrationEventPublisher eventPublisher;
 
     private FinalizeRefundService service;
 
@@ -56,25 +56,27 @@ class FinalizeRefundServiceTest {
         service = new FinalizeRefundService(
                 refundRepository,
                 paymentRefundApi,
-                ledgerPostingApi,
+                eventPublisher,
                 Clock.fixed(FINALIZED_AT, ZoneOffset.UTC)
         );
     }
 
     @Test
-    void successShouldPostExactRefundFactsAfterPaymentAndRefundMutation() {
+    void successShouldPublishExactRefundFactsAfterPaymentAndRefundMutation() {
         Refund refund = processingRefund();
         stubRepository(refund);
 
         FinalizedRefund finalized = service.finalizeRefund(command(success()));
 
-        PostRefundSucceededCommand expectedPosting = new PostRefundSucceededCommand(
+        RefundSucceededEventV1 expectedEvent = new RefundSucceededEventV1(
                 MERCHANT_ID,
                 REFUND_PUBLIC_ID,
-                REFUND_AMOUNT,
+                PAYMENT_PUBLIC_ID,
+                REFUND_AMOUNT.amountMinor(),
+                REFUND_AMOUNT.currency().getCurrencyCode(),
                 FINALIZED_AT
         );
-        InOrder order = inOrder(paymentRefundApi, refundRepository, ledgerPostingApi);
+        InOrder order = inOrder(paymentRefundApi, refundRepository, eventPublisher);
         order.verify(paymentRefundApi).completeRefund(
                 MERCHANT_ID,
                 PAYMENT_PUBLIC_ID,
@@ -82,7 +84,7 @@ class FinalizeRefundServiceTest {
                 REFUND_AMOUNT
         );
         order.verify(refundRepository).save(refund);
-        order.verify(ledgerPostingApi).postRefundSucceeded(expectedPosting);
+        order.verify(eventPublisher).publish(expectedEvent);
         assertThat(finalized.status()).isEqualTo(RefundStatus.SUCCEEDED);
         assertThat(finalized.completedAt()).isEqualTo(FINALIZED_AT);
     }
@@ -92,7 +94,7 @@ class FinalizeRefundServiceTest {
             value = RefundProviderOutcome.class,
             names = {"DECLINED", "TECHNICAL_FAILURE", "UNKNOWN"}
     )
-    void nonSuccessOutcomeShouldNeverPostLedger(RefundProviderOutcome outcome) {
+    void nonSuccessOutcomeShouldNeverPublishSuccessEvent(RefundProviderOutcome outcome) {
         Refund refund = processingRefund();
         stubRepository(refund);
         RefundProviderResult result = new RefundProviderResult(
@@ -105,19 +107,20 @@ class FinalizeRefundServiceTest {
 
         service.finalizeRefund(command(result));
 
-        verify(ledgerPostingApi, never()).postRefundSucceeded(any());
+        verify(eventPublisher, never()).publish(any());
     }
 
     @Test
-    void ledgerFailureShouldPropagateFromFinalizeBoundary() {
+    void outboxFailureShouldPropagateFromFinalizeBoundary() {
         Refund refund = processingRefund();
         stubRepository(refund);
-        when(ledgerPostingApi.postRefundSucceeded(any()))
-                .thenThrow(new IllegalStateException("forced ledger failure"));
+        org.mockito.Mockito.doThrow(new IllegalStateException("forced outbox failure"))
+                .when(eventPublisher)
+                .publish(any());
 
         assertThatThrownBy(() -> service.finalizeRefund(command(success())))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("forced ledger failure");
+                .hasMessage("forced outbox failure");
     }
 
     private void stubRepository(Refund refund) {

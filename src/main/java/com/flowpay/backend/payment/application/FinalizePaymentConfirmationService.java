@@ -2,8 +2,8 @@ package com.flowpay.backend.payment.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
-import com.flowpay.backend.ledger.application.LedgerPostingApi;
-import com.flowpay.backend.ledger.application.PostPaymentSucceededCommand;
+import com.flowpay.backend.payment.application.event.PaymentIntegrationEventPublisher;
+import com.flowpay.backend.payment.application.event.PaymentSucceededEventV1;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -30,7 +31,7 @@ public class FinalizePaymentConfirmationService {
 
     private final PaymentIntentRepository paymentIntentRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
-    private final LedgerPostingApi ledgerPostingApi;
+    private final PaymentIntegrationEventPublisher eventPublisher;
     private final Clock clock;
 
     @Transactional
@@ -46,7 +47,7 @@ public class FinalizePaymentConfirmationService {
 
         PaymentProviderResult providerResult = command.providerResult();
         validateConfirmation(payment, transaction, providerResult);
-        Instant completedAt = clock.instant();
+        Instant completedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
         applyOutcome(payment, transaction, providerResult, completedAt);
 
         PaymentIntent savedPayment;
@@ -59,10 +60,11 @@ public class FinalizePaymentConfirmationService {
         }
 
         if (providerResult.outcome() == ProviderOutcome.SUCCESS) {
-            ledgerPostingApi.postPaymentSucceeded(new PostPaymentSucceededCommand(
+            eventPublisher.publish(new PaymentSucceededEventV1(
                     savedPayment.merchantId(),
                     savedPayment.publicId(),
-                    savedPayment.amount(),
+                    savedPayment.amount().amountMinor(),
+                    savedPayment.amount().currency().getCurrencyCode(),
                     completedAt
             ));
         }

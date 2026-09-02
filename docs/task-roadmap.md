@@ -235,17 +235,27 @@ and the mandatory implementation order.
 
 ## Phase 6 — Outbox & RabbitMQ
 
-Planned tasks:
+Status: `DONE/FROZEN`.
 
-- outbox schema.
-- integration-event abstraction.
-- payment/refund event mapping.
-- outbox writer.
-- relay worker.
-- RabbitMQ topology.
-- consumer deduplication.
-- retry/error handling.
-- integration tests.
+Completed tasks:
+
+- P6-T01 Phase 5 exit gate and eventing architecture freeze.
+- P6-T02 Outbox database migration.
+- P6-T03 Versioned integration-event contracts and producer ports.
+- P6-T04 Transactional Outbox writer and persistence.
+- P6-T05 RabbitMQ topology and confirmed publisher.
+- P6-T06 Outbox relay and publication retry.
+- P6-T07 Ledger integration-event consumer.
+- P6-T08 Payment success Outbox cutover.
+- P6-T09 Refund success Outbox cutover.
+- P6-T10 Consumer retry and dead-letter handling.
+- P6-T11 Relay and consumer failure/concurrency hardening.
+- P6-T12 End-to-end PostgreSQL and RabbitMQ verification.
+- P6-T13 Architecture, data-safety, and regression tests.
+- P6-T14 Quality gate and documentation freeze.
+
+See `phase-6-outbox-rabbitmq.md` for frozen decisions, dependencies,
+acceptance criteria, and the mandatory implementation order.
 
 ## Phase 7 — Webhooks
 

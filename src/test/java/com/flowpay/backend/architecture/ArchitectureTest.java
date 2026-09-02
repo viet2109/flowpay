@@ -1,5 +1,6 @@
 package com.flowpay.backend.architecture;
 
+import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
@@ -9,7 +10,10 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
-@AnalyzeClasses(packages = "com.flowpay.backend")
+@AnalyzeClasses(
+        packages = "com.flowpay.backend",
+        importOptions = ImportOption.DoNotIncludeTests.class
+)
 class ArchitectureTest {
 
     private static final String[] BUSINESS_MODULES = {
@@ -95,11 +99,10 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
-    static final ArchRule paymentMustUseOnlyLedgerApplicationBoundary = noClasses()
+    static final ArchRule paymentMustNotDependOnLedger = noClasses()
             .that().resideInAPackage("com.flowpay.backend.payment..")
-            .should().dependOnClassesThat().resideInAnyPackage(
-                    "com.flowpay.backend.ledger.domain..",
-                    "com.flowpay.backend.ledger.infrastructure.."
+            .should().dependOnClassesThat().resideInAPackage(
+                    "com.flowpay.backend.ledger.."
             )
             .allowEmptyShould(true);
 
@@ -121,11 +124,10 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
-    static final ArchRule refundMustUseOnlyLedgerApplicationBoundary = noClasses()
+    static final ArchRule refundMustNotDependOnLedger = noClasses()
             .that().resideInAPackage("com.flowpay.backend.refund..")
-            .should().dependOnClassesThat().resideInAnyPackage(
-                    "com.flowpay.backend.ledger.domain..",
-                    "com.flowpay.backend.ledger.infrastructure.."
+            .should().dependOnClassesThat().resideInAPackage(
+                    "com.flowpay.backend.ledger.."
             )
             .allowEmptyShould(true);
 
@@ -262,6 +264,103 @@ class ArchitectureTest {
             .that().resideInAPackage("..application..")
             .should().dependOnClassesThat().haveFullyQualifiedName(
                     "org.springframework.security.core.context.SecurityContextHolder"
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule producerEventContractsMustRemainBrokerAndConsumerIndependent = noClasses()
+            .that().resideInAnyPackage(
+                    "com.flowpay.backend.payment.application.event..",
+                    "com.flowpay.backend.refund.application.event.."
+            )
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "org.springframework.amqp..",
+                    "com.fasterxml.jackson..",
+                    "jakarta.persistence..",
+                    "com.flowpay.backend.ledger..",
+                    "com.flowpay.backend.webhook.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule outboxPersistenceMustRemainBrokerIndependent = noClasses()
+            .that().resideInAPackage(
+                    "com.flowpay.backend.infrastructure.messaging.outbox.."
+            )
+            .should().dependOnClassesThat().resideInAPackage(
+                    "org.springframework.amqp.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule rabbitTemplateMustRemainInTopLevelMessagingInfrastructure = noClasses()
+            .that().resideOutsideOfPackage(
+                    "com.flowpay.backend.infrastructure.messaging.."
+            )
+            .should().dependOnClassesThat().haveFullyQualifiedName(
+                    "org.springframework.amqp.rabbit.core.RabbitTemplate"
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule businessModulesMustRemainBrokerIndependent = noClasses()
+            .that().resideInAnyPackage(BUSINESS_MODULES)
+            .should().dependOnClassesThat().resideInAPackage(
+                    "org.springframework.amqp.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule businessModulesMustNotDependOnMessagingInfrastructure = noClasses()
+            .that().resideInAnyPackage(BUSINESS_MODULES)
+            .should().dependOnClassesThat().resideInAPackage(
+                    "com.flowpay.backend.infrastructure.messaging.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule amqpTransportMustRemainInTopLevelMessagingInfrastructure = noClasses()
+            .that().resideOutsideOfPackage(
+                    "com.flowpay.backend.infrastructure.messaging.."
+            )
+            .should().dependOnClassesThat().resideInAPackage(
+                    "org.springframework.amqp.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule messagingMustNotDependOnSourceImplementationDetails = noClasses()
+            .that().resideInAPackage(
+                    "com.flowpay.backend.infrastructure.messaging.."
+            )
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.flowpay.backend.payment.api..",
+                    "com.flowpay.backend.payment.domain..",
+                    "com.flowpay.backend.payment.infrastructure..",
+                    "com.flowpay.backend.refund.api..",
+                    "com.flowpay.backend.refund.domain..",
+                    "com.flowpay.backend.refund.infrastructure.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule ledgerMustNotDependOnMessagingInfrastructure = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.ledger..")
+            .should().dependOnClassesThat().resideInAPackage(
+                    "com.flowpay.backend.infrastructure.messaging.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule ledgerEventConsumerMustNotAccessSourcePersistence = noClasses()
+            .that().resideInAPackage(
+                    "com.flowpay.backend.infrastructure.messaging.rabbit.."
+            )
+            .and().haveSimpleNameStartingWith("LedgerIntegrationEvent")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.flowpay.backend.payment.infrastructure..",
+                    "com.flowpay.backend.refund.infrastructure..",
+                    "com.flowpay.backend.merchant.infrastructure.."
             )
             .allowEmptyShould(true);
 

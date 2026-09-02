@@ -13,6 +13,11 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+  rabbitmq:
+    publisher-confirm-type: ${RABBITMQ_PUBLISHER_CONFIRM_TYPE:correlated}
+    publisher-returns: ${RABBITMQ_PUBLISHER_RETURNS:true}
+    template:
+      mandatory: ${RABBITMQ_TEMPLATE_MANDATORY:true}
 
 server:
   shutdown: graceful
@@ -36,6 +41,28 @@ logging:
     console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] [requestId=%X{requestId:-}] %logger{36} - %msg%n"
 
 flowpay:
+  messaging:
+    topology:
+      exchange: ${RABBITMQ_EVENT_EXCHANGE:flowpay.events}
+      ledger-queue: ${RABBITMQ_LEDGER_QUEUE:flowpay.ledger.events}
+      dead-letter-exchange: ${RABBITMQ_DEAD_LETTER_EXCHANGE:flowpay.events.dlx}
+      ledger-dead-letter-queue: ${RABBITMQ_LEDGER_DLQ:flowpay.ledger.events.dlq}
+      dead-letter-routing-key: ${RABBITMQ_LEDGER_DEAD_ROUTING_KEY:ledger.dead}
+    ledger-consumer:
+      enabled: ${LEDGER_EVENT_CONSUMER_ENABLED:true}
+      retry:
+        max-attempts: ${LEDGER_EVENT_CONSUMER_RETRY_MAX_ATTEMPTS:3}
+        initial-interval: ${LEDGER_EVENT_CONSUMER_RETRY_INITIAL_INTERVAL:500ms}
+        multiplier: ${LEDGER_EVENT_CONSUMER_RETRY_MULTIPLIER:2.0}
+        max-interval: ${LEDGER_EVENT_CONSUMER_RETRY_MAX_INTERVAL:5s}
+    outbox:
+      publisher-confirm-timeout: ${OUTBOX_PUBLISHER_CONFIRM_TIMEOUT:5s}
+      relay:
+        enabled: ${OUTBOX_RELAY_ENABLED:true}
+        fixed-delay: ${OUTBOX_RELAY_FIXED_DELAY:1s}
+        batch-size: ${OUTBOX_RELAY_BATCH_SIZE:100}
+        initial-backoff: ${OUTBOX_RELAY_INITIAL_BACKOFF:1s}
+        max-backoff: ${OUTBOX_RELAY_MAX_BACKOFF:60s}
   idempotency:
     retention: ${IDEMPOTENCY_RETENTION:24h}
     cleanup:

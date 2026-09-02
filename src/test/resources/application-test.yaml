@@ -18,6 +18,12 @@ management:
       sampler: always-off
 
 flowpay:
+  messaging:
+    ledger-consumer:
+      enabled: false
+    outbox:
+      relay:
+        enabled: false
   security:
     prometheus-public: false
     jwt:
