@@ -50,6 +50,12 @@ flowpay:
       dead-letter-routing-key: ${RABBITMQ_LEDGER_DEAD_ROUTING_KEY:ledger.dead}
     outbox:
       publisher-confirm-timeout: ${OUTBOX_PUBLISHER_CONFIRM_TIMEOUT:5s}
+      relay:
+        enabled: ${OUTBOX_RELAY_ENABLED:true}
+        fixed-delay: ${OUTBOX_RELAY_FIXED_DELAY:1s}
+        batch-size: ${OUTBOX_RELAY_BATCH_SIZE:100}
+        initial-backoff: ${OUTBOX_RELAY_INITIAL_BACKOFF:1s}
+        max-backoff: ${OUTBOX_RELAY_MAX_BACKOFF:60s}
   idempotency:
     retention: ${IDEMPOTENCY_RETENTION:24h}
     cleanup:

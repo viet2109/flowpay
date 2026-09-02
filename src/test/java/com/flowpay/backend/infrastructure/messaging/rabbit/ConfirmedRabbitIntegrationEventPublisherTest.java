@@ -178,7 +178,16 @@ class ConfirmedRabbitIntegrationEventPublisherTest {
                         "flowpay.ledger.events.dlq",
                         "ledger.dead"
                 ),
-                new FlowPayMessagingProperties.Outbox(timeout)
+                new FlowPayMessagingProperties.Outbox(
+                        timeout,
+                        new FlowPayMessagingProperties.Relay(
+                                false,
+                                Duration.ofSeconds(1),
+                                100,
+                                Duration.ofSeconds(1),
+                                Duration.ofMinutes(1)
+                        )
+                )
         );
     }
 

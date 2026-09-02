@@ -2,6 +2,8 @@ package com.flowpay.backend.architecture;
 
 import com.flowpay.backend.idempotency.application.IdempotencyCompletionCommand;
 import com.flowpay.backend.idempotency.application.IdempotencyCompletionService;
+import com.flowpay.backend.infrastructure.messaging.outbox.relay.OutboxRelayPersistenceService;
+import com.flowpay.backend.infrastructure.messaging.outbox.relay.OutboxRelayService;
 import com.flowpay.backend.ledger.application.LedgerReversalService;
 import com.flowpay.backend.ledger.application.ReverseLedgerTransactionCommand;
 import com.flowpay.backend.payment.application.ConfirmPaymentCommand;
@@ -91,12 +93,40 @@ class TransactionBoundaryRegressionTest {
         );
     }
 
+    @Test
+    void outboxRelayMustKeepBrokerIoBetweenShortDatabaseTransactions()
+            throws Exception {
+        assertNotTransactional(
+                OutboxRelayService.class,
+                "relayDueEvents"
+        );
+        assertTransactional(
+                OutboxRelayPersistenceService.class,
+                "findDue",
+                java.time.Instant.class,
+                int.class
+        );
+        assertTransactional(
+                OutboxRelayPersistenceService.class,
+                "markPublished",
+                String.class,
+                java.time.Instant.class
+        );
+        assertTransactional(
+                OutboxRelayPersistenceService.class,
+                "recordFailure",
+                String.class,
+                java.time.Instant.class,
+                String.class
+        );
+    }
+
     private static void assertTransactional(
             Class<?> type,
             String methodName,
-            Class<?> parameterType
+            Class<?>... parameterTypes
     ) throws NoSuchMethodException {
-        Method method = type.getDeclaredMethod(methodName, parameterType);
+        Method method = type.getDeclaredMethod(methodName, parameterTypes);
         assertThat(method.getAnnotation(Transactional.class))
                 .as("%s.%s transaction boundary", type.getSimpleName(), methodName)
                 .isNotNull();
@@ -108,6 +138,19 @@ class TransactionBoundaryRegressionTest {
             Class<?> parameterType
     ) throws NoSuchMethodException {
         Method method = type.getDeclaredMethod(methodName, parameterType);
+        assertThat(type.getAnnotation(Transactional.class))
+                .as("%s class-level transaction", type.getSimpleName())
+                .isNull();
+        assertThat(method.getAnnotation(Transactional.class))
+                .as("%s.%s outer transaction", type.getSimpleName(), methodName)
+                .isNull();
+    }
+
+    private static void assertNotTransactional(
+            Class<?> type,
+            String methodName
+    ) throws NoSuchMethodException {
+        Method method = type.getDeclaredMethod(methodName);
         assertThat(type.getAnnotation(Transactional.class))
                 .as("%s class-level transaction", type.getSimpleName())
                 .isNull();

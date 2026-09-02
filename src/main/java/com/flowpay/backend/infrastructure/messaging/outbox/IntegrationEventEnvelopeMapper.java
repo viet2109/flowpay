@@ -1,5 +1,6 @@
 package com.flowpay.backend.infrastructure.messaging.outbox;
 
+import com.flowpay.backend.infrastructure.messaging.outbox.relay.OutboxRelaySnapshot;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -18,14 +19,47 @@ public class IntegrationEventEnvelopeMapper {
 
     public IntegrationEventEnvelope from(OutboxEvent event) {
         OutboxEvent source = Objects.requireNonNull(event, "event must not be null");
-        JsonNode payload = readPayload(source.payload());
-        validateOccurrenceTime(source.occurredAt(), payload);
-        return new IntegrationEventEnvelope(
+        return from(
                 source.eventId(),
                 source.eventType(),
                 source.aggregateType(),
                 source.aggregateId(),
                 source.occurredAt(),
+                source.payload()
+        );
+    }
+
+    public IntegrationEventEnvelope from(OutboxRelaySnapshot snapshot) {
+        OutboxRelaySnapshot source = Objects.requireNonNull(
+                snapshot,
+                "snapshot must not be null"
+        );
+        return from(
+                source.eventId(),
+                source.eventType(),
+                source.aggregateType(),
+                source.aggregateId(),
+                source.occurredAt(),
+                source.payload()
+        );
+    }
+
+    private IntegrationEventEnvelope from(
+            String eventId,
+            String eventType,
+            String aggregateType,
+            String aggregateId,
+            Instant occurredAt,
+            String serializedPayload
+    ) {
+        JsonNode payload = readPayload(serializedPayload);
+        validateOccurrenceTime(occurredAt, payload);
+        return new IntegrationEventEnvelope(
+                eventId,
+                eventType,
+                aggregateType,
+                aggregateId,
+                occurredAt,
                 payload
         );
     }

@@ -52,16 +52,43 @@ public record FlowPayMessagingProperties(
         }
     }
 
-    public record Outbox(Duration publisherConfirmTimeout) {
+    public record Outbox(
+            Duration publisherConfirmTimeout,
+            Relay relay
+    ) {
 
         public Outbox {
-            Objects.requireNonNull(
+            publisherConfirmTimeout = requirePositive(
                     publisherConfirmTimeout,
-                    "outbox.publisherConfirmTimeout must not be null"
+                    "outbox.publisherConfirmTimeout"
             );
-            if (publisherConfirmTimeout.isZero() || publisherConfirmTimeout.isNegative()) {
+            relay = Objects.requireNonNull(relay, "outbox.relay must not be null");
+        }
+    }
+
+    public record Relay(
+            boolean enabled,
+            Duration fixedDelay,
+            int batchSize,
+            Duration initialBackoff,
+            Duration maxBackoff
+    ) {
+
+        public Relay {
+            fixedDelay = requirePositive(fixedDelay, "outbox.relay.fixedDelay");
+            if (batchSize <= 0) {
                 throw new IllegalArgumentException(
-                        "outbox.publisherConfirmTimeout must be positive"
+                        "outbox.relay.batchSize must be positive"
+                );
+            }
+            initialBackoff = requirePositive(
+                    initialBackoff,
+                    "outbox.relay.initialBackoff"
+            );
+            maxBackoff = requirePositive(maxBackoff, "outbox.relay.maxBackoff");
+            if (maxBackoff.compareTo(initialBackoff) < 0) {
+                throw new IllegalArgumentException(
+                        "outbox.relay.maxBackoff must not be less than initialBackoff"
                 );
             }
         }
@@ -74,5 +101,13 @@ public record FlowPayMessagingProperties(
             throw new IllegalArgumentException(fieldName + " must not be blank");
         }
         return normalized;
+    }
+
+    private static Duration requirePositive(Duration value, String fieldName) {
+        Objects.requireNonNull(value, fieldName + " must not be null");
+        if (value.isZero() || value.isNegative()) {
+            throw new IllegalArgumentException(fieldName + " must be positive");
+        }
+        return value;
     }
 }

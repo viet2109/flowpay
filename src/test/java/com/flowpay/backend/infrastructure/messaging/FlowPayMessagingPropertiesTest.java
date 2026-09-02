@@ -25,6 +25,7 @@ class FlowPayMessagingPropertiesTest {
                 .isEqualTo("flowpay.ledger.events");
         assertThat(properties.outbox().publisherConfirmTimeout())
                 .isEqualTo(Duration.ofSeconds(5));
+        assertThat(properties.outbox().relay().batchSize()).isEqualTo(100);
     }
 
     @Test
@@ -40,6 +41,20 @@ class FlowPayMessagingPropertiesTest {
         )).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> properties(
                 "events", "ledger", "dlx", "dlq", "dead", Duration.ZERO
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new FlowPayMessagingProperties.Relay(
+                true,
+                Duration.ofSeconds(1),
+                0,
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(2)
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new FlowPayMessagingProperties.Relay(
+                true,
+                Duration.ofSeconds(1),
+                10,
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(1)
         )).isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -59,7 +74,16 @@ class FlowPayMessagingPropertiesTest {
                         deadLetterQueue,
                         deadLetterRoutingKey
                 ),
-                new FlowPayMessagingProperties.Outbox(timeout)
+                new FlowPayMessagingProperties.Outbox(
+                        timeout,
+                        new FlowPayMessagingProperties.Relay(
+                                true,
+                                Duration.ofSeconds(1),
+                                100,
+                                Duration.ofSeconds(1),
+                                Duration.ofMinutes(1)
+                        )
+                )
         );
     }
 }
