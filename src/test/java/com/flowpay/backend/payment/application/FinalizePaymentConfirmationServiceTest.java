@@ -3,9 +3,8 @@ package com.flowpay.backend.payment.application;
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.common.money.Money;
-import com.flowpay.backend.ledger.application.LedgerPostingApi;
-import com.flowpay.backend.ledger.application.LedgerPostingException;
-import com.flowpay.backend.ledger.application.PostPaymentSucceededCommand;
+import com.flowpay.backend.payment.application.event.PaymentIntegrationEventPublisher;
+import com.flowpay.backend.payment.application.event.PaymentSucceededEventV1;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
@@ -53,7 +52,7 @@ class FinalizePaymentConfirmationServiceTest {
     private PaymentTransactionRepository paymentTransactionRepository;
 
     @Mock
-    private LedgerPostingApi ledgerPostingApi;
+    private PaymentIntegrationEventPublisher eventPublisher;
 
     private FinalizePaymentConfirmationService service;
 
@@ -62,7 +61,7 @@ class FinalizePaymentConfirmationServiceTest {
         service = new FinalizePaymentConfirmationService(
                 paymentIntentRepository,
                 paymentTransactionRepository,
-                ledgerPostingApi,
+                eventPublisher,
                 Clock.fixed(COMPLETED_AT, ZoneOffset.UTC)
         );
     }
@@ -95,16 +94,17 @@ class FinalizePaymentConfirmationServiceTest {
         verify(paymentIntentRepository).save(payment);
         verify(paymentTransactionRepository).save(transaction);
         if (providerResult.outcome() == ProviderOutcome.SUCCESS) {
-            verify(ledgerPostingApi).postPaymentSucceeded(
-                    new PostPaymentSucceededCommand(
+            verify(eventPublisher).publish(
+                    new PaymentSucceededEventV1(
                             payment.merchantId(),
                             payment.publicId(),
-                            payment.amount(),
+                            payment.amount().amountMinor(),
+                            payment.amount().currency().getCurrencyCode(),
                             COMPLETED_AT
                     )
             );
         } else {
-            verifyNoInteractions(ledgerPostingApi);
+            verifyNoInteractions(eventPublisher);
         }
         assertThat(result).isEqualTo(new FinalizedPaymentConfirmation(
                 "pi_finalize",
@@ -221,18 +221,17 @@ class FinalizePaymentConfirmationServiceTest {
     }
 
     @Test
-    void shouldPropagateLedgerFailureWithoutMisclassifyingItAsPaymentState() {
+    void shouldPropagateOutboxFailureWithoutMisclassifyingItAsPaymentState() {
         PaymentIntent payment = processingPayment();
         PaymentTransaction transaction = processingTransaction(payment.internalId());
         arrangeSuccessfulPersistence(payment, transaction);
-        LedgerPostingException ledgerFailure = org.mockito.Mockito.mock(
-                LedgerPostingException.class
-        );
-        when(ledgerPostingApi.postPaymentSucceeded(any(PostPaymentSucceededCommand.class)))
-                .thenThrow(ledgerFailure);
+        RuntimeException outboxFailure = new RuntimeException("outbox unavailable");
+        org.mockito.Mockito.doThrow(outboxFailure)
+                .when(eventPublisher)
+                .publish(any(PaymentSucceededEventV1.class));
 
         assertThatThrownBy(() -> service.finalizeConfirmation(command(success())))
-                .isSameAs(ledgerFailure)
+                .isSameAs(outboxFailure)
                 .isNotInstanceOf(ApiException.class);
         verify(paymentIntentRepository).save(payment);
         verify(paymentTransactionRepository).save(transaction);

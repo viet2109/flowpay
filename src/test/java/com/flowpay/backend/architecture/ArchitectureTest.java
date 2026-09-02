@@ -95,11 +95,10 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
-    static final ArchRule paymentMustUseOnlyLedgerApplicationBoundary = noClasses()
+    static final ArchRule paymentMustNotDependOnLedger = noClasses()
             .that().resideInAPackage("com.flowpay.backend.payment..")
-            .should().dependOnClassesThat().resideInAnyPackage(
-                    "com.flowpay.backend.ledger.domain..",
-                    "com.flowpay.backend.ledger.infrastructure.."
+            .should().dependOnClassesThat().resideInAPackage(
+                    "com.flowpay.backend.ledger.."
             )
             .allowEmptyShould(true);
 
