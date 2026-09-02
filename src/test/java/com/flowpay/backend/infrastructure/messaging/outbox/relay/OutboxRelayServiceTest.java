@@ -29,12 +29,14 @@ class OutboxRelayServiceTest {
             mock(IntegrationEventEnvelopeMapper.class);
     private final IntegrationEventTransportPublisher transportPublisher =
             mock(IntegrationEventTransportPublisher.class);
+    private final OutboxRelayBackoffPolicy backoffPolicy =
+            mock(OutboxRelayBackoffPolicy.class);
     private final FlowPayMessagingProperties properties = properties();
     private final OutboxRelayService relayService = new OutboxRelayService(
             persistenceService,
             envelopeMapper,
             transportPublisher,
-            new OutboxRelayBackoffPolicy(properties),
+            backoffPolicy,
             new OutboxRelayFailureSummary(),
             properties,
             Clock.fixed(NOW, ZoneOffset.UTC)
@@ -64,13 +66,15 @@ class OutboxRelayServiceTest {
                         IntegrationEventPublicationStatus.CONFIRMED
                 )
         );
+        when(backoffPolicy.delayAfterFailure("ievt_unsafe", 2))
+                .thenReturn(Duration.ofSeconds(3));
 
         OutboxRelayBatchResult result = relayService.relayDueEvents();
 
         assertThat(result).isEqualTo(new OutboxRelayBatchResult(2, 1, 1));
         verify(persistenceService).recordFailure(
                 "ievt_unsafe",
-                NOW.plusSeconds(4),
+                NOW.plusSeconds(3),
                 "Outbox publication failed unexpectedly: IllegalStateException"
         );
         verify(persistenceService).markPublished("ievt_succeeding", NOW);

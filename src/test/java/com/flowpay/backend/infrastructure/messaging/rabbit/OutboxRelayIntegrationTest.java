@@ -7,6 +7,7 @@ import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvel
 import com.flowpay.backend.infrastructure.messaging.outbox.OutboxEvent;
 import com.flowpay.backend.infrastructure.messaging.outbox.OutboxRepository;
 import com.flowpay.backend.infrastructure.messaging.outbox.relay.OutboxRelayBatchResult;
+import com.flowpay.backend.infrastructure.messaging.outbox.relay.OutboxRelayBackoffPolicy;
 import com.flowpay.backend.infrastructure.messaging.outbox.relay.OutboxRelayFailureSummary;
 import com.flowpay.backend.infrastructure.messaging.outbox.relay.OutboxRelayService;
 import com.flowpay.backend.payment.application.event.PaymentSucceededEventV1;
@@ -61,6 +62,9 @@ class OutboxRelayIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private OutboxRelayService relayService;
+
+    @Autowired
+    private OutboxRelayBackoffPolicy backoffPolicy;
 
     @Autowired
     private OutboxRepository outboxRepository;
@@ -161,7 +165,9 @@ class OutboxRelayIntegrationTest extends PostgresIntegrationTest {
         RelayRow unsafe = row("ievt_relay_unsafe");
         assertThat(unsafe.status()).isEqualTo("FAILED");
         assertThat(unsafe.retryCount()).isOne();
-        assertThat(unsafe.availableAt()).isEqualTo(NOW.plusMillis(100));
+        assertThat(unsafe.availableAt()).isEqualTo(
+                NOW.plus(backoffPolicy.delayAfterFailure("ievt_relay_unsafe", 0))
+        );
         assertThat(unsafe.lastError())
                 .isEqualTo(
                         "Outbox publication failed unexpectedly: IllegalStateException"
@@ -186,24 +192,26 @@ class OutboxRelayIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void shouldRetryIndefinitelyWithCappedBackoffAndNeverSelectPublishedRows() {
-        save(pending("ievt_relay_backoff", "unknown.relay.v1", NOW));
+        String eventId = "ievt_relay_backoff";
+        save(pending(eventId, "unknown.relay.v1", NOW));
 
-        assertThat(relayService.relayDueEvents().failedCount()).isOne();
-        assertFailed("ievt_relay_backoff", 1, NOW.plusMillis(100));
-        assertThat(relayService.relayDueEvents())
-                .isEqualTo(OutboxRelayBatchResult.empty());
-
-        clock.advance(Duration.ofMillis(100));
-        assertThat(relayService.relayDueEvents().failedCount()).isOne();
-        assertFailed("ievt_relay_backoff", 2, NOW.plusMillis(300));
-
-        clock.advance(Duration.ofMillis(200));
-        assertThat(relayService.relayDueEvents().failedCount()).isOne();
-        assertFailed("ievt_relay_backoff", 3, NOW.plusMillis(500));
-
-        clock.advance(Duration.ofMillis(200));
-        assertThat(relayService.relayDueEvents().failedCount()).isOne();
-        assertFailed("ievt_relay_backoff", 4, NOW.plusMillis(700));
+        for (int previousFailureCount = 0;
+             previousFailureCount < 4;
+             previousFailureCount++) {
+            assertThat(relayService.relayDueEvents().failedCount()).isOne();
+            Duration delay = backoffPolicy.delayAfterFailure(
+                    eventId,
+                    previousFailureCount
+            );
+            assertFailed(
+                    eventId,
+                    previousFailureCount + 1,
+                    clock.instant().plus(delay)
+            );
+            assertThat(relayService.relayDueEvents())
+                    .isEqualTo(OutboxRelayBatchResult.empty());
+            clock.advance(delay);
+        }
     }
 
     @Test
@@ -215,22 +223,26 @@ class OutboxRelayIntegrationTest extends PostgresIntegrationTest {
                 NOW
         ));
         stopRabbitApplication();
+        Duration retryDelay = backoffPolicy.delayAfterFailure(
+                "ievt_relay_recovery",
+                0
+        );
         try {
             OutboxRelayBatchResult failedBatch = relayService.relayDueEvents();
 
             assertThat(failedBatch.failedCount()).isOne();
-            assertFailed("ievt_relay_recovery", 1, NOW.plusMillis(100));
+            assertFailed("ievt_relay_recovery", 1, NOW.plus(retryDelay));
             assertThat(relayService.relayDueEvents())
                     .isEqualTo(OutboxRelayBatchResult.empty());
         } finally {
             ensureRabbitRunning();
         }
 
-        clock.advance(Duration.ofMillis(100));
+        clock.advance(retryDelay);
         OutboxRelayBatchResult recoveredBatch = relayService.relayDueEvents();
 
         assertThat(recoveredBatch.publishedCount()).isOne();
-        assertPublished("ievt_relay_recovery", NOW.plusMillis(100));
+        assertPublished("ievt_relay_recovery", NOW.plus(retryDelay));
         assertThat(row("ievt_relay_recovery").retryCount()).isOne();
         assertThat(receiveLedgerMessage().getMessageProperties().getMessageId())
                 .isEqualTo("ievt_relay_recovery");

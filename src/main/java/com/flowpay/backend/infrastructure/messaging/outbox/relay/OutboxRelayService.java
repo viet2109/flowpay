@@ -87,7 +87,10 @@ public class OutboxRelayService {
             String safeFailureSummary
     ) {
         Instant failedAt = clock.instant();
-        Duration delay = backoffPolicy.delayAfterFailure(snapshot.retryCount());
+        Duration delay = backoffPolicy.delayAfterFailure(
+                snapshot.eventId(),
+                snapshot.retryCount()
+        );
         try {
             persistenceService.recordFailure(
                     snapshot.eventId(),
