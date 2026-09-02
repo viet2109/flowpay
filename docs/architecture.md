@@ -502,7 +502,21 @@ state and a `PENDING` Outbox row atomically, but never performs broker I/O. The
 relay reads an immutable due-event snapshot in a short database transaction,
 publishes without an active database transaction, and records `PUBLISHED` only
 after a positive publisher confirm and successful routing. Publication failure
-remains durably retryable with capped backoff.
+remains durably retryable with capped exponential backoff and deterministic
+equal jitter between 50% and 100% of the current capped delay.
+
+The broker envelope is stable JSON containing `eventId`, `eventType`,
+`aggregateType`, `aggregateId`, `occurredAt`, and `payload`. The active V1
+payloads are:
+
+| Event type | Aggregate | Payload fields |
+|---|---|---|
+| `payment.succeeded.v1` | `PAYMENT_INTENT` / payment public ID | `merchantInternalId`, `paymentPublicId`, `amountMinor`, `currency`, `occurredAt` |
+| `refund.succeeded.v1` | `REFUND` / refund public ID | `merchantInternalId`, `refundPublicId`, `paymentPublicId`, `amountMinor`, `currency`, `occurredAt` |
+
+Payloads contain only the explicit consumer facts above. Authentication and
+idempotency values, credentials, persistence entities/versions, and raw provider
+responses are not event data.
 
 RabbitMQ delivery is at-least-once. A top-level transport listener validates
 the explicit envelope and delegates to a transactional Ledger event handler,

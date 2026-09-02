@@ -391,6 +391,12 @@ direction while preserving accounts, amounts, and currency. The original rows
 remain unchanged; Phase 5 permits one reversal per original and does not reverse
 a reversal.
 
+Payment/Refund integration events are explicit versioned application contracts,
+and the Outbox row and RabbitMQ envelope are top-level infrastructure records.
+They are not domain aggregate roots and do not expose source aggregates or JPA
+entities. Ledger consumes their immutable accounting facts through its public
+application API.
+
 ## 8. Webhook module
 
 ### WebhookEndpoint — Aggregate Root

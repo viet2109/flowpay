@@ -235,7 +235,7 @@ and the mandatory implementation order.
 
 ## Phase 6 — Outbox & RabbitMQ
 
-Status: `IN PROGRESS`.
+Status: `DONE/FROZEN`.
 
 Completed tasks:
 
@@ -252,9 +252,6 @@ Completed tasks:
 - P6-T11 Relay and consumer failure/concurrency hardening.
 - P6-T12 End-to-end PostgreSQL and RabbitMQ verification.
 - P6-T13 Architecture, data-safety, and regression tests.
-
-Remaining tasks:
-
 - P6-T14 Quality gate and documentation freeze.
 
 See `phase-6-outbox-rabbitmq.md` for frozen decisions, dependencies,

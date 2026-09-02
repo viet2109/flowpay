@@ -163,13 +163,14 @@ Status: `DONE/FROZEN` as of 2026-09-01.
 
 Double-entry Ledger accounts, immutable balanced transactions and entries,
 concurrency-safe account provisioning, deterministic duplicate-safe posting,
-Payment/Refund success accounting, and reversal postings. Phase 5 uses a
-transitional synchronous local posting trigger; Outbox, RabbitMQ, integration
-events, and consumer delivery remain owned by Phase 6.
+Payment/Refund success accounting, and reversal postings. Phase 5 introduced a
+transitional synchronous local posting trigger. Phase 6 supersedes that trigger
+with Outbox-backed asynchronous delivery while preserving the Phase 5 Ledger
+posting and duplicate-safety rules.
 
 ### Phase 6 — Outbox & RabbitMQ
 
-Status: `IN PROGRESS` as of 2026-09-01.
+Status: `DONE/FROZEN` as of 2026-09-02.
 
 Transactional Outbox persistence, confirmed RabbitMQ publication, retryable
 relay, at-least-once delivery, bounded consumer retry/dead-lettering, and

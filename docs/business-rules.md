@@ -495,7 +495,11 @@ must not occur inside that transaction.
 Phase 6 publishes only `payment.succeeded.v1` and `refund.succeeded.v1`.
 Integration-event IDs remain stable across relay retries, aggregate IDs use
 source public IDs, and envelope occurrence time must equal the occurrence time
-inside the explicit V1 payload.
+inside the explicit V1 payload. Payment success carries merchant internal ID,
+payment public ID, amount minor, currency, and occurrence time. Refund success
+adds refund and payment public IDs for correlation. These payloads must not
+contain credentials, request authentication/idempotency material, persistence
+entities or versions, or raw provider responses.
 
 ### BR-EVT-007 — Confirmed retryable publication
 
@@ -503,6 +507,8 @@ An Outbox event becomes `PUBLISHED` only after a positive publisher confirm and
 successful routing. A negative acknowledgement, confirm timeout, broker error,
 or mandatory return leaves the event retryable. Concurrent relay publication
 may create duplicate messages and must never downgrade `PUBLISHED` to `FAILED`.
+Relay delay uses capped exponential backoff with deterministic equal jitter so
+concurrent failures do not synchronize every retry at the same instant.
 
 ### BR-EVT-008 — Idempotent Ledger consumption
 
