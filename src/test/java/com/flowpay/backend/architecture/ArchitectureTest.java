@@ -291,6 +291,24 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule rabbitTemplateMustRemainInTopLevelMessagingInfrastructure = noClasses()
+            .that().resideOutsideOfPackage(
+                    "com.flowpay.backend.infrastructure.messaging.."
+            )
+            .should().dependOnClassesThat().haveFullyQualifiedName(
+                    "org.springframework.amqp.rabbit.core.RabbitTemplate"
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule businessModulesMustRemainBrokerIndependent = noClasses()
+            .that().resideInAnyPackage(BUSINESS_MODULES)
+            .should().dependOnClassesThat().resideInAPackage(
+                    "org.springframework.amqp.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule topLevelPackagesMustBeFreeOfCycles = slices()
             .matching("com.flowpay.backend.(*)..")
             .should().beFreeOfCycles()
