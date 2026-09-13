@@ -264,10 +264,10 @@ Status: `IN PROGRESS`.
 Completed tasks:
 
 - P7-T01 Phase 6 exit gate and Webhook architecture freeze.
+- P7-T02 Webhook configuration migration.
 
 Remaining tasks:
 
-- P7-T02 Webhook configuration migration.
 - P7-T03 WebhookEndpoint domain, URL policy, and secret cryptography.
 - P7-T04 Webhook endpoint persistence and dashboard APIs.
 - P7-T05 Complete Webhook source event catalog.

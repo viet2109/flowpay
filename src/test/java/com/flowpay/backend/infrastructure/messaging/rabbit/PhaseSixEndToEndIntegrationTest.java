@@ -363,13 +363,13 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void runningApplicationShouldUseTheCleanPhaseSixMigrationChain() {
+    void runningApplicationShouldUseTheCleanMigrationChainThroughWebhookConfiguration() {
         assertThat(jdbcTemplate.queryForList("""
                 SELECT version::integer
                 FROM flyway_schema_history
                 WHERE success = true
                 ORDER BY installed_rank
-                """, Integer.class)).containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9);
+                """, Integer.class)).containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
     }
 
     private StoredKey createStoredKey(String suffix) {

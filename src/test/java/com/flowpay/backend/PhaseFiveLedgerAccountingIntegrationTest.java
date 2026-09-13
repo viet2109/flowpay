@@ -85,14 +85,14 @@ class PhaseFiveLedgerAccountingIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void shouldPostExactPaymentAccountingOnCleanV001ThroughV009Schema() {
+    void shouldPostExactPaymentAccountingOnCleanV001ThroughV010Schema() {
         assertThat(jdbcTemplate.queryForList("""
                 SELECT version
                 FROM flyway_schema_history
                 WHERE success = true
                 ORDER BY installed_rank
                 """, String.class)).containsExactly(
-                "001", "002", "003", "004", "005", "006", "007", "008", "009"
+                "001", "002", "003", "004", "005", "006", "007", "008", "009", "010"
         );
 
         long merchantId = insertMerchant("mrc_accounting_payment");

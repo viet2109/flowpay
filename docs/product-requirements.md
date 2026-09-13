@@ -182,8 +182,8 @@ Status: `IN PROGRESS` as of 2026-09-13.
 
 Endpoint configuration, subscriptions, immutable event materialization, signed
 at-least-once HTTP delivery, leased multi-instance claiming, retry/backoff,
-delivery history, and dead delivery handling. P7-T01 architecture and contracts
-are frozen; implementation starts with the V010 endpoint schema.
+delivery history, and dead delivery handling. Architecture/contracts are frozen,
+and the V010 endpoint/subscription schema is complete.
 
 ### Phase 8 — Production engineering
 
