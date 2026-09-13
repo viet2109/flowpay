@@ -713,6 +713,9 @@ Payment/Refund access behaves as not found.
 
 Dashboard JWT required.
 
+All endpoint identifiers are public `wep_...` IDs. Unknown and cross-merchant
+resources both return `404`.
+
 ### Create endpoint
 
 ```http
@@ -730,13 +733,41 @@ POST /api/v1/merchant/webhook-endpoints
 }
 ```
 
-Create response returns the webhook secret once.
+Returns `201`. The raw secret is returned only in this response:
+
+```json
+{
+  "data": {
+    "id": "wep_01K...",
+    "url": "https://example.com/api/webhooks/flowpay",
+    "status": "ACTIVE",
+    "events": ["payment.failed", "payment.succeeded", "refund.succeeded"],
+    "secret": "whsec_...",
+    "createdAt": "2026-09-13T03:00:00Z",
+    "updatedAt": "2026-09-13T03:00:00Z"
+  }
+}
+```
+
+### List and retrieve
+
+```http
+GET /api/v1/merchant/webhook-endpoints
+GET /api/v1/merchant/webhook-endpoints/{endpointId}
+```
+
+Endpoint reads return `id`, `url`, `status`, sorted `events`, `createdAt`, and
+`updatedAt`. They never return the raw secret or encrypted secret.
 
 ### Update
 
 ```http
 PATCH /api/v1/merchant/webhook-endpoints/{endpointId}
 ```
+
+`url` and `events` are optional, but at least one must be supplied. When present,
+`events` replaces the complete non-empty subscription set. Only ACTIVE endpoints
+can be updated.
 
 ### Disable
 
@@ -753,6 +784,16 @@ POST /api/v1/merchant/webhook-endpoints/{endpointId}/rotate-secret
 ```
 
 Returns the new raw secret once.
+
+```json
+{
+  "data": {
+    "id": "wep_01K...",
+    "secret": "whsec_...",
+    "updatedAt": "2026-09-13T03:05:00Z"
+  }
+}
+```
 
 ## 14. Webhook delivery
 
@@ -775,10 +816,11 @@ Payload:
   "data": {
     "payment": {
       "id": "pi_01K...",
-      "orderId": "ORDER-001",
       "amount": 500000,
       "currency": "VND",
-      "status": "SUCCEEDED"
+      "status": "SUCCEEDED",
+      "failureCode": null,
+      "failureMessage": null
     }
   }
 }
@@ -796,6 +838,13 @@ Default timestamp tolerance:
 
 `5 minutes`
 
+`createdAt` is the source event occurrence time. Processing/failed variants use
+the matching event type and status; failed variants contain only bounded,
+normalized failure fields. The same event ID and exact body are reused for every
+attempt, while the signature timestamp/signature may change. Cross-event ordering
+is not guaranteed, so merchants must deduplicate by `FlowPay-Event-Id` and
+tolerate out-of-order state notifications.
+
 ### Delivery history
 
 ```http
@@ -803,19 +852,44 @@ GET /api/v1/merchant/webhook-deliveries
 GET /api/v1/merchant/webhook-deliveries/{deliveryId}
 ```
 
+List query parameters are `status`, `endpointId`, `eventType`, `page`, and
+`size`. Defaults are page `0`, size `20`, maximum size `100`, ordered by
+`createdAt DESC`.
+
+A delivery summary exposes:
+
+```text
+id, endpointId, eventId, eventType, resourceType, resourceId,
+status, attemptCount, nextAttemptAt, deliveredAt,
+lastHttpStatus, lastError, createdAt, updatedAt
+```
+
+The detail response adds attempts ordered by `attemptNo ASC`, each containing:
+
+```text
+attemptNo, startedAt, finishedAt, httpStatus, durationMs, errorMessage
+```
+
+Internal IDs, source integration-event IDs, entity versions, endpoint secrets,
+and ciphertext are never exposed.
+
 ### Manual retry
 
 ```http
 POST /api/v1/merchant/webhook-deliveries/{deliveryId}/retry
 ```
 
-Intended for dead/failed deliveries.
+Allowed only for a merchant-owned DEAD delivery whose endpoint remains ACTIVE.
+It schedules asynchronous retry and does not perform outbound HTTP inline.
 
 Success:
 
 ```http
 202 Accepted
 ```
+
+The response body contains the newly scheduled delivery summary. Attempt count
+and attempt history are not reset.
 
 ## 15. Event types v1
 
@@ -892,6 +966,7 @@ Webhook:
 
 - `WEBHOOK_ENDPOINT_NOT_FOUND`
 - `WEBHOOK_INVALID_STATE`
+- `WEBHOOK_DELIVERY_NOT_FOUND`
 
 Rate limiting:
 

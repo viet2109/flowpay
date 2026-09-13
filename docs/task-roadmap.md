@@ -259,20 +259,32 @@ acceptance criteria, and the mandatory implementation order.
 
 ## Phase 7 — Webhooks
 
-Planned tasks:
+Status: `IN PROGRESS`.
 
-- endpoint/subscription schema.
-- endpoint CRUD.
-- secret generation/encryption.
-- webhook event materialization.
-- delivery queue/state.
-- HMAC signing.
-- HTTP delivery adapter.
-- retry/backoff.
-- delivery-attempt history.
-- dead state/manual retry.
-- dashboard delivery APIs.
-- integration tests.
+Completed tasks:
+
+- P7-T01 Phase 6 exit gate and Webhook architecture freeze.
+
+Remaining tasks:
+
+- P7-T02 Webhook configuration migration.
+- P7-T03 WebhookEndpoint domain, URL policy, and secret cryptography.
+- P7-T04 Webhook endpoint persistence and dashboard APIs.
+- P7-T05 Complete Webhook source event catalog.
+- P7-T06 Webhook delivery migration.
+- P7-T07 WebhookEvent, Delivery, and Attempt domain/persistence.
+- P7-T08 RabbitMQ Webhook topology and event materialization.
+- P7-T09 HMAC signing and outbound HTTP adapter.
+- P7-T10 Delivery claim, lease, and attempt execution.
+- P7-T11 Retry, DEAD state, and stale-delivery recovery.
+- P7-T12 Manual retry and delivery dashboard APIs.
+- P7-T13 End-to-end event-to-Webhook verification.
+- P7-T14 Concurrency, failure, and security hardening.
+- P7-T15 Architecture and regression tests.
+- P7-T16 Quality gate and documentation freeze.
+
+See the local `phase-7-webhooks.md` plan for frozen decisions, dependencies,
+acceptance criteria, and the mandatory implementation order.
 
 ## Phase 8 — Production Engineering
 

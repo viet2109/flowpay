@@ -560,7 +560,43 @@ Production should eventually use a secret-management/KMS solution.
 
 ### BR-WEB-006 — Retry
 
-Failed webhook deliveries are retried using backoff and eventually transition to `DEAD` after the configured maximum attempts.
+The initial attempt is immediate. Automatic retry base delays are 10 seconds,
+30 seconds, 2 minutes, 10 minutes, and 1 hour, for six total normal attempts.
+Each retry uses deterministic additive jitter from zero through 20 percent of
+its base delay and is never scheduled earlier than the base delay. A final
+failure transitions the delivery to `DEAD`.
+
+### BR-WEB-007 — Transaction and claim boundary
+
+Materialization, delivery claim, and result finalization use separate short
+transactions. Outbound HTTP never runs inside a database transaction. A claim
+stores a lease and increments the attempt number, which fences stale results.
+
+### BR-WEB-008 — Subscription snapshot and source deduplication
+
+Every valid source integration event is materialized once by source event ID,
+even when no endpoint matches. Matching ACTIVE endpoint subscriptions are
+snapshotted only on first materialization and are not recomputed on equivalent
+RabbitMQ redelivery.
+
+### BR-WEB-009 — Endpoint lifecycle races
+
+Disabling an endpoint prevents future claims and marks its PENDING/RETRYING
+deliveries DEAD. An already in-flight request may finish using the immutable
+URL/secret/body snapshot captured for that attempt. Secret rotation and endpoint
+updates affect later attempts only.
+
+### BR-WEB-010 — Ordering
+
+FlowPay does not guarantee ordering across separate Webhook events for the same
+resource. Merchants must deduplicate by public event ID and tolerate state
+notifications arriving out of order.
+
+### BR-WEB-011 — Manual retry
+
+Only a merchant-owned DEAD delivery whose endpoint remains ACTIVE can be
+manually scheduled for retry. Scheduling returns `202`, performs no synchronous
+HTTP, and preserves attempt count and history.
 
 ## 12. Security and logging
 

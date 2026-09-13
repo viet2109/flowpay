@@ -428,10 +428,16 @@ Fields:
 
 - internal ID
 - public ID (`evt_...`)
+- source integration-event ID
+- merchant ID
 - event type
 - resource type/id
 - JSON payload
 - occurred/created timestamps
+
+Source event ID is the deduplication identity. An equivalent duplicate returns
+the existing event without recomputing endpoint subscriptions; a contradictory
+duplicate fails closed. Payload and identity are immutable after materialization.
 
 ### WebhookDelivery — Aggregate Root
 
@@ -439,11 +445,14 @@ Represents delivery of one webhook event to one endpoint.
 
 Fields:
 
+- internal ID
+- public ID (`wdl_...`)
 - event ID
 - endpoint ID
 - status
 - attempt count
 - next-attempt timestamp
+- lease-expiry timestamp
 - delivered timestamp
 - last HTTP status/error
 - version
@@ -461,7 +470,10 @@ Status:
 
 Records one concrete delivery attempt.
 
-It is append-only diagnostic history.
+It stores attempt number, start/finish timestamps, HTTP status or normalized
+error, and duration. It is append-only diagnostic history; the attempt number is
+also the fencing token that prevents a stale worker result from overwriting a
+newer attempt.
 
 ## 9. Cross-module relationships
 

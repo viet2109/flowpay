@@ -531,7 +531,7 @@ INDEX(status, available_at)
 id                     BIGINT PK
 public_id              VARCHAR NOT NULL UNIQUE
 merchant_id            BIGINT NOT NULL FK -> merchants.id
-url                    VARCHAR NOT NULL
+url                    VARCHAR(2048) NOT NULL
 secret_ciphertext      TEXT NOT NULL
 status                 VARCHAR NOT NULL
 created_at             TIMESTAMPTZ NOT NULL
@@ -544,6 +544,15 @@ Status:
 - `ACTIVE`
 - `DISABLED`
 
+Constraints/indexes:
+
+```text
+CHECK(status IN ('ACTIVE', 'DISABLED'))
+INDEX(merchant_id, status, created_at DESC)
+```
+
+Endpoint URLs are intentionally not globally or merchant unique.
+
 ### `webhook_endpoint_events`
 
 ```text
@@ -551,6 +560,7 @@ endpoint_id          BIGINT NOT NULL FK -> webhook_endpoints.id
 event_type           VARCHAR NOT NULL
 
 PRIMARY KEY(endpoint_id, event_type)
+CHECK(event_type IN the six supported public Webhook event names)
 ```
 
 ### `webhook_events`
@@ -558,6 +568,8 @@ PRIMARY KEY(endpoint_id, event_type)
 ```text
 id                  BIGINT PK
 public_id           VARCHAR NOT NULL UNIQUE
+source_event_id     VARCHAR NOT NULL UNIQUE
+merchant_id         BIGINT NOT NULL FK -> merchants.id
 event_type          VARCHAR NOT NULL
 resource_type       VARCHAR NOT NULL
 resource_id         VARCHAR NOT NULL
@@ -568,15 +580,22 @@ created_at          TIMESTAMPTZ NOT NULL
 
 Webhook events are immutable.
 
+`event_type` is restricted to the six public Webhook event names and
+`resource_type` to `PAYMENT_INTENT` or `REFUND`. Source-event identity provides
+Rabbit redelivery deduplication; merchant ownership makes delivery history
+tenant-safe without querying source-module persistence.
+
 ### `webhook_deliveries`
 
 ```text
 id                     BIGINT PK
+public_id              VARCHAR NOT NULL UNIQUE
 webhook_event_id       BIGINT NOT NULL FK -> webhook_events.id
 webhook_endpoint_id    BIGINT NOT NULL FK -> webhook_endpoints.id
 status                 VARCHAR NOT NULL
 attempt_count          INTEGER NOT NULL DEFAULT 0
 next_attempt_at        TIMESTAMPTZ NULL
+lease_expires_at       TIMESTAMPTZ NULL
 delivered_at           TIMESTAMPTZ NULL
 last_http_status       INTEGER NULL
 last_error             TEXT NULL
@@ -589,13 +608,22 @@ Constraint:
 
 ```sql
 UNIQUE(webhook_event_id, webhook_endpoint_id)
+CHECK(status IN ('PENDING', 'DELIVERING', 'DELIVERED', 'RETRYING', 'DEAD'))
+CHECK(attempt_count >= 0)
+CHECK(last_http_status IS NULL OR last_http_status BETWEEN 100 AND 599)
 ```
 
 Worker index:
 
 ```sql
 INDEX(status, next_attempt_at)
+INDEX(status, lease_expires_at)
+INDEX(webhook_endpoint_id, created_at DESC)
 ```
+
+Timestamp consistency follows the state machine: PENDING/RETRYING have
+`next_attempt_at`; DELIVERING has `lease_expires_at`; DELIVERED has
+`delivered_at`; DEAD has none of these scheduling timestamps.
 
 ### `webhook_delivery_attempts`
 
@@ -615,7 +643,12 @@ Constraint:
 
 ```sql
 UNIQUE(delivery_id, attempt_no)
+CHECK(attempt_no > 0)
+CHECK(duration_ms IS NULL OR duration_ms >= 0)
+CHECK(http_status IS NULL OR http_status BETWEEN 100 AND 599)
 ```
+
+Webhook foreign keys do not cascade physical deletes.
 
 ## 9. Optimistic locking
 

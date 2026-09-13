@@ -537,6 +537,38 @@ The Payment and Refund cutovers are complete. Their production success paths no
 longer call Ledger directly; the verified Outbox writer, confirmed publisher,
 relay, and Ledger consumer own eventual Ledger posting.
 
+Phase 7 adds Webhook as a second, independent consumer of the same exchange. It
+preserves the two success V1 contracts and adds explicit
+`payment.processing.v1`, `payment.failed.v1`, `refund.processing.v1`, and
+`refund.failed.v1` contracts. The Webhook consumer materializes each source
+event exactly once in PostgreSQL by source event ID and creates zero or more
+delivery rows from the ACTIVE subscription snapshot in the same short
+transaction. An equivalent duplicate is acknowledged without recomputing
+subscriptions; a contradictory duplicate fails closed and follows bounded
+consumer retry/dead-letter handling.
+
+Outbound delivery uses three separate boundaries:
+
+```text
+materialize event/deliveries TX
+→ claim delivery + open attempt TX
+→ signed HTTP POST with no database transaction
+→ fenced result-finalization TX
+```
+
+The claim increments `attemptCount`, stores a lease, and uses that attempt number
+as a fencing token. Expired leases are recoverable and may produce an external
+duplicate, which is part of the documented at-least-once contract. Endpoint
+disable, claim, and materialization coordinate through database row locks; an
+already in-flight request uses its immutable URL/secret/body snapshot and may
+finish, while future claims use the latest ACTIVE endpoint configuration.
+
+FlowPay guarantees stable identity and body per public Webhook event, but not
+ordering across separate events for the same aggregate. Merchants deduplicate by
+`FlowPay-Event-Id` and tolerate processing/terminal events arriving out of
+order. Webhook delivery failure cannot roll back or mutate Payment, Refund,
+Ledger, or an already published Outbox record.
+
 ## 13. Synchronous query versus asynchronous side effect
 
 Use a synchronous module API only when a business operation needs another module's current state to make a decision.
