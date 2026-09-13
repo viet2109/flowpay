@@ -79,6 +79,11 @@ flowpay:
     provider: ${REFUND_PROVIDER:simulator}
     simulator:
       default-outcome: ${REFUND_SIMULATOR_DEFAULT_OUTCOME:SUCCESS}
+  webhook:
+    secret:
+      encryption-key: ${WEBHOOK_SECRET_ENCRYPTION_KEY}
+    url-policy:
+      allow-insecure-localhost: ${WEBHOOK_ALLOW_INSECURE_LOCALHOST:false}
   security:
     prometheus-public: false
     jwt:

@@ -18,6 +18,9 @@ management:
       sampler: always-off
 
 flowpay:
+  webhook:
+    secret:
+      encryption-key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
   messaging:
     ledger-consumer:
       enabled: false

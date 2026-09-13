@@ -420,6 +420,15 @@ Status:
 - `ACTIVE`
 - `DISABLED`
 
+Creation produces an ACTIVE endpoint with a required, non-empty set drawn from
+the six canonical public event types. Only ACTIVE endpoints may replace their
+URL, subscription set, or encrypted secret. Disable is a one-way soft state
+transition in Phase 7; disabled endpoints cannot be mutated or re-enabled.
+
+The aggregate persists only versioned secret ciphertext. The generated raw
+`whsec_...` value is deliberately outside aggregate state and normal read
+models.
+
 ### WebhookEvent — Aggregate Root
 
 Immutable public event payload.
