@@ -733,7 +733,8 @@ POST /api/v1/merchant/webhook-endpoints
 }
 ```
 
-Returns `201`. The raw secret is returned only in this response:
+Returns `201` with `Location: /api/v1/merchant/webhook-endpoints/{endpointId}`.
+The raw secret is returned only in this response:
 
 ```json
 {
@@ -759,6 +760,9 @@ GET /api/v1/merchant/webhook-endpoints/{endpointId}
 Endpoint reads return `id`, `url`, `status`, sorted `events`, `createdAt`, and
 `updatedAt`. They never return the raw secret or encrypted secret.
 
+List returns `{ "data": [...] }` (not paginated), includes ACTIVE and DISABLED
+endpoints, and orders by `createdAt DESC` with an internal ID tie-breaker.
+
 ### Update
 
 ```http
@@ -769,6 +773,12 @@ PATCH /api/v1/merchant/webhook-endpoints/{endpointId}
 `events` replaces the complete non-empty subscription set. Only ACTIVE endpoints
 can be updated.
 
+Omit a field to leave it unchanged; explicit `null` values are invalid.
+Event names must exactly match the six canonical public event names; duplicates
+are invalid. PATCH and secret rotation on DISABLED endpoints return
+`409 WEBHOOK_INVALID_STATE`. Concurrent mutation conflicts also return
+`409 WEBHOOK_INVALID_STATE`; reload the endpoint before retrying.
+
 ### Disable
 
 ```http
@@ -776,6 +786,9 @@ DELETE /api/v1/merchant/webhook-endpoints/{endpointId}
 ```
 
 Returns `204` and changes status to `DISABLED`.
+
+Repeating DELETE for an already DISABLED endpoint also returns `204`.
+Endpoint configuration and subscriptions are retained; there is no re-enable API.
 
 ### Rotate secret
 

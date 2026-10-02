@@ -184,7 +184,10 @@ Endpoint configuration, subscriptions, immutable event materialization, signed
 at-least-once HTTP delivery, leased multi-instance claiming, retry/backoff,
 delivery history, and dead delivery handling. Architecture/contracts are frozen,
 the V010 endpoint/subscription schema is complete, and endpoint lifecycle, URL
-policy, and secret cryptography are implemented.
+policy, and secret cryptography are implemented. Merchant-scoped dashboard APIs
+now persist, list, retrieve, update, soft-disable, and rotate endpoint secrets
+with optimistic concurrency protection. Event materialization and HTTP delivery
+remain pending.
 
 ### Phase 8 — Production engineering
 

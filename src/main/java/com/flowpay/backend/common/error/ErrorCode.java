@@ -15,6 +15,8 @@ public enum ErrorCode {
     MERCHANT_NOT_FOUND("Merchant not found", "merchant-not-found"),
     MERCHANT_SUSPENDED("Merchant suspended", "merchant-suspended"),
     API_KEY_NOT_FOUND("API key not found", "api-key-not-found"),
+    WEBHOOK_ENDPOINT_NOT_FOUND("Webhook endpoint not found", "webhook-endpoint-not-found"),
+    WEBHOOK_INVALID_STATE("Webhook invalid state", "webhook-invalid-state"),
     API_KEY_REVOKED("API key revoked", "api-key-revoked"),
     INVALID_API_KEY("Invalid API key", "invalid-api-key"),
     IDEMPOTENCY_KEY_REQUIRED("Idempotency key required", "idempotency-key-required"),

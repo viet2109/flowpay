@@ -4,6 +4,8 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import org.springframework.web.bind.annotation.RestController;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
@@ -79,6 +81,29 @@ class ArchitectureTest {
             .that().areAnnotatedWith(RestController.class)
             .should().dependOnClassesThat().resideInAPackage("..infrastructure..")
             .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule webhookMustUseOnlyMerchantPublicApplicationApi = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.webhook..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.flowpay.backend.merchant.domain..",
+                    "com.flowpay.backend.merchant.infrastructure..")
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule webhookMustNotAccessAnotherModulesRepositories = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.webhook..")
+            .should().dependOnClassesThat(DescribedPredicate.<JavaClass>describe(
+                    "business repositories outside Webhook",
+                    type -> type.getPackageName().startsWith("com.flowpay.backend.")
+                            && !type.getPackageName().startsWith("com.flowpay.backend.webhook.")
+                            && type.getSimpleName().endsWith("Repository")));
+
+    @ArchTest
+    static final ArchRule webhookJpaEntitiesMustRemainPackagePrivate = classes()
+            .that().resideInAPackage("com.flowpay.backend.webhook.infrastructure.persistence..")
+            .and().haveSimpleNameEndingWith("Entity")
+            .should().notBePublic();
 
     @ArchTest
     static final ArchRule merchantMustNotDependOnIdentityInfrastructure = noClasses()
