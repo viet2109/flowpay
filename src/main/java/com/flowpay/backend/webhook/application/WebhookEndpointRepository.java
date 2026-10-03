@@ -10,6 +10,8 @@ public interface WebhookEndpointRepository {
     Optional<WebhookEndpoint> findByPublicIdAndMerchantId(String publicId, long merchantId);
     /** Caller-owned transaction; serialize disable against materialization. */
     Optional<WebhookEndpoint> findByPublicIdAndMerchantIdForUpdate(String publicId, long merchantId);
+    /** Caller-owned transaction. Lock endpoint before delivery; optionally skip contended endpoints. */
+    Optional<WebhookEndpoint> findByInternalIdForShare(long internalId, boolean skipLocked);
     /** Snapshot matching endpoint IDs while holding shared row locks until commit. */
     List<Long> findActiveSubscribedIdsForShare(long merchantId, WebhookEventType type);
     List<WebhookEndpoint> findAllByMerchantId(long merchantId);

@@ -17,6 +17,15 @@ public class WebhookEndpointRepositoryAdapter implements WebhookEndpointReposito
     private final JdbcTemplate jdbc;
 
     @Override
+    public Optional<WebhookEndpoint> findByInternalIdForShare(long internalId, boolean skipLocked) {
+        var ids = jdbc.queryForList(skipLocked
+                ? "SELECT id FROM webhook_endpoints WHERE id = ? FOR SHARE SKIP LOCKED"
+                : "SELECT id FROM webhook_endpoints WHERE id = ? FOR SHARE", Long.class, internalId);
+        return ids.isEmpty() ? Optional.empty() : repository.findById(internalId)
+                .map(WebhookEndpointPersistenceMapper::toDomain);
+    }
+
+    @Override
     public Optional<WebhookEndpoint> findByPublicIdAndMerchantIdForUpdate(String publicId, long merchantId) {
         var ids = jdbc.queryForList("""
                 SELECT id FROM webhook_endpoints WHERE public_id = ? AND merchant_id = ? FOR UPDATE

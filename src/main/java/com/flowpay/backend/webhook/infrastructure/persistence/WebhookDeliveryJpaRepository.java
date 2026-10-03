@@ -14,6 +14,17 @@ interface WebhookDeliveryJpaRepository extends JpaRepository<WebhookDeliveryEnti
     @Query("select d from WebhookDeliveryEntity d where d.id = :id")
     Optional<WebhookDeliveryEntity> findByIdForUpdate(@Param("id") long id);
 
+    @Query(value = "SELECT * FROM webhook_deliveries WHERE id = :id FOR UPDATE SKIP LOCKED", nativeQuery = true)
+    Optional<WebhookDeliveryEntity> findByIdForUpdateSkipLocked(@Param("id") long id);
+
+    @Query(value = """
+            SELECT d.* FROM webhook_deliveries d JOIN webhook_endpoints p ON p.id = d.webhook_endpoint_id
+            WHERE d.status IN ('PENDING', 'RETRYING') AND d.next_attempt_at <= :now AND p.status = 'ACTIVE'
+            ORDER BY d.next_attempt_at, d.id LIMIT :limit
+            FOR UPDATE OF d SKIP LOCKED FOR SHARE OF p SKIP LOCKED
+            """, nativeQuery = true)
+    List<WebhookDeliveryEntity> findClaimCandidates(@Param("now") Instant now, @Param("limit") int limit);
+
     @Query("""
             select d from WebhookDeliveryEntity d, WebhookEventEntity e, WebhookEndpointEntity p
             where d.webhookEventId = e.id and d.webhookEndpointId = p.id

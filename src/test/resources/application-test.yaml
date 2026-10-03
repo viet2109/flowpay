@@ -19,6 +19,8 @@ management:
 
 flowpay:
   webhook:
+    delivery-worker:
+      enabled: false
     secret:
       encryption-key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
   messaging:

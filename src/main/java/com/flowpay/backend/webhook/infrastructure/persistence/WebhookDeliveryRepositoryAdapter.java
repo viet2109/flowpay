@@ -31,6 +31,17 @@ public class WebhookDeliveryRepositoryAdapter implements WebhookDeliveryReposito
     }
 
     @Override
+    public Optional<WebhookDelivery> findByInternalIdForUpdateSkipLocked(long internalId) {
+        return repository.findByIdForUpdateSkipLocked(internalId).map(WebhookDeliveryPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public List<WebhookDelivery> findClaimCandidates(Instant now, int limit) {
+        validateCandidates(now, limit);
+        return repository.findClaimCandidates(now, limit).stream().map(WebhookDeliveryPersistenceMapper::toDomain).toList();
+    }
+
+    @Override
     public Optional<WebhookDelivery> findByPublicIdAndMerchantId(String publicId, long merchantId) {
         return repository.findOwned(publicId, merchantId).map(WebhookDeliveryPersistenceMapper::toDomain);
     }

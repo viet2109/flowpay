@@ -640,6 +640,14 @@ Among V011 tables, only mutable deliveries carry a version; immutable events
 and retained attempt history have no version column. Public delivery identities
 use `wdl_...`.
 
+P7-T10 adds no migration. Worker candidate selection joins ACTIVE endpoints and
+uses `FOR UPDATE OF delivery SKIP LOCKED` / `FOR SHARE OF endpoint SKIP LOCKED`
+in a short transaction. Each actual claim then takes the endpoint shared lock
+before the delivery write lock, rechecks due status, and commits DELIVERING,
+incremented attempt count, lease, and an OPEN attempt atomically. HTTP runs after
+commit. Finalization locks in the same order and fences by status/attempt count;
+delivery and conditional attempt completion commit or roll back together.
+
 ### `webhook_delivery_attempts`
 
 ```text

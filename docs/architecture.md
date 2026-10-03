@@ -592,7 +592,37 @@ messages. Request `toString()` redacts URL, body, and plaintext secret.
 Response handling completes at headers and closes the body stream without
 reading/draining it, so an oversized or indefinitely slow merchant response body
 cannot extend an otherwise acknowledged attempt. No response body is retained.
-Delivery claiming, persisted attempt finalization, and scheduling remain future tasks.
+P7-T10 supplies delivery claiming, persisted attempt finalization, and scheduling.
+
+`WebhookDeliveryWorker` selects a bounded ACTIVE-endpoint candidate batch in a
+short transaction that skips contended delivery/endpoint rows. Candidates are
+not claims: each is rechecked and claimed in its own independent transaction
+immediately before sending, so later items do not consume their lease waiting
+behind earlier HTTP calls. Claim locks the endpoint for share first, then locks
+the delivery `FOR UPDATE SKIP LOCKED`, increments the attempt, and atomically
+inserts its OPEN history row. Finalization uses the same endpoint-before-delivery
+lock order, checks DELIVERING plus expected attempt number, and commits the
+delivery transition and one-time history completion together. Duplicate or
+stale results are ignored without overwriting history.
+
+The immutable send snapshot contains the persisted event body and current
+endpoint URL/encrypted secret; decryption and UTF-8 encoding happen after claim
+commit. Rotation/update/disable cannot change that in-flight snapshot. 2xx
+finalizes DELIVERED; other outcomes delegate to `WebhookDeliveryFailurePolicy`.
+Its initial implementation uses the approved five retry delays with deterministic
+additive jitter keyed by public delivery ID and next attempt number; a sixth
+failure, or a failure after endpoint disable, becomes DEAD. Transport diagnostics
+are fixed codes only, and elapsed milliseconds are bounded to the persisted INT.
+Persistence failure never triggers an inline resend; it leaves a lease for the
+recovery flow to handle.
+
+`flowpay.webhook.delivery-worker` defaults to enabled, one-second fixed delay,
+100 candidates, and a 30-second lease. The lease must strictly exceed the HTTP
+request timeout; durations and batch size must be positive. Tests disable the
+background worker and invoke batches explicitly. `flowpay.webhook.delivery`
+defaults to `retry-delays=10s,30s,2m,10m,1h` and `retry-jitter-max=0.20`.
+Expired-lease recovery and cancellation of scheduled deliveries on endpoint
+disable remain P7-T11 work; manual retry/dashboard delivery APIs remain P7-T12.
 
 Outbound delivery uses three separate boundaries:
 

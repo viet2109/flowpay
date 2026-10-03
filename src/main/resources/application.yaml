@@ -90,6 +90,14 @@ flowpay:
     simulator:
       default-outcome: ${REFUND_SIMULATOR_DEFAULT_OUTCOME:SUCCESS}
   webhook:
+    delivery-worker:
+      enabled: ${WEBHOOK_DELIVERY_WORKER_ENABLED:true}
+      fixed-delay: ${WEBHOOK_DELIVERY_WORKER_FIXED_DELAY:1s}
+      batch-size: ${WEBHOOK_DELIVERY_WORKER_BATCH_SIZE:100}
+      lease-timeout: ${WEBHOOK_DELIVERY_WORKER_LEASE_TIMEOUT:30s}
+    delivery:
+      retry-delays: ${WEBHOOK_DELIVERY_RETRY_DELAYS:10s,30s,2m,10m,1h}
+      retry-jitter-max: ${WEBHOOK_DELIVERY_RETRY_JITTER_MAX:0.20}
     http:
       connect-timeout: ${WEBHOOK_HTTP_CONNECT_TIMEOUT:2s}
       request-timeout: ${WEBHOOK_HTTP_REQUEST_TIMEOUT:5s}
