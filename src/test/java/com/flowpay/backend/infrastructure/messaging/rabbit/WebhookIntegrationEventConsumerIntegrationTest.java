@@ -20,6 +20,7 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
@@ -28,9 +29,13 @@ import tools.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.Clock;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.*;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -48,6 +53,13 @@ class WebhookIntegrationEventConsumerIntegrationTest extends PostgresIntegration
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ObjectMapper mapper;
     @Autowired private PlatformTransactionManager transactions;
+    @Autowired private WebhookSecretCipher cipher;
+    @Autowired private WebhookDeliveryRepository deliveries;
+    @Autowired private WebhookDeliveryAttemptRepository attempts;
+    @Autowired private WebhookDeliveryExecutionService execution;
+    @MockitoBean private WebhookHttpClientPort http;
+    @MockitoBean private Clock clock;
+    private final AtomicReference<Instant> now = new AtomicReference<>(OCCURRED);
     private long merchant;
 
     @DynamicPropertySource
@@ -64,6 +76,8 @@ class WebhookIntegrationEventConsumerIntegrationTest extends PostgresIntegration
 
     @BeforeEach
     void cleanState() {
+        now.set(OCCURRED);
+        when(clock.instant()).thenAnswer(call -> now.get());
         for (String queue : new String[]{webhook.topology().webhookQueue(), webhook.topology().webhookDeadLetterQueue(),
                 messaging.topology().ledgerQueue(), messaging.topology().ledgerDeadLetterQueue()}) {
             admin.purgeQueue(queue, true);
@@ -156,9 +170,47 @@ class WebhookIntegrationEventConsumerIntegrationTest extends PostgresIntegration
         }
     }
 
+    @Test
+    void merchantDeliveryDeadAndMaterializerDlqAreIndependentFailureDomains() {
+        endpoint("one");
+        var source = envelope(WebhookEventType.PAYMENT_PROCESSING, 10000);
+        assertThat(publisher.publish(source).confirmed()).isTrue();
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(count("webhook_deliveries")).isOne());
+        var event = events.findBySourceEventId(source.eventId()).orElseThrow();
+        long deliveryId = jdbc.queryForObject("SELECT id FROM webhook_deliveries", Long.class);
+        when(http.send(any())).thenReturn(WebhookHttpDeliveryResult.http(500, 1));
+        var worker = new WebhookDeliveryWorker(execution, http, cipher,
+                new WebhookDeliveryWorkerProperties(true, Duration.ofSeconds(1), 100, Duration.ofSeconds(30)), clock);
+        for (int no = 1; no <= 6; no++) {
+            worker.deliverBatch();
+            var delivery = deliveries.findByInternalId(deliveryId).orElseThrow();
+            assertThat(delivery.attemptCount()).isEqualTo(no);
+            if (no < 6) now.set(delivery.nextAttemptAt());
+        }
+        assertThat(deliveries.findByInternalId(deliveryId).orElseThrow().status()).isEqualTo(WebhookDeliveryStatus.DEAD);
+        assertThat(attempts.findAllByDeliveryId(deliveryId)).hasSize(6);
+        assertThat(queueSize(webhook.topology().webhookDeadLetterQueue())).isZero();
+
+        // Equivalent broker redelivery does not revive DEAD or create another delivery.
+        assertThat(publisher.publish(source).confirmed()).isTrue();
+        // Contradictory source facts fail materialization and are dead-lettered independently of HTTP history.
+        assertThat(publisher.publish(envelope(WebhookEventType.PAYMENT_PROCESSING, 9000)).confirmed()).isTrue();
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertThat(queueSize(webhook.topology().webhookDeadLetterQueue())).isOne());
+        worker.deliverBatch();
+        verify(http, times(6)).send(any());
+        assertThat(count("webhook_events")).isOne();
+        assertThat(count("webhook_deliveries")).isOne();
+        assertThat(events.findBySourceEventId(source.eventId()).orElseThrow().payload()).isEqualTo(event.payload());
+        assertThat(deliveries.findByInternalId(deliveryId).orElseThrow().status()).isEqualTo(WebhookDeliveryStatus.DEAD);
+        assertThat(attempts.findAllByDeliveryId(deliveryId)).hasSize(6);
+        assertThat(count("ledger_transactions")).isZero();
+        assertThat(queueSize(messaging.topology().ledgerDeadLetterQueue())).isZero();
+    }
+
     private void endpoint(String suffix) {
         new TransactionTemplate(transactions).execute(status -> endpoints.save(WebhookEndpoint.create(
-                "wep_" + suffix, merchant, "https://example.com/webhooks", "encrypted",
+                "wep_" + suffix, merchant, "https://example.com/webhooks", cipher.encrypt("whsec_consumer_fixture"),
                 Arrays.asList(WebhookEventType.values()), OCCURRED)));
     }
 

@@ -50,7 +50,7 @@ class WebhookHttpClientIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {200, 204, 299, 300, 302, 307, 400, 500, 503})
+    @ValueSource(ints = {200, 204, 299, 300, 302, 307, 400, 429, 500, 503})
     void sendsExactSignedUtf8BytesAndHeadersAndTreatsOnly2xxAsSuccess(int status) throws Exception {
         var redirected = new AtomicInteger();
         var headers = new AtomicReference<com.sun.net.httpserver.Headers>();

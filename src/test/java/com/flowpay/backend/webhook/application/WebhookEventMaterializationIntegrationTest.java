@@ -132,7 +132,9 @@ class WebhookEventMaterializationIntegrationTest extends PostgresIntegrationTest
 
     @Test
     void concurrentSourceDuplicatesCreateExactlyOneEventAndSubscriptionSnapshot() throws Exception {
-        endpoint("one", merchant, WebhookEventType.PAYMENT_SUCCEEDED);
+        long firstEndpoint = endpoint("one", merchant, WebhookEventType.PAYMENT_SUCCEEDED);
+        long secondEndpoint = endpoint("two", merchant, WebhookEventType.PAYMENT_SUCCEEDED);
+        endpoint("not_subscribed", merchant, WebhookEventType.REFUND_SUCCEEDED);
         var start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(6)) {
             List<Future<WebhookMaterializationResult>> calls = java.util.stream.IntStream.range(0, 6)
@@ -144,7 +146,11 @@ class WebhookEventMaterializationIntegrationTest extends PostgresIntegrationTest
             assertThat(results).extracting(WebhookMaterializationResult::eventPublicId).containsOnly(results.getFirst().eventPublicId());
         }
         assertThat(count("webhook_events")).isOne();
-        assertThat(count("webhook_deliveries")).isOne();
+        assertThat(count("webhook_deliveries")).isEqualTo(2);
+        assertThat(jdbc.queryForList("SELECT webhook_endpoint_id FROM webhook_deliveries", Long.class))
+                .containsExactlyInAnyOrder(firstEndpoint, secondEndpoint);
+        assertThat(jdbc.queryForList("SELECT DISTINCT webhook_event_id FROM webhook_deliveries", Long.class))
+                .hasSize(1);
     }
 
     @Test

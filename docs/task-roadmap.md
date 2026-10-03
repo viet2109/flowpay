@@ -276,10 +276,10 @@ Completed tasks:
 - P7-T11 Retry, DEAD state, and stale-delivery recovery.
 - P7-T12 Manual retry and delivery dashboard APIs.
 - P7-T13 End-to-end event-to-Webhook verification.
+- P7-T14 Concurrency, failure, and security hardening.
 
 Remaining tasks:
 
-- P7-T14 Concurrency, failure, and security hardening.
 - P7-T15 Architecture and regression tests.
 - P7-T16 Quality gate and documentation freeze.
 

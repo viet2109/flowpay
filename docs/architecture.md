@@ -813,6 +813,27 @@ Database cleanup precedes scheduler initialization, and listener/receiver cleanu
 prevents active work from crossing test boundaries. No production configuration,
 API, schema, event contract, or dependency changes are required.
 
+P7-T14 adds `WebhookDeliveryHardeningIntegrationTest` with real PostgreSQL and
+loopback HTTP but explicitly invoked workers. Bounded receiver barriers exercise
+rotation/disable during an in-flight request and an old HTTP outcome arriving
+after lease recovery and a later attempt's success. A result-persistence fault
+after a merchant's successful acknowledgement proves that recovery can resend
+the identical event ID/body without rewriting the abandoned attempt's unknown
+HTTP outcome. Independent HMAC checks verify old/new secret snapshots; captured
+logs and persisted diagnostics exclude secrets, ciphertext, signatures, and
+injected sensitive exception text. Authenticated ciphertext tampering prevents
+HTTP while unrelated deliveries still progress.
+
+The materialization concurrency test verifies one source-event snapshot with
+the complete matching endpoint set, rather than only one endpoint. RabbitMQ
+verification distinguishes delivery DEAD from materializer DLQ and proves that
+equivalent broker redelivery cannot revive DEAD. HTTP/URL tests retain bounded
+timeouts and no redirects, and verify production URL rejection before signing
+or network invocation. Existing claim/recovery, dashboard manual-retry races,
+tenant isolation, and architecture tests remain part of the regression gate.
+These tests do not add locks, weaken production URL policy, or promise exactly-once
+external processing; DNS-rebinding/egress controls remain Phase 8 work.
+
 ### Architecture tests
 
 ArchUnit should enforce critical package dependencies, including:
