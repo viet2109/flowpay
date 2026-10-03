@@ -190,6 +190,10 @@ with optimistic concurrency protection. Event materialization and HTTP delivery
 remain pending. The complete six-event Payment/Refund source catalog now writes
 processing and known failure events atomically through Outbox, preserving
 UNKNOWN semantics and the existing success-only Ledger consumer.
+V011 now supplies the event/delivery/attempt schema with source-event dedupe,
+merchant ownership, public delivery identity, state/timestamp checks, lease
+indexes, and retained attempt history; domain/persistence and execution remain
+pending.
 
 ### Phase 8 — Production engineering
 

@@ -525,6 +525,11 @@ INDEX(status, available_at)
 
 ## 8. Webhooks
 
+V010 implements endpoint configuration/subscriptions; V011 implements the
+event, delivery, and attempt schema below. V011 preserves V001–V010 and existing
+endpoint data. Event materialization and delivery execution are subsequent
+Phase 7 tasks, not part of the migrations.
+
 ### `webhook_endpoints`
 
 ```text
@@ -621,9 +626,18 @@ INDEX(status, lease_expires_at)
 INDEX(webhook_endpoint_id, created_at DESC)
 ```
 
-Timestamp consistency follows the state machine: PENDING/RETRYING have
-`next_attempt_at`; DELIVERING has `lease_expires_at`; DELIVERED has
-`delivered_at`; DEAD has none of these scheduling timestamps.
+V011 enforces all scheduling timestamp combinations with a CHECK constraint:
+
+| Status | `next_attempt_at` | `lease_expires_at` | `delivered_at` |
+|---|---|---|---|
+| PENDING / RETRYING | NOT NULL | NULL | NULL |
+| DELIVERING | NULL | NOT NULL | NULL |
+| DELIVERED | NULL | NULL | NOT NULL |
+| DEAD | NULL | NULL | NULL |
+
+Among V011 tables, only mutable deliveries carry a version; immutable events
+and retained attempt history have no version column. Public delivery identities
+use `wdl_...`.
 
 ### `webhook_delivery_attempts`
 
