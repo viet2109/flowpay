@@ -52,12 +52,13 @@ class TransactionBoundaryRegressionTest {
     void webhookDeliveryKeepsHttpBetweenIndependentClaimAndFinalizationTransactions() throws Exception {
         var execution = com.flowpay.backend.webhook.application.WebhookDeliveryExecutionService.class;
         assertNotTransactional(com.flowpay.backend.webhook.application.WebhookDeliveryWorker.class, "deliverBatch");
-        for (Method method : execution.getDeclaredMethods()) {
-            if (method.getName().equals("claim") || method.getName().equals("finalizeResult") || method.getName().equals("candidates")
-                    || method.getName().equals("expiredCandidates") || method.getName().equals("recoverExpired")) {
-                assertThat(method.getAnnotation(Transactional.class).propagation()).isEqualTo(Propagation.REQUIRES_NEW);
-            }
-        }
+        assertRequiresNew(execution, "candidates");
+        assertRequiresNew(execution, "expiredCandidates");
+        assertRequiresNew(execution, "claim", long.class, long.class);
+        assertRequiresNew(execution, "recoverExpired", long.class, long.class, int.class);
+        assertRequiresNew(execution, "finalizeResult",
+                com.flowpay.backend.webhook.application.ClaimedWebhookDelivery.class,
+                com.flowpay.backend.webhook.application.WebhookHttpDeliveryResult.class);
     }
 
     @Test
@@ -215,6 +216,19 @@ class TransactionBoundaryRegressionTest {
         assertThat(method.getAnnotation(Transactional.class))
                 .as("%s.%s transaction boundary", type.getSimpleName(), methodName)
                 .isNotNull();
+    }
+
+    private static void assertRequiresNew(Class<?> type, String methodName, Class<?>... parameterTypes)
+            throws NoSuchMethodException {
+        // Exact lookup also fails if a boundary is renamed/removed, rather than silently skipping it.
+        Method method = type.getDeclaredMethod(methodName, parameterTypes);
+        assertThat(method.getAnnotation(Transactional.class))
+                .as("%s.%s independent write-capable transaction", type.getSimpleName(), methodName)
+                .isNotNull()
+                .satisfies(annotation -> {
+                    assertThat(annotation.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+                    assertThat(annotation.readOnly()).isFalse();
+                });
     }
 
     private static void assertNotTransactional(

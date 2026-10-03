@@ -843,6 +843,27 @@ ArchUnit should enforce critical package dependencies, including:
 - modules do not import another module's infrastructure.
 - no forbidden cross-module repository/entity dependencies.
 
+P7-T15 explicitly bans Payment/Refund/Ledger dependencies on Webhook, source
+implementation access from Webhook, and messaging access to Webhook HTTP or
+persistence implementations and aggregates. The existing typed materialization
+boundary permits only its two public event/resource enum values in addition to
+Webhook application contracts; it does not expose aggregates. Merchant reads
+are limited to `MerchantAccessApi` / `ActiveMerchantSnapshot`. Controllers cannot
+invoke delivery execution or cryptography ports, and materialization cannot
+perform HTTP/signing. All earlier ArchUnit rules remain in place.
+
+Transaction regressions resolve all five delivery persistence boundaries by
+exact signature and require independent write-capable transactions; removing
+or renaming a boundary can no longer silently skip an assertion. The real
+Phase 7 E2E fixture also checks that successful Payment/Refund provider calls
+have no active DB transaction. Its financial-isolation regression compares
+complete Payment, Transaction, Refund, Ledger, and published Outbox snapshots
+(including versions/timestamps/payloads) through delivery retries, DEAD, and
+manual retry. Original Create/Confirm/Refund Idempotency responses replay without
+another provider call or financial mutation. Prior UNKNOWN, refund-capacity,
+success-only Ledger routing, tenant/security, and public API regressions remain
+part of the full verification gate.
+
 ## 17. Logging and observability
 
 Every HTTP request receives/propagates `X-Request-Id`.

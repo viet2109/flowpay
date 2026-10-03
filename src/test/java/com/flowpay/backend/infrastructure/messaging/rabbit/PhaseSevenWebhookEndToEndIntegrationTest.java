@@ -42,6 +42,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 import tools.jackson.databind.JsonNode;
@@ -148,8 +149,14 @@ class PhaseSevenWebhookEndToEndIntegrationTest extends PostgresIntegrationTest {
         jdbc.execute(CLEAN);
         clock.set(Instant.now().truncatedTo(ChronoUnit.MICROS));
         purgeQueues();
-        when(paymentProvider.charge(any())).thenReturn(paymentResult(ProviderOutcome.SUCCESS));
-        when(refundProvider.refund(any())).thenReturn(refundResult(RefundProviderOutcome.SUCCESS));
+        when(paymentProvider.charge(any())).thenAnswer(call -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            return paymentResult(ProviderOutcome.SUCCESS);
+        });
+        when(refundProvider.refund(any())).thenAnswer(call -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            return refundResult(RefundProviderOutcome.SUCCESS);
+        });
         jdbc.update("""
                 INSERT INTO merchants (public_id, name, status, created_at, updated_at)
                 VALUES (?, 'Phase seven merchant', 'ACTIVE', ?, ?)
@@ -438,6 +445,69 @@ class PhaseSevenWebhookEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(route(disabled).receipts).hasSize(receivedBeforeDisable);
         assertThat(route(healthy).receipts).hasSizeGreaterThanOrEqualTo(2);
         assertLedgerBalanced(2);
+    }
+
+    @Test
+    void webhookDeadAndManualRetryCannotMutateFinancialRecordsOrSourceReplay() throws Exception {
+        RegisteredEndpoint endpoint = register("/financial-isolation",
+                List.of("payment.succeeded", "refund.succeeded"), 503);
+        String payment = createPayment("financial-isolation");
+        JsonNode confirmation = confirm(payment, "financial-isolation", 200);
+        relayAndAwait(2, 1, 1);
+        JsonNode refund = refund(payment, "financial-isolation", 201);
+        relayAndAwait(4, 2, 2);
+        List<String> deliveryIds = jdbc.queryForList("SELECT public_id FROM webhook_deliveries ORDER BY id", String.class);
+        for (String id : deliveryIds) awaitDelivery(id, "RETRYING", 1);
+        assertLedgerBalanced(2);
+        assertThat(count("SELECT refunded_amount_minor FROM payment_intents WHERE public_id = ?", payment)).isEqualTo(200_000);
+        assertThat(count("SELECT refund_reserved_minor FROM payment_intents WHERE public_id = ?", payment)).isZero();
+        var financialBeforeRetries = financialSnapshot();
+
+        // Two independent jitter schedules; advance only to the earliest persisted deadline.
+        for (int step = 0; step < 10 && count("SELECT COUNT(*) FROM webhook_deliveries WHERE status = 'DEAD'") < 2; step++) {
+            String id = jdbc.queryForObject("""
+                    SELECT public_id FROM webhook_deliveries WHERE status = 'RETRYING'
+                    ORDER BY next_attempt_at, id LIMIT 1
+                    """, String.class);
+            int nextNo = (int) count("SELECT attempt_count FROM webhook_deliveries WHERE public_id = ?", id) + 1;
+            Instant next = nextAttempt(id);
+            if (next.isAfter(clock.instant())) clock.set(next);
+            awaitDelivery(id, nextNo == 6 ? "DEAD" : "RETRYING", nextNo);
+            // Do not advance the test clock past a different request's in-flight lease.
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(count("""
+                    SELECT COUNT(*) FROM webhook_deliveries WHERE status = 'DELIVERING'
+                        OR (status = 'RETRYING' AND next_attempt_at <= ?)
+                    """, utc(clock.instant()))).isZero());
+            assertThat(financialSnapshot()).isEqualTo(financialBeforeRetries);
+        }
+        for (String id : deliveryIds) awaitDelivery(id, "DEAD", 6);
+        assertNoDlq(); // Merchant HTTP failures do not become materializer/ledger failures.
+        route(endpoint).responseStatus.set(204);
+        String retried = deliveryIds.getFirst();
+        mvc.perform(post(DELIVERIES + "/" + retried + "/retry")
+                .header(HttpHeaders.AUTHORIZATION, dashboardToken)).andExpect(status().isAccepted());
+        awaitDelivery(retried, "DELIVERED", 7);
+        awaitDelivery(deliveryIds.get(1), "DEAD", 6);
+        assertThat(financialSnapshot()).isEqualTo(financialBeforeRetries);
+
+        // Source Idempotency snapshots remain logical replays even though Payment is now partially refunded.
+        assertThat(createPayment("financial-isolation")).isEqualTo(payment);
+        assertThat(confirm(payment, "financial-isolation", 200)).isEqualTo(confirmation);
+        assertThat(refund(payment, "financial-isolation", 201)).isEqualTo(refund);
+        verify(paymentProvider, times(1)).charge(any());
+        verify(refundProvider, times(1)).refund(any());
+        assertThat(financialSnapshot()).isEqualTo(financialBeforeRetries);
+        assertThat(route(endpoint).failure.get()).isNull();
+    }
+
+    private Map<String, List<Map<String, Object>>> financialSnapshot() {
+        var snapshot = new java.util.LinkedHashMap<String, List<Map<String, Object>>>();
+        for (String table : List.of("payment_intents", "payment_transactions", "refunds", "ledger_accounts",
+                "ledger_transactions", "ledger_entries", "outbox_events")) {
+            // Fixed fixture table names only. Include versions, timestamps and payloads, not just row counts/statuses.
+            snapshot.put(table, jdbc.queryForList("SELECT * FROM " + table + " ORDER BY id"));
+        }
+        return snapshot;
     }
 
     private RegisteredEndpoint register(String path, List<String> events, int responseStatus) throws Exception {
