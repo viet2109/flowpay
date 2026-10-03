@@ -30,6 +30,30 @@ public class WebhookDeliveryExecutionService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public List<WebhookDelivery> expiredCandidates() {
+        return deliveries.findRecoveryCandidates(clock.instant(), properties.batchSize());
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean recoverExpired(long deliveryId, long endpointId, int expectedAttemptNo) {
+        var endpoint = endpoints.findByInternalIdForShare(endpointId, true).orElse(null);
+        if (endpoint == null) return false;
+        var delivery = deliveries.findByInternalIdForUpdateSkipLocked(deliveryId).orElse(null);
+        var now = clock.instant();
+        if (delivery == null || delivery.webhookEndpointId() != endpointId
+                || delivery.status() != WebhookDeliveryStatus.DELIVERING || delivery.attemptCount() != expectedAttemptNo
+                || delivery.leaseExpiresAt().isAfter(now)) return false;
+        var attempt = attempts.findByDeliveryIdAndAttemptNo(deliveryId, expectedAttemptNo).orElseThrow();
+        if (attempt.finishedAt() != null) return false;
+        if (now.isBefore(delivery.updatedAt())) now = delivery.updatedAt();
+        delivery.expireLease(expectedAttemptNo, nextAttemptAt(delivery, endpoint.status(), now).orElse(null), now);
+        attempt.abandon(now);
+        attempts.complete(attempt);
+        deliveries.save(delivery);
+        return true;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<ClaimedWebhookDelivery> claim(long deliveryId, long endpointId) {
         // Endpoint first, consistent with disable/materialization. Both claim locks skip contention.
         var endpoint = endpoints.findByInternalIdForShare(endpointId, true).orElse(null);
@@ -61,8 +85,7 @@ public class WebhookDeliveryExecutionService {
         if (result.successful()) {
             delivery.markDelivered(claim.attemptNo(), result.httpStatus(), now);
         } else {
-            var next = endpoint.status() == WebhookEndpointStatus.ACTIVE
-                    ? failurePolicy.nextAttemptAt(delivery.publicId(), claim.attemptNo(), now) : Optional.<Instant>empty();
+            var next = nextAttemptAt(delivery, endpoint.status(), now);
             if (next.isPresent()) {
                 delivery.scheduleRetry(claim.attemptNo(), result.httpStatus(), result.errorMessage(), next.get(), now);
             } else {
@@ -73,5 +96,10 @@ public class WebhookDeliveryExecutionService {
         attempts.complete(attempt);
         deliveries.save(delivery);
         return true;
+    }
+
+    private Optional<Instant> nextAttemptAt(WebhookDelivery delivery, WebhookEndpointStatus endpointStatus, Instant now) {
+        return endpointStatus == WebhookEndpointStatus.ACTIVE
+                ? failurePolicy.nextAttemptAt(delivery.publicId(), delivery.attemptCount(), now) : Optional.empty();
     }
 }

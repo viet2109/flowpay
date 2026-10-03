@@ -7,6 +7,29 @@ import java.time.Instant;
 import static org.assertj.core.api.Assertions.*;
 
 class WebhookDeliveryAttemptTest {
+
+    @Test
+    void abandonRetainsUnknownHttpMetadataAndCannotRewriteFinishedHistory() {
+        var now = Instant.parse("2026-10-04T00:00:00Z");
+        var attempt = WebhookDeliveryAttempt.open(1, 1, now);
+        attempt.abandon(now.plusSeconds(30));
+        assertThat(attempt.errorMessage()).isEqualTo("DELIVERY_LEASE_EXPIRED");
+        assertThat(attempt.httpStatus()).isNull();
+        assertThat(attempt.durationMs()).isNull();
+        assertThatThrownBy(() -> attempt.complete(200, 1, null, now.plusSeconds(31))).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> attempt.abandon(now.plusSeconds(31))).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void boundsAttemptDiagnosticWithTheSameUnicodeSafeLimitAsDelivery() {
+        var now = Instant.parse("2026-10-04T00:00:00Z");
+        var attempt = WebhookDeliveryAttempt.open(1, 1, now);
+        attempt.complete(null, 5, " x".repeat(600), now);
+        assertThat(attempt.errorMessage()).hasSize(512);
+        var other = WebhookDeliveryAttempt.open(1, 2, now);
+        other.complete(null, null, "x".repeat(511) + "😀tail", now);
+        assertThat(other.errorMessage()).isEqualTo("x".repeat(511));
+    }
     private static final Instant NOW = Instant.parse("2026-10-03T10:00:00.123456Z");
 
     @Test

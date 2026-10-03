@@ -24,6 +24,14 @@ public class WebhookDeliveryWorker {
             throw new IllegalStateException("Webhook worker must run outside a database transaction");
         }
         if (!properties.enabled()) return;
+        for (var expired : execution.expiredCandidates()) {
+            if (Thread.currentThread().isInterrupted()) return;
+            try {
+                execution.recoverExpired(expired.internalId(), expired.webhookEndpointId(), expired.attemptCount());
+            } catch (RuntimeException exception) {
+                log.warn("Webhook delivery {} lease recovery could not be persisted", expired.publicId());
+            }
+        }
         for (var candidate : execution.candidates()) {
             if (Thread.currentThread().isInterrupted()) break;
             try {

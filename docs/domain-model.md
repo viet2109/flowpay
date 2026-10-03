@@ -492,6 +492,14 @@ to reject competing claims and stale detached results. Repository due/expired
 queries return bounded candidates, not claims; worker use cases must lock and
 recheck eligibility in their own short transaction.
 
+Lease expiry is explicit domain behavior, valid only for the current DELIVERING
+attempt at or after its lease deadline. It transitions to RETRYING with a
+policy-provided next timestamp or DEAD when no retry is eligible, retains attempt
+count, and records `DELIVERY_LEASE_EXPIRED`. Stopping scheduled work after
+endpoint disable records `ENDPOINT_DISABLED` without inventing an attempt.
+Delivery and attempt diagnostic strings are bounded to 512 UTF-16 code units,
+with surrogate pairs preserved; application paths supply fixed normalized codes.
+
 ### WebhookDeliveryAttempt — Child/history record
 
 Records one concrete delivery attempt.
@@ -507,6 +515,11 @@ them with `WHERE finished_at IS NULL`, matching immutable identity/start fields.
 There is no generic save/delete API for history. Delivery and attempt writes
 join the caller-owned claim/finalization transaction; a lost competing completion
 cannot overwrite finished history.
+
+Abandonment is a one-time completion with `DELIVERY_LEASE_EXPIRED` and known
+finish time, but NULL HTTP status and duration because the worker's actual HTTP
+outcome/timing are unknown. Recovery commits that completion with the delivery
+transition and fences later results from the abandoned attempt.
 
 ## 9. Cross-module relationships
 

@@ -43,4 +43,18 @@ interface WebhookDeliveryJpaRepository extends JpaRepository<WebhookDeliveryEnti
             ORDER BY lease_expires_at, id LIMIT :limit
             """, nativeQuery = true)
     List<WebhookDeliveryEntity> findExpiredLeases(@Param("now") Instant now, @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT d.* FROM webhook_deliveries d JOIN webhook_endpoints p ON p.id = d.webhook_endpoint_id
+            WHERE d.status = 'DELIVERING' AND d.lease_expires_at <= :now
+            ORDER BY d.lease_expires_at, d.id LIMIT :limit
+            FOR UPDATE OF d SKIP LOCKED FOR SHARE OF p SKIP LOCKED
+            """, nativeQuery = true)
+    List<WebhookDeliveryEntity> findRecoveryCandidates(@Param("now") Instant now, @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT * FROM webhook_deliveries WHERE webhook_endpoint_id = :endpointId
+                AND status IN ('PENDING', 'RETRYING') ORDER BY id LIMIT :limit FOR UPDATE
+            """, nativeQuery = true)
+    List<WebhookDeliveryEntity> findScheduledByEndpointForUpdate(@Param("endpointId") long endpointId, @Param("limit") int limit);
 }

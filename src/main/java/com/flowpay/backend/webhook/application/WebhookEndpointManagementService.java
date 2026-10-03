@@ -23,6 +23,7 @@ import java.util.Objects;
 public class WebhookEndpointManagementService implements WebhookEndpointManagementUseCase {
     private final MerchantAccessApi merchantAccess;
     private final WebhookEndpointRepository repository;
+    private final WebhookDeliveryCancellationService deliveryCancellation;
     private final WebhookEndpointPublicIdGenerator publicIds;
     private final WebhookSecretGenerator secrets;
     private final WebhookSecretCipher cipher;
@@ -87,7 +88,7 @@ public class WebhookEndpointManagementService implements WebhookEndpointManageme
             endpoint.disable(clock.instant());
             save(endpoint);
         }
-        // P7-T11: invoke Webhook-owned delivery cancellation here in this same transaction.
+        deliveryCancellation.cancelScheduled(endpoint.internalId());
     }
 
     @Override

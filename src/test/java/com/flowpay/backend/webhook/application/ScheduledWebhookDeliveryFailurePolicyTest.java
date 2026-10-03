@@ -33,4 +33,27 @@ class ScheduledWebhookDeliveryFailurePolicyTest {
         var jitter = new ScheduledWebhookDeliveryFailurePolicy(new WebhookDeliveryRetryProperties(DELAYS, new BigDecimal("0.2")));
         assertThat(jitter.nextAttemptAt("wdl_one", 1, NOW)).isNotEqualTo(jitter.nextAttemptAt("wdl_two", 1, NOW));
     }
+
+    @Test
+    void allBaseDelaysAreExactWhenJitterIsDisabled() {
+        var policy = new ScheduledWebhookDeliveryFailurePolicy(new WebhookDeliveryRetryProperties(DELAYS, BigDecimal.ZERO));
+        for (int failed = 1; failed <= 5; failed++) {
+            assertThat(policy.nextAttemptAt("wdl_delay", failed, NOW)).contains(NOW.plus(DELAYS.get(failed - 1)));
+        }
+    }
+
+    @Test
+    void jitterStaysBoundedAndStableAcrossManyIdentitiesAndEveryRetryNumber() {
+        var config = new WebhookDeliveryRetryProperties(DELAYS, new BigDecimal("0.2"));
+        var policy = new ScheduledWebhookDeliveryFailurePolicy(config);
+        var restarted = new ScheduledWebhookDeliveryFailurePolicy(config);
+        for (int id = 0; id < 500; id++) {
+            for (int failed = 1; failed <= 5; failed++) {
+                String identity = "wdl_jitter" + id;
+                var next = policy.nextAttemptAt(identity, failed, NOW).orElseThrow();
+                assertThat(next).isBetween(NOW.plus(DELAYS.get(failed - 1)), NOW.plusNanos(DELAYS.get(failed - 1).toNanos() * 12 / 10));
+                assertThat(restarted.nextAttemptAt(identity, failed, NOW)).contains(next);
+            }
+        }
+    }
 }

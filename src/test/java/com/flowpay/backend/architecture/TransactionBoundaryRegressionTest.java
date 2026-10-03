@@ -42,10 +42,20 @@ class TransactionBoundaryRegressionTest {
         var execution = com.flowpay.backend.webhook.application.WebhookDeliveryExecutionService.class;
         assertNotTransactional(com.flowpay.backend.webhook.application.WebhookDeliveryWorker.class, "deliverBatch");
         for (Method method : execution.getDeclaredMethods()) {
-            if (method.getName().equals("claim") || method.getName().equals("finalizeResult") || method.getName().equals("candidates")) {
+            if (method.getName().equals("claim") || method.getName().equals("finalizeResult") || method.getName().equals("candidates")
+                    || method.getName().equals("expiredCandidates") || method.getName().equals("recoverExpired")) {
                 assertThat(method.getAnnotation(Transactional.class).propagation()).isEqualTo(Propagation.REQUIRES_NEW);
             }
         }
+    }
+
+    @Test
+    void webhookCancellationMustJoinEndpointDisableTransaction() throws Exception {
+        var service = com.flowpay.backend.webhook.application.WebhookDeliveryCancellationService.class;
+        assertThat(service.getMethod("cancelScheduled", long.class).getAnnotation(Transactional.class).propagation())
+                .isEqualTo(Propagation.MANDATORY);
+        assertTransactional(com.flowpay.backend.webhook.application.WebhookEndpointManagementService.class,
+                "disable", String.class, String.class);
     }
 
     @Test

@@ -648,6 +648,14 @@ incremented attempt count, lease, and an OPEN attempt atomically. HTTP runs afte
 commit. Finalization locks in the same order and fences by status/attempt count;
 delivery and conditional attempt completion commit or roll back together.
 
+P7-T11 also requires no migration. Expired-lease candidate selection includes
+disabled endpoints and skips contended rows. Recovery rechecks status, attempt
+number, and expiry under endpoint-before-delivery locks, then atomically closes
+the abandoned OPEN attempt and retries/stops the delivery. Unknown HTTP status
+and duration remain NULL. Endpoint disable locks the endpoint exclusively and
+cancels all PENDING/RETRYING rows using bounded write-locked pages in that same
+transaction; it never skips scheduled rows or changes retained attempt history.
+
 ### `webhook_delivery_attempts`
 
 ```text

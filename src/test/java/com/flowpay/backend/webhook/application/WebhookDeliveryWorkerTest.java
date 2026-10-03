@@ -60,6 +60,25 @@ class WebhookDeliveryWorkerTest {
         verify(execution).finalizeResult(eq(second), any());
     }
 
+    @Test
+    void oneRecoveryFailureDoesNotPreventNextRecoveryOrDueQueryAndNeverCallsHttp() {
+        var first = candidate(1);
+        var second = candidate(2);
+        when(first.attemptCount()).thenReturn(1);
+        when(second.attemptCount()).thenReturn(1);
+        when(execution.expiredCandidates()).thenReturn(List.of(first, second));
+        when(execution.recoverExpired(1, 10, 1)).thenThrow(new IllegalStateException("private persistence details"));
+        when(execution.recoverExpired(2, 20, 1)).thenReturn(true);
+        when(execution.candidates()).thenReturn(List.of());
+        worker(true).deliverBatch();
+        var ordered = inOrder(execution);
+        ordered.verify(execution).expiredCandidates();
+        ordered.verify(execution).recoverExpired(1, 10, 1);
+        ordered.verify(execution).recoverExpired(2, 20, 1);
+        ordered.verify(execution).candidates();
+        verifyNoInteractions(http, cipher);
+    }
+
     private ClaimedWebhookDelivery setupClaim(long id) {
         var claim = snapshot(id);
         var candidate = candidate(id);

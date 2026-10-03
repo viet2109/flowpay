@@ -37,7 +37,9 @@ class WebhookDeliveryConfigurationTest {
                     .run(result -> assertThat(result).hasFailed());
         }
         for (String invalid : new String[]{"retry-delays=10s", "retry-delays=0s,30s,2m,10m,1h",
-                "retry-jitter-max=-0.1", "retry-jitter-max=1.1"}) {
+                "retry-delays=10s,-30s,2m,10m,1h", "retry-delays=10s,30s,2m,10m,1h,2h", "retry-delays=",
+                "retry-delays=PT2562048H,30s,2m,10m,1h", "retry-jitter-max=-0.1", "retry-jitter-max=1.1",
+                "retry-jitter-max=invalid", "retry-jitter-max="}) {
             context.withPropertyValues("flowpay.webhook.delivery." + invalid).run(result -> assertThat(result).hasFailed());
         }
     }

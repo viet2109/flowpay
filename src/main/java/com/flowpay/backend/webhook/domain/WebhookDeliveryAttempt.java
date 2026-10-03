@@ -66,6 +66,11 @@ public final class WebhookDeliveryAttempt {
         this.errorMessage = optionalError(errorMessage);
     }
 
+    public void abandon(Instant finishedAt) {
+        // Actual HTTP status/duration are unknown after a worker crash; do not fabricate them.
+        complete(null, null, "DELIVERY_LEASE_EXPIRED", finishedAt);
+    }
+
     private void validateResult(Instant finishedAt, Integer httpStatus, Integer durationMs, String error) {
         Instant finish = Objects.requireNonNull(finishedAt, "finishedAt must not be null");
         if (finish.isBefore(startedAt) || finish.isBefore(createdAt)) {
@@ -83,6 +88,6 @@ public final class WebhookDeliveryAttempt {
     }
 
     private static String optionalError(String error) {
-        return error == null || error.isBlank() ? null : error.trim();
+        return WebhookDiagnostic.bounded(error);
     }
 }

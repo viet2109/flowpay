@@ -149,6 +149,18 @@ public final class WebhookDelivery {
         // Attempt count and diagnostic history intentionally survive manual retry.
     }
 
+    /** An uncertain abandoned attempt is a failure only after its lease has expired. */
+    public void expireLease(int expectedAttemptNo, Instant nextAttemptAt, Instant now) {
+        requireCurrentAttempt(expectedAttemptNo);
+        Instant changedAt = changeTime(now);
+        if (leaseExpiresAt.isAfter(changedAt)) throw new IllegalStateException("delivery lease has not expired");
+        if (nextAttemptAt == null) {
+            markDead(expectedAttemptNo, null, "DELIVERY_LEASE_EXPIRED", changedAt);
+        } else {
+            scheduleRetry(expectedAttemptNo, null, "DELIVERY_LEASE_EXPIRED", nextAttemptAt, changedAt);
+        }
+    }
+
     public void stopForDisabledEndpoint(Instant now) {
         if (status != WebhookDeliveryStatus.PENDING && status != WebhookDeliveryStatus.RETRYING) {
             throw new IllegalStateException("only scheduled deliveries can be stopped before claim");
@@ -197,7 +209,7 @@ public final class WebhookDelivery {
     }
 
     private static String optionalError(String error) {
-        return error == null || error.isBlank() ? null : error.trim();
+        return WebhookDiagnostic.bounded(error);
     }
 
     private static String failure(Integer status, String error) {

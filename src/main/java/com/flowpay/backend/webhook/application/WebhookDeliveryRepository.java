@@ -17,4 +17,8 @@ public interface WebhookDeliveryRepository {
     /** Short caller-owned transaction; ACTIVE endpoints only, skip contended rows. Still not claims. */
     List<WebhookDelivery> findClaimCandidates(Instant now, int limit);
     List<WebhookDelivery> findExpiredLeases(Instant now, int limit);
+    /** Includes disabled endpoints; skip contended rows and recheck each lease before recovery. */
+    List<WebhookDelivery> findRecoveryCandidates(Instant now, int limit);
+    /** Endpoint must already be exclusively locked; do not skip rows during atomic disable. */
+    List<WebhookDelivery> findScheduledByEndpointForUpdate(long endpointId, int limit);
 }

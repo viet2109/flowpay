@@ -58,6 +58,19 @@ public class WebhookDeliveryRepositoryAdapter implements WebhookDeliveryReposito
         return repository.findExpiredLeases(now, limit).stream().map(WebhookDeliveryPersistenceMapper::toDomain).toList();
     }
 
+    @Override
+    public List<WebhookDelivery> findRecoveryCandidates(Instant now, int limit) {
+        validateCandidates(now, limit);
+        return repository.findRecoveryCandidates(now, limit).stream().map(WebhookDeliveryPersistenceMapper::toDomain).toList();
+    }
+
+    @Override
+    public List<WebhookDelivery> findScheduledByEndpointForUpdate(long endpointId, int limit) {
+        if (endpointId <= 0 || limit <= 0) throw new IllegalArgumentException("endpoint ID and limit must be positive");
+        return repository.findScheduledByEndpointForUpdate(endpointId, limit).stream()
+                .map(WebhookDeliveryPersistenceMapper::toDomain).toList();
+    }
+
     private static void validateCandidates(Instant now, int limit) {
         Objects.requireNonNull(now, "now must not be null");
         if (limit <= 0) {

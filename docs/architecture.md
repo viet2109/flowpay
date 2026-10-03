@@ -621,8 +621,28 @@ recovery flow to handle.
 request timeout; durations and batch size must be positive. Tests disable the
 background worker and invoke batches explicitly. `flowpay.webhook.delivery`
 defaults to `retry-delays=10s,30s,2m,10m,1h` and `retry-jitter-max=0.20`.
-Expired-lease recovery and cancellation of scheduled deliveries on endpoint
-disable remain P7-T11 work; manual retry/dashboard delivery APIs remain P7-T12.
+P7-T11 completes expired-lease recovery and atomic endpoint-disable cancellation.
+Before each send batch, the worker selects a bounded batch of expired DELIVERING
+rows, including disabled endpoints, while skipping contended delivery/endpoint
+locks. Each recovery has its own short transaction: lock endpoint before
+delivery, recheck lease/status/expected attempt, close the OPEN attempt with
+`DELIVERY_LEASE_EXPIRED`, and use the same failure policy to schedule RETRYING or
+mark DEAD. It does not increment attempt count, send HTTP, or fabricate HTTP
+status/duration for the abandoned worker. Those unknown history fields remain
+NULL. A recovered attempt's late result cannot overwrite the recovered schedule
+or later attempt. Failure to persist one recovery rolls it back and does not
+prevent unrelated recovery or due delivery processing.
+
+Endpoint disable holds the endpoint's exclusive row lock and invokes a MANDATORY
+cancellation use case in that same transaction. Scheduled PENDING/RETRYING rows
+are read in bounded pages with write locks (no SKIP LOCKED) and stopped through
+domain behavior; endpoint and all pages commit or roll back together. History,
+attempt counts, DELIVERING, DELIVERED, and existing DEAD rows are retained. A
+currently DELIVERING request may finish successfully; failure or expiry after
+disable becomes DEAD, never a new scheduled retry. Repeated disable is idempotent.
+Diagnostics are normalized application codes and bounded to 512 UTF-16 code
+units without splitting a surrogate pair; the storage bound is not a substitute
+for secret sanitization. Manual retry/dashboard delivery APIs remain P7-T12.
 
 Outbound delivery uses three separate boundaries:
 

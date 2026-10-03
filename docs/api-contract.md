@@ -787,6 +787,12 @@ DELETE /api/v1/merchant/webhook-endpoints/{endpointId}
 
 Returns `204` and changes status to `DISABLED`.
 
+The status change and cancellation of all PENDING/RETRYING deliveries commit
+atomically. Cancelled deliveries become DEAD with `ENDPOINT_DISABLED`, their
+next schedule is cleared, and attempt counts/history are preserved. Already
+DELIVERING requests may finish successfully; failure or lease expiry after
+disable becomes DEAD instead of scheduling another retry.
+
 Repeating DELETE for an already DISABLED endpoint also returns `204`.
 Endpoint configuration and subscriptions are retained; there is no re-enable API.
 

@@ -14,6 +14,50 @@ class WebhookDeliveryTest {
     private static final Instant NOW = Instant.parse("2026-10-03T10:00:00.123456Z");
 
     @Test
+    void expiryRequiresCurrentAttemptAndElapsedLeaseBeforeChangingState() {
+        var delivery = create();
+        assertThatThrownBy(() -> delivery.expireLease(1, NOW.plusSeconds(40), NOW)).isInstanceOf(IllegalStateException.class);
+        delivery.claim(NOW, NOW.plusSeconds(30));
+        assertThatThrownBy(() -> delivery.expireLease(1, NOW.plusSeconds(40), NOW.plusSeconds(29)))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> delivery.expireLease(2, NOW.plusSeconds(40), NOW.plusSeconds(30)))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> delivery.expireLease(1, NOW.plusSeconds(29), NOW.plusSeconds(30)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(delivery.status()).isEqualTo(WebhookDeliveryStatus.DELIVERING);
+        assertThat(delivery.leaseExpiresAt()).isEqualTo(NOW.plusSeconds(30));
+        delivery.expireLease(1, NOW.plusSeconds(40), NOW.plusSeconds(30));
+        assertThat(delivery.status()).isEqualTo(WebhookDeliveryStatus.RETRYING);
+        assertThat(delivery.lastError()).isEqualTo("DELIVERY_LEASE_EXPIRED");
+        assertThat(delivery.lastHttpStatus()).isNull();
+        assertThat(delivery.leaseExpiresAt()).isNull();
+        assertThat(delivery.attemptCount()).isOne();
+    }
+
+    @Test
+    void expiredLeaseWithoutNextScheduleBecomesDeadAndFencesLateSuccess() {
+        var delivery = create();
+        delivery.claim(NOW, NOW.plusSeconds(30));
+        delivery.expireLease(1, null, NOW.plusSeconds(30));
+        assertThat(delivery.status()).isEqualTo(WebhookDeliveryStatus.DEAD);
+        assertThat(delivery.nextAttemptAt()).isNull();
+        assertThat(delivery.leaseExpiresAt()).isNull();
+        assertThat(delivery.lastError()).isEqualTo("DELIVERY_LEASE_EXPIRED");
+        assertThatThrownBy(() -> delivery.markDelivered(1, 200, NOW.plusSeconds(31))).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void boundsDeliveryDiagnosticWithoutBreakingUnicodeOrChangingFailureValidation() {
+        var delivery = create();
+        delivery.claim(NOW, NOW.plusSeconds(30));
+        delivery.scheduleRetry(1, 503, " " + "x".repeat(511) + "😀tail ", NOW.plusSeconds(10), NOW);
+        assertThat(delivery.lastError()).isEqualTo("x".repeat(511));
+        delivery.claim(NOW.plusSeconds(10), NOW.plusSeconds(40));
+        delivery.markDead(2, null, " x".repeat(600), NOW.plusSeconds(10));
+        assertThat(delivery.lastError()).hasSize(512);
+    }
+
+    @Test
     void createsDuePendingAndClaimsWithLeaseAndFencingToken() {
         WebhookDelivery delivery = create();
         assertThat(delivery.internalId()).isNull();

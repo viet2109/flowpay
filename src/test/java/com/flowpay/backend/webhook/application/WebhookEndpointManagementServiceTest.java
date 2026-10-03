@@ -5,6 +5,7 @@ import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.merchant.application.ActiveMerchantSnapshot;
 import com.flowpay.backend.merchant.application.MerchantAccessApi;
 import com.flowpay.backend.webhook.domain.WebhookEndpoint;
+import com.flowpay.backend.webhook.domain.WebhookEndpointStatus;
 import com.flowpay.backend.webhook.domain.WebhookEventType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,12 +26,13 @@ class WebhookEndpointManagementServiceTest {
     private static final Instant NOW = Instant.parse("2026-09-13T03:00:00Z");
     private final MerchantAccessApi merchants = mock(MerchantAccessApi.class);
     private final WebhookEndpointRepository repository = mock(WebhookEndpointRepository.class);
+    private final WebhookDeliveryCancellationService cancellation = mock(WebhookDeliveryCancellationService.class);
     private final WebhookEndpointPublicIdGenerator ids = mock(WebhookEndpointPublicIdGenerator.class);
     private final WebhookSecretGenerator secrets = mock(WebhookSecretGenerator.class);
     private final WebhookSecretCipher cipher = mock(WebhookSecretCipher.class);
     private final WebhookUrlPolicy policy = mock(WebhookUrlPolicy.class);
     private final WebhookEndpointManagementService service = new WebhookEndpointManagementService(
-            merchants, repository, ids, secrets, cipher, policy, Clock.fixed(NOW, ZoneOffset.UTC));
+            merchants, repository, cancellation, ids, secrets, cipher, policy, Clock.fixed(NOW, ZoneOffset.UTC));
 
     @BeforeEach
     void setup() {
@@ -93,6 +95,32 @@ class WebhookEndpointManagementServiceTest {
         when(repository.findByPublicIdAndMerchantIdForUpdate("wep_owned", 7)).thenReturn(Optional.of(endpoint()));
         when(repository.save(any())).thenThrow(new OptimisticLockingFailureException("SQL private details"));
         assertConflict(() -> service.disable("mrc_owner", "wep_owned"));
+    }
+
+    @Test
+    void disableCancelsScheduledWorkAfterSavingOwnedEndpointAndIsIdempotent() {
+        var endpoint = WebhookEndpoint.rehydrate(17, "wep_owned", 7, "https://example.com", "encrypted",
+                WebhookEndpointStatus.ACTIVE, List.of(WebhookEventType.PAYMENT_FAILED), 0, NOW, NOW);
+        when(repository.findByPublicIdAndMerchantIdForUpdate("wep_owned", 7)).thenReturn(Optional.of(endpoint));
+        when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
+        service.disable("mrc_owner", "wep_owned");
+        var ordered = inOrder(repository, cancellation);
+        ordered.verify(repository).findByPublicIdAndMerchantIdForUpdate("wep_owned", 7);
+        ordered.verify(repository).save(endpoint);
+        ordered.verify(cancellation).cancelScheduled(17);
+        assertThat(endpoint.status()).isEqualTo(WebhookEndpointStatus.DISABLED);
+        service.disable("mrc_owner", "wep_owned");
+        verify(repository, times(1)).save(any());
+        verify(cancellation, times(2)).cancelScheduled(17);
+    }
+
+    @Test
+    void missingOrOtherMerchantEndpointNeverTriggersDeliveryCancellation() {
+        when(repository.findByPublicIdAndMerchantIdForUpdate("wep_other", 7)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.disable("mrc_owner", "wep_other"))
+                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.WEBHOOK_ENDPOINT_NOT_FOUND));
+        verifyNoInteractions(cancellation);
+        verify(repository, never()).save(any());
     }
 
     @Test

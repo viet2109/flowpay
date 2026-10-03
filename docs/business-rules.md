@@ -593,6 +593,13 @@ Each retry uses deterministic additive jitter from zero through 20 percent of
 its base delay and is never scheduled earlier than the base delay. A final
 failure transitions the delivery to `DEAD`.
 
+Expired DELIVERING leases use that same remaining-attempt budget and jitter
+policy. Recovery completes the abandoned OPEN history row once with
+`DELIVERY_LEASE_EXPIRED`, leaves unknown HTTP status/duration NULL, and schedules
+RETRYING or marks DEAD without creating a new attempt or sending HTTP. Once
+recovered, the previous worker's late result is ignored. Recovery on a disabled
+endpoint always stops the delivery DEAD.
+
 ### BR-WEB-007 — Transaction and claim boundary
 
 Materialization, delivery claim, and result finalization use separate short
@@ -612,6 +619,11 @@ Disabling an endpoint prevents future claims and marks its PENDING/RETRYING
 deliveries DEAD. An already in-flight request may finish using the immutable
 URL/secret/body snapshot captured for that attempt. Secret rotation and endpoint
 updates affect later attempts only.
+
+Endpoint status change and cancellation of all scheduled deliveries commit in
+one transaction. Cancellation retains attempts/history and does not touch
+DELIVERING, DELIVERED, or existing DEAD deliveries. A failure after an in-flight
+endpoint disable becomes DEAD rather than RETRYING.
 
 ### BR-WEB-010 — Ordering
 
