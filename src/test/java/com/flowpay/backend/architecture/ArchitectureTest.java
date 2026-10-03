@@ -106,6 +106,25 @@ class ArchitectureTest {
             .should().notBePublic();
 
     @ArchTest
+    static final ArchRule webhookJpaRepositoriesMustRemainPackagePrivate = classes()
+            .that().resideInAPackage("com.flowpay.backend.webhook.infrastructure.persistence..")
+            .and().haveSimpleNameEndingWith("JpaRepository")
+            .should().notBePublic();
+
+    @ArchTest
+    static final ArchRule webhookDomainMustRemainTechnologyIndependent = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.webhook.domain..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "org.springframework..", "jakarta.persistence..", "org.hibernate..",
+                    "tools.jackson..", "com.fasterxml.jackson..", "java.net.http..");
+
+    @ArchTest
+    static final ArchRule webhookDomainMustNotImportSourceBusinessModules = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.webhook.domain..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.flowpay.backend.payment..", "com.flowpay.backend.refund..");
+
+    @ArchTest
     static final ArchRule merchantMustNotDependOnIdentityInfrastructure = noClasses()
             .that().resideInAPackage("com.flowpay.backend.merchant..")
             .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.identity.infrastructure..")

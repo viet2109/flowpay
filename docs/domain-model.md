@@ -448,6 +448,11 @@ Source event ID is the deduplication identity. An equivalent duplicate returns
 the existing event without recomputing endpoint subscriptions; a contradictory
 duplicate fails closed. Payload and identity are immutable after materialization.
 
+The implemented event repository exposes insert/read only, using PostgreSQL
+source-ID uniqueness for dedupe without aborting a materialization transaction.
+The immutable payload is a String snapshot; JSON serialization and semantic
+duplicate comparison belong to the subsequent materializer use case.
+
 ### WebhookDelivery — Aggregate Root
 
 Represents delivery of one webhook event to one endpoint.
@@ -475,6 +480,15 @@ Status:
 - `RETRYING`
 - `DEAD`
 
+Claim is valid only for due PENDING/RETRYING deliveries, increments the attempt
+count, and replaces the schedule with a future lease. Completion requires
+DELIVERING plus the current attempt number; successful completion requires HTTP
+2xx. Failure schedules RETRYING or transitions to DEAD. Manual DEAD → RETRYING
+preserves attempt count/history. Mutable delivery persistence uses `@Version`
+to reject competing claims and stale detached results. Repository due/expired
+queries return bounded candidates, not claims; worker use cases must lock and
+recheck eligibility in their own short transaction.
+
 ### WebhookDeliveryAttempt — Child/history record
 
 Records one concrete delivery attempt.
@@ -483,6 +497,13 @@ It stores attempt number, start/finish timestamps, HTTP status or normalized
 error, and duration. It is append-only diagnostic history; the attempt number is
 also the fencing token that prevents a stale worker result from overwriting a
 newer attempt.
+
+An attempt opens without result metadata and completes once with a status or
+normalized error. Persistence inserts open attempts and conditionally completes
+them with `WHERE finished_at IS NULL`, matching immutable identity/start fields.
+There is no generic save/delete API for history. Delivery and attempt writes
+join the caller-owned claim/finalization transaction; a lost competing completion
+cannot overwrite finished history.
 
 ## 9. Cross-module relationships
 

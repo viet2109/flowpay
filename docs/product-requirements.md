@@ -192,8 +192,11 @@ processing and known failure events atomically through Outbox, preserving
 UNKNOWN semantics and the existing success-only Ledger consumer.
 V011 now supplies the event/delivery/attempt schema with source-event dedupe,
 merchant ownership, public delivery identity, state/timestamp checks, lease
-indexes, and retained attempt history; domain/persistence and execution remain
-pending.
+indexes, and retained attempt history. Event/delivery/attempt domain and
+persistence are implemented with immutable event snapshots, attempt fencing,
+optimistic delivery locking, and one-time attempt completion. Rabbit
+materialization, worker orchestration, HTTP delivery, and dashboard delivery
+APIs remain pending.
 
 ### Phase 8 — Production engineering
 
