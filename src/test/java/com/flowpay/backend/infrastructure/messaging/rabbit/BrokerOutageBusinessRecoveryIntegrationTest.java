@@ -176,14 +176,14 @@ class BrokerOutageBusinessRecoveryIntegrationTest extends PostgresIntegrationTes
         assertThat(refundStatus(refundId)).isEqualTo("SUCCEEDED");
         assertThat(paymentProvider.invocationCount()).isOne();
         assertThat(refundProvider.invocationCount()).isOne();
-        assertThat(countRows("outbox_events")).isEqualTo(2L);
-        assertThat(countOutboxStatus("PENDING")).isEqualTo(2L);
+        assertThat(countRows("outbox_events")).isEqualTo(4L);
+        assertThat(countOutboxStatus("PENDING")).isEqualTo(4L);
         assertThat(countRows("ledger_transactions")).isZero();
 
         OutboxRelayBatchResult failed = relayService.relayDueEvents();
 
-        assertThat(failed).isEqualTo(new OutboxRelayBatchResult(2, 0, 2));
-        assertThat(countOutboxStatus("FAILED")).isEqualTo(2L);
+        assertThat(failed).isEqualTo(new OutboxRelayBatchResult(4, 0, 4));
+        assertThat(countOutboxStatus("FAILED")).isEqualTo(4L);
         assertThat(paymentStatus(paymentId)).isEqualTo("PARTIALLY_REFUNDED");
         assertThat(refundStatus(refundId)).isEqualTo("SUCCEEDED");
 
@@ -191,12 +191,19 @@ class BrokerOutageBusinessRecoveryIntegrationTest extends PostgresIntegrationTes
         clock.advance(Duration.ofSeconds(2));
         OutboxRelayBatchResult recovered = relayService.relayDueEvents();
 
-        assertThat(recovered).isEqualTo(new OutboxRelayBatchResult(2, 2, 0));
+        // Ledger still binds only success types. Without Webhook topology, the
+        // two processing events must remain retryable after mandatory returns.
+        assertThat(recovered).isEqualTo(new OutboxRelayBatchResult(4, 2, 2));
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
             assertThat(countOutboxStatus("PUBLISHED")).isEqualTo(2L);
             assertThat(countRows("ledger_transactions")).isEqualTo(2L);
             assertThat(countRows("ledger_entries")).isEqualTo(4L);
         });
+        assertThat(countOutboxStatus("FAILED")).isEqualTo(2L);
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT event_type FROM outbox_events WHERE status = 'FAILED'
+                """, String.class)).containsExactlyInAnyOrder(
+                "payment.processing.v1", "refund.processing.v1");
         assertThat(paymentProvider.invocationCount()).isOne();
         assertThat(refundProvider.invocationCount()).isOne();
         assertThat(countRows("payment_intents")).isOne();

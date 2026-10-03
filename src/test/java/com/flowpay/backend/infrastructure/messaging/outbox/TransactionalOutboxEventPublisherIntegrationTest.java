@@ -2,12 +2,18 @@ package com.flowpay.backend.infrastructure.messaging.outbox;
 
 import com.flowpay.backend.payment.application.event.PaymentIntegrationEventPublisher;
 import com.flowpay.backend.payment.application.event.PaymentSucceededEventV1;
+import com.flowpay.backend.payment.application.event.PaymentProcessingEventV1;
+import com.flowpay.backend.payment.application.event.PaymentFailedEventV1;
 import com.flowpay.backend.refund.application.event.RefundIntegrationEventPublisher;
 import com.flowpay.backend.refund.application.event.RefundSucceededEventV1;
+import com.flowpay.backend.refund.application.event.RefundProcessingEventV1;
+import com.flowpay.backend.refund.application.event.RefundFailedEventV1;
 import com.flowpay.backend.testing.PostgresIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -283,6 +289,34 @@ class TransactionalOutboxEventPublisherIntegrationTest extends PostgresIntegrati
         assertThatThrownBy(() -> envelopeMapper.from(malformed))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Outbox envelope and payload occurredAt must match");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"payment.processing.v1", "payment.failed.v1", "refund.processing.v1", "refund.failed.v1"})
+    void newSourceTypesRequireCallerTransactionAndRollBackWithIt(String type) {
+        Runnable publish = switch (type) {
+            case "payment.processing.v1" -> () -> paymentPublisher.publish(
+                    new PaymentProcessingEventV1(15, "pi_catalog", 1000, "VND", PAYMENT_OCCURRED_AT));
+            case "payment.failed.v1" -> () -> paymentPublisher.publish(
+                    new PaymentFailedEventV1(15, "pi_catalog", 1000, "VND", "PROVIDER_UNAVAILABLE",
+                            "Operation failed.", PAYMENT_OCCURRED_AT));
+            case "refund.processing.v1" -> () -> refundPublisher.publish(
+                    new RefundProcessingEventV1(15, "re_catalog", "pi_catalog", 400, "VND", PAYMENT_OCCURRED_AT));
+            case "refund.failed.v1" -> () -> refundPublisher.publish(
+                    new RefundFailedEventV1(15, "re_catalog", "pi_catalog", 400, "VND",
+                            "PROVIDER_UNAVAILABLE", "Operation failed.", PAYMENT_OCCURRED_AT));
+            default -> throw new IllegalArgumentException("Unexpected test event");
+        };
+        assertThatThrownBy(publish::run).isInstanceOf(IllegalTransactionStateException.class);
+        inTransaction(publish);
+        OutboxEvent saved = singleDueEvent(CREATED_AT);
+        assertThat(saved.eventType()).isEqualTo(type);
+        assertThat(envelopeMapper.from(saved).occurredAt()).isEqualTo(PAYMENT_OCCURRED_AT);
+        assertThatThrownBy(() -> inTransaction(() -> {
+            publish.run();
+            throw new ForcedSourceRollbackException();
+        })).isInstanceOf(ForcedSourceRollbackException.class);
+        assertThat(countRows("outbox_events")).isOne();
     }
 
     private PaymentSucceededEventV1 paymentEvent(String paymentPublicId) {

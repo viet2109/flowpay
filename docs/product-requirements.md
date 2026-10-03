@@ -187,7 +187,9 @@ the V010 endpoint/subscription schema is complete, and endpoint lifecycle, URL
 policy, and secret cryptography are implemented. Merchant-scoped dashboard APIs
 now persist, list, retrieve, update, soft-disable, and rotate endpoint secrets
 with optimistic concurrency protection. Event materialization and HTTP delivery
-remain pending.
+remain pending. The complete six-event Payment/Refund source catalog now writes
+processing and known failure events atomically through Outbox, preserving
+UNKNOWN semantics and the existing success-only Ledger consumer.
 
 ### Phase 8 — Production engineering
 

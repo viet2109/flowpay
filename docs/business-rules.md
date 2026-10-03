@@ -485,14 +485,15 @@ Consumers must assume at-least-once delivery and protect against duplicate proce
 
 ### BR-EVT-005 — Source transaction atomicity
 
-A successful Payment or Refund finalization and its required integration event
-must persist in the same PostgreSQL transaction. Failure to serialize or insert
-the Outbox event rolls back the local source finalization. RabbitMQ publication
-must not occur inside that transaction.
+Payment/Refund PROCESSING transitions and known terminal finalizations must
+persist their required integration event in the same PostgreSQL transaction.
+Failure to serialize or insert the Outbox event rolls back the local transition.
+Preparation failure must prevent the provider call. RabbitMQ publication must
+not occur inside that transaction.
 
-### BR-EVT-006 — Active Phase 6 success contracts
+### BR-EVT-006 — Frozen Phase 6 success contracts
 
-Phase 6 publishes only `payment.succeeded.v1` and `refund.succeeded.v1`.
+Phase 6 introduced `payment.succeeded.v1` and `refund.succeeded.v1`.
 Integration-event IDs remain stable across relay retries, aggregate IDs use
 source public IDs, and envelope occurrence time must equal the occurrence time
 inside the explicit V1 payload. Payment success carries merchant internal ID,
@@ -523,6 +524,25 @@ FlowPay guarantees atomic business-state/event persistence, at-least-once
 publication and delivery, and an idempotent Ledger effect. It does not claim
 exactly-once publication or delivery, or distributed ACID across PostgreSQL and
 RabbitMQ.
+
+### BR-EVT-010 — Complete source-event catalog
+
+Phase 7 adds `payment.processing.v1`, `payment.failed.v1`,
+`refund.processing.v1`, and `refund.failed.v1` without changing success V1.
+Processing payloads carry the same identity/Money/time fields as their success
+counterparts. Failed payloads additionally carry required, safe normalized
+`failureCode` and `failureMessage` from the provider port, not raw responses.
+
+Payment processing is emitted by confirmation preparation after the intent and
+attempt are saved. Refund processing is emitted only for NEW acquisition after
+reservation and refund persistence. Replay, IN_PROGRESS, KEY_REUSED, and rejected
+transitions produce no new event. Known DECLINED/TECHNICAL_FAILURE outcomes emit
+failed events; UNKNOWN emits neither success nor failed events.
+
+Event occurrence time is exactly the persisted transition time, at PostgreSQL
+microsecond precision. Ledger bindings remain limited to the two success types.
+Before Webhook topology is installed, unrouted processing/failed events remain
+durably retryable in Outbox rather than being treated as published.
 
 ## 11. Webhooks
 

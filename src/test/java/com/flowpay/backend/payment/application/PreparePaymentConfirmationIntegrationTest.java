@@ -55,7 +55,7 @@ class PreparePaymentConfirmationIntegrationTest extends PostgresIntegrationTest 
     @BeforeEach
     void cleanData() {
         jdbcTemplate.update(
-                "TRUNCATE TABLE payment_transactions, payment_intents, merchant_members, "
+                "TRUNCATE TABLE outbox_events, payment_transactions, payment_intents, merchant_members, "
                         + "merchant_api_keys, refresh_tokens, merchants, users RESTART IDENTITY CASCADE"
         );
     }

@@ -26,6 +26,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.Queue;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -70,6 +72,7 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
     private static final String PAYMENT_PATH = "/api/v1/payment-intents";
     private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
     private static final long PAYMENT_AMOUNT = 1_000_000L;
+    private static final String NON_LEDGER_PROBE = "test.phase7.non-ledger-events";
 
     @Container
     private static final RabbitMQContainer RABBITMQ =
@@ -126,6 +129,14 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void cleanState() {
+        // A test-only downstream probe routes the new catalog while production
+        // Webhook topology is intentionally deferred to P7-T08.
+        rabbitAdmin.declareQueue(new Queue(NON_LEDGER_PROBE));
+        for (String eventType : List.of("payment.processing.v1", "payment.failed.v1",
+                "refund.processing.v1", "refund.failed.v1")) {
+            rabbitAdmin.declareBinding(new Binding(NON_LEDGER_PROBE, Binding.DestinationType.QUEUE,
+                    messagingProperties.topology().exchange(), eventType, null));
+        }
         paymentProvider.reset();
         refundProvider.reset();
         jdbcTemplate.update("""
@@ -187,7 +198,7 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(countOutbox(PaymentSucceededEventV1.EVENT_TYPE, paymentId)).isOne();
 
         assertThat(relayService.relayDueEvents())
-                .isEqualTo(new OutboxRelayBatchResult(1, 1, 0));
+                .isEqualTo(new OutboxRelayBatchResult(2, 2, 0));
         awaitPostingCount(1L);
         assertThat(outboxStatus(paymentId)).isEqualTo("PUBLISHED");
         assertPaymentPosting(paymentId, key.merchantId(), PAYMENT_AMOUNT);
@@ -222,7 +233,7 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(countOutbox(RefundSucceededEventV1.EVENT_TYPE, partialRefundId)).isOne();
 
         assertThat(relayService.relayDueEvents())
-                .isEqualTo(new OutboxRelayBatchResult(1, 1, 0));
+                .isEqualTo(new OutboxRelayBatchResult(2, 2, 0));
         awaitPostingCount(2L);
         assertRefundPosting(partialRefundId, key.merchantId(), 300_000L);
 
@@ -243,12 +254,13 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(paymentState(paymentId)).isEqualTo("REFUNDED:1000000:0");
         assertThat(countOutbox(RefundSucceededEventV1.EVENT_TYPE)).isEqualTo(3L);
-        assertThat(countOutboxStatus("PENDING")).isEqualTo(2L);
+        assertThat(countOutboxStatus("PENDING")).isEqualTo(4L);
         assertThat(relayService.relayDueEvents())
-                .isEqualTo(new OutboxRelayBatchResult(2, 2, 0));
+                .isEqualTo(new OutboxRelayBatchResult(4, 4, 0));
 
         awaitPostingCount(4L);
-        assertThat(countOutboxStatus("PUBLISHED")).isEqualTo(4L);
+        assertThat(countOutboxStatus("PUBLISHED")).isEqualTo(8L);
+        assertThat(rabbitAdmin.getQueueInfo(NON_LEDGER_PROBE).getMessageCount()).isEqualTo(4);
         assertRefundPosting(secondRefundId, key.merchantId(), 200_000L);
         assertRefundPosting(fullRefundId, key.merchantId(), 500_000L);
         assertThat(countBalancedPostings()).isEqualTo(4L);
@@ -269,8 +281,8 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
     }
 
     @ParameterizedTest(name = "payment provider {0} emits no success event")
-    @EnumSource(value = ProviderOutcome.class, names = {"DECLINED", "UNKNOWN"})
-    void unsuccessfulPaymentShouldNotProduceOutboxOrLedgerSideEffects(
+    @EnumSource(value = ProviderOutcome.class, names = {"DECLINED", "TECHNICAL_FAILURE", "UNKNOWN"})
+    void unsuccessfulPaymentShouldPublishOnlyProcessingAndKnownFailureWithoutLedgerEffects(
             ProviderOutcome outcome
     ) throws Exception {
         paymentProvider.respondWith(outcome);
@@ -305,15 +317,23 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(paymentTransactionStatus(paymentId))
                 .isEqualTo(expectedTransactionStatus);
         assertThat(paymentProvider.invocationCount()).isOne();
-        assertThat(countRows("outbox_events")).isZero();
-        assertThat(relayService.relayDueEvents()).isEqualTo(OutboxRelayBatchResult.empty());
+        assertThat(countOutbox("payment.processing.v1", paymentId)).isOne();
+        assertThat(countOutbox("payment.failed.v1", paymentId))
+                .isEqualTo(outcome == ProviderOutcome.UNKNOWN ? 0L : 1L);
+        assertThat(countOutbox(PaymentSucceededEventV1.EVENT_TYPE, paymentId)).isZero();
+        int eventCount = outcome == ProviderOutcome.UNKNOWN ? 1 : 2;
+        assertThat(countRows("outbox_events")).isEqualTo(eventCount);
+        assertThat(relayService.relayDueEvents()).isEqualTo(new OutboxRelayBatchResult(eventCount, eventCount, 0));
+        assertThat(rabbitAdmin.getQueueInfo(NON_LEDGER_PROBE).getMessageCount()).isEqualTo(eventCount);
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                assertThat(countRows("ledger_transactions")).isZero());
         assertThat(countRows("ledger_transactions")).isZero();
         assertThat(deadLetterCount()).isZero();
     }
 
     @ParameterizedTest(name = "refund provider {0} emits no success event")
-    @EnumSource(value = RefundProviderOutcome.class, names = {"DECLINED", "UNKNOWN"})
-    void unsuccessfulRefundShouldNotProduceOutboxOrLedgerSideEffects(
+    @EnumSource(value = RefundProviderOutcome.class, names = {"DECLINED", "TECHNICAL_FAILURE", "UNKNOWN"})
+    void unsuccessfulRefundShouldPublishOnlyProcessingAndKnownFailureWithoutLedgerEffects(
             RefundProviderOutcome outcome
     ) throws Exception {
         StoredKey key = createStoredKey("refund_" + outcome.name().toLowerCase());
@@ -330,7 +350,7 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
                 200
         );
         assertThat(relayService.relayDueEvents())
-                .isEqualTo(new OutboxRelayBatchResult(1, 1, 0));
+                .isEqualTo(new OutboxRelayBatchResult(2, 2, 0));
         awaitPostingCount(1L);
 
         refundProvider.respondWith(outcome);
@@ -355,8 +375,16 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo(expectedRefundStatus);
         assertThat(refundProvider.invocationCount()).isOne();
         assertThat(countOutbox(RefundSucceededEventV1.EVENT_TYPE)).isZero();
-        assertThat(countRows("outbox_events")).isOne();
-        assertThat(relayService.relayDueEvents()).isEqualTo(OutboxRelayBatchResult.empty());
+        String refundId = response.path("id").stringValue();
+        assertThat(countOutbox("refund.processing.v1", refundId)).isOne();
+        assertThat(countOutbox("refund.failed.v1", refundId))
+                .isEqualTo(outcome == RefundProviderOutcome.UNKNOWN ? 0L : 1L);
+        int eventCount = outcome == RefundProviderOutcome.UNKNOWN ? 1 : 2;
+        assertThat(countRows("outbox_events")).isEqualTo(2L + eventCount);
+        assertThat(relayService.relayDueEvents()).isEqualTo(new OutboxRelayBatchResult(eventCount, eventCount, 0));
+        assertThat(rabbitAdmin.getQueueInfo(NON_LEDGER_PROBE).getMessageCount()).isEqualTo(1 + eventCount);
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                assertThat(countRows("ledger_transactions")).isOne());
         assertThat(countRows("ledger_transactions")).isOne();
         assertThat(countBalancedPostings()).isOne();
         assertThat(deadLetterCount()).isZero();
@@ -548,7 +576,8 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
 
     private String outboxStatus(String aggregateId) {
         return jdbcTemplate.queryForObject(
-                "SELECT status FROM outbox_events WHERE aggregate_id = ?",
+                "SELECT status FROM outbox_events WHERE aggregate_id = ? AND event_type IN "
+                        + "('payment.succeeded.v1', 'refund.succeeded.v1')",
                 String.class,
                 aggregateId
         );
@@ -559,7 +588,8 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
             String... sensitiveValues
     ) throws Exception {
         String payload = jdbcTemplate.queryForObject(
-                "SELECT payload::text FROM outbox_events WHERE aggregate_id = ?",
+                "SELECT payload::text FROM outbox_events WHERE aggregate_id = ? AND event_type IN "
+                        + "('payment.succeeded.v1', 'refund.succeeded.v1')",
                 String.class,
                 aggregateId
         );
@@ -605,6 +635,7 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
                     published_at = NULL,
                     last_error = NULL
                 WHERE aggregate_id = ?
+                  AND event_type IN ('payment.succeeded.v1', 'refund.succeeded.v1')
                 """, OffsetDateTime.now(clock), aggregateId);
     }
 
@@ -642,6 +673,7 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
     }
 
     private void purgeQueues() {
+        rabbitAdmin.purgeQueue(NON_LEDGER_PROBE, true);
         rabbitAdmin.purgeQueue(messagingProperties.topology().ledgerQueue(), true);
         rabbitAdmin.purgeQueue(
                 messagingProperties.topology().ledgerDeadLetterQueue(),

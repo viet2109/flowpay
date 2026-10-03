@@ -3,6 +3,7 @@ package com.flowpay.backend.refund.application;
 import com.flowpay.backend.common.money.Money;
 import com.flowpay.backend.payment.application.PaymentRefundApi;
 import com.flowpay.backend.refund.application.event.RefundIntegrationEventPublisher;
+import com.flowpay.backend.refund.application.event.RefundFailedEventV1;
 import com.flowpay.backend.refund.application.event.RefundSucceededEventV1;
 import com.flowpay.backend.refund.domain.Refund;
 import com.flowpay.backend.refund.domain.RefundProviderOutcome;
@@ -107,7 +108,15 @@ class FinalizeRefundServiceTest {
 
         service.finalizeRefund(command(result));
 
-        verify(eventPublisher, never()).publish(any());
+        verify(eventPublisher, never()).publish(any(RefundSucceededEventV1.class));
+        if (outcome == RefundProviderOutcome.UNKNOWN) {
+            org.mockito.Mockito.verifyNoInteractions(eventPublisher);
+        } else {
+            verify(eventPublisher).publish(new RefundFailedEventV1(
+                    MERCHANT_ID, REFUND_PUBLIC_ID, PAYMENT_PUBLIC_ID,
+                    REFUND_AMOUNT.amountMinor(), REFUND_AMOUNT.currency().getCurrencyCode(),
+                    result.failureCode(), result.failureMessage(), FINALIZED_AT));
+        }
     }
 
     @Test
@@ -116,7 +125,7 @@ class FinalizeRefundServiceTest {
         stubRepository(refund);
         org.mockito.Mockito.doThrow(new IllegalStateException("forced outbox failure"))
                 .when(eventPublisher)
-                .publish(any());
+                .publish(any(RefundSucceededEventV1.class));
 
         assertThatThrownBy(() -> service.finalizeRefund(command(success())))
                 .isInstanceOf(IllegalStateException.class)

@@ -2,8 +2,12 @@ package com.flowpay.backend.infrastructure.messaging.outbox;
 
 import com.flowpay.backend.payment.application.event.PaymentIntegrationEventPublisher;
 import com.flowpay.backend.payment.application.event.PaymentSucceededEventV1;
+import com.flowpay.backend.payment.application.event.PaymentProcessingEventV1;
+import com.flowpay.backend.payment.application.event.PaymentFailedEventV1;
 import com.flowpay.backend.refund.application.event.RefundIntegrationEventPublisher;
 import com.flowpay.backend.refund.application.event.RefundSucceededEventV1;
+import com.flowpay.backend.refund.application.event.RefundProcessingEventV1;
+import com.flowpay.backend.refund.application.event.RefundFailedEventV1;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -54,6 +58,30 @@ public class TransactionalOutboxEventPublisher
                 source,
                 source.occurredAt()
         );
+    }
+
+    @Override
+    public void publish(PaymentProcessingEventV1 event) {
+        PaymentProcessingEventV1 source = Objects.requireNonNull(event, "event must not be null");
+        persist(source.aggregateType(), source.aggregateId(), source.eventType(), source, source.occurredAt());
+    }
+
+    @Override
+    public void publish(PaymentFailedEventV1 event) {
+        PaymentFailedEventV1 source = Objects.requireNonNull(event, "event must not be null");
+        persist(source.aggregateType(), source.aggregateId(), source.eventType(), source, source.occurredAt());
+    }
+
+    @Override
+    public void publish(RefundProcessingEventV1 event) {
+        RefundProcessingEventV1 source = Objects.requireNonNull(event, "event must not be null");
+        persist(source.aggregateType(), source.aggregateId(), source.eventType(), source, source.occurredAt());
+    }
+
+    @Override
+    public void publish(RefundFailedEventV1 event) {
+        RefundFailedEventV1 source = Objects.requireNonNull(event, "event must not be null");
+        persist(source.aggregateType(), source.aggregateId(), source.eventType(), source, source.occurredAt());
     }
 
     private void persist(

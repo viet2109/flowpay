@@ -109,7 +109,8 @@ class FinalizePaymentConfirmationIntegrationTest extends PostgresIntegrationTest
         if (providerResult.outcome() == ProviderOutcome.SUCCESS) {
             assertPaymentSuccessOutbox(payment, transaction.completedAt());
         } else {
-            assertThat(countRows("outbox_events")).isZero();
+            assertThat(countRows("outbox_events"))
+                    .isEqualTo(providerResult.outcome() == ProviderOutcome.UNKNOWN ? 0L : 1L);
             assertThat(countRows("ledger_transactions")).isZero();
             assertThat(countRows("ledger_entries")).isZero();
             assertThat(countRows("ledger_accounts")).isZero();

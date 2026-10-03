@@ -512,7 +512,20 @@ payloads are:
 | Event type | Aggregate | Payload fields |
 |---|---|---|
 | `payment.succeeded.v1` | `PAYMENT_INTENT` / payment public ID | `merchantInternalId`, `paymentPublicId`, `amountMinor`, `currency`, `occurredAt` |
+| `payment.processing.v1` | `PAYMENT_INTENT` / payment public ID | Same scalar fields as payment success V1 |
+| `payment.failed.v1` | `PAYMENT_INTENT` / payment public ID | Payment identity/Money/time fields plus normalized `failureCode`, `failureMessage` |
 | `refund.succeeded.v1` | `REFUND` / refund public ID | `merchantInternalId`, `refundPublicId`, `paymentPublicId`, `amountMinor`, `currency`, `occurredAt` |
+| `refund.processing.v1` | `REFUND` / refund public ID | Same scalar fields as refund success V1 |
+| `refund.failed.v1` | `REFUND` / refund public ID | Refund identity/Money/time fields plus normalized `failureCode`, `failureMessage` |
+
+P7-T05 completes production source publication for all six types. Preparation
+persists processing events in the source transaction; known terminal failures
+persist failed events in finalization. UNKNOWN produces no terminal event.
+Refund processing is NEW-only, and rejected/replayed operations do not emit.
+The typed producer ports and Outbox writer require the caller transaction.
+Success V1 schemas and Ledger's success-only bindings are unchanged. Webhook
+queue provisioning is deferred to P7-T08; until then, mandatory returns for
+unrouted new types keep those rows retryable, with no effect on source commits.
 
 Payloads contain only the explicit consumer facts above. Authentication and
 idempotency values, credentials, persistence entities/versions, and raw provider
