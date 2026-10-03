@@ -90,6 +90,9 @@ flowpay:
     simulator:
       default-outcome: ${REFUND_SIMULATOR_DEFAULT_OUTCOME:SUCCESS}
   webhook:
+    http:
+      connect-timeout: ${WEBHOOK_HTTP_CONNECT_TIMEOUT:2s}
+      request-timeout: ${WEBHOOK_HTTP_REQUEST_TIMEOUT:5s}
     secret:
       encryption-key: ${WEBHOOK_SECRET_ENCRYPTION_KEY}
     url-policy:

@@ -851,6 +851,14 @@ Default timestamp tolerance:
 
 `5 minutes`
 
+FlowPay signs the ASCII Unix-seconds timestamp, a literal `.`, and the exact body
+bytes sent in the POST. Outbound requests also send
+`User-Agent: FlowPay-Webhooks/1.0`. Redirects are never followed. All HTTP 2xx
+statuses acknowledge delivery; other final statuses, connection/request timeouts,
+TLS, and transport errors fail the attempt. Configurable connection/request
+timeouts default to two/five seconds. Merchant response bodies are not read or
+retained; acknowledgement is based on the final response status/headers.
+
 `createdAt` is the source event occurrence time. Processing/failed variants use
 the matching event type and status; failed variants contain only bounded,
 normalized failure fields. The same event ID and exact body are reused for every

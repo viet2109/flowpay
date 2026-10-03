@@ -579,6 +579,21 @@ requeue into the Webhook DLQ; consumer failure does not change Outbox publicatio
 state. Provision the Webhook queue/bindings before, or atomically with, enabling
 the four additional source publishers during deployment.
 
+P7-T09 supplies the stateless `WebhookSigner`, immutable transient HTTP request,
+normalized HTTP result, and dedicated JDK HTTP adapter behind `WebhookHttpClientPort`.
+HMAC-SHA256 signs the ASCII Unix-seconds prefix plus `.` and the exact outbound
+body bytes. The adapter uses the same bytes in its POST, revalidates the URL,
+disables redirects, and rejects calls with an active database transaction.
+Configurable `flowpay.webhook.http.connect-timeout` / `request-timeout` default
+to two / five seconds and must be positive. It performs one client invocation,
+not a retry loop; HTTP 2xx is success and every other final status is failure.
+Transport/timeout/TLS/interruption diagnostics are fixed codes, never exception
+messages. Request `toString()` redacts URL, body, and plaintext secret.
+Response handling completes at headers and closes the body stream without
+reading/draining it, so an oversized or indefinitely slow merchant response body
+cannot extend an otherwise acknowledged attempt. No response body is retained.
+Delivery claiming, persisted attempt finalization, and scheduling remain future tasks.
+
 Outbound delivery uses three separate boundaries:
 
 ```text

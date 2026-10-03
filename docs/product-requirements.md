@@ -186,7 +186,7 @@ delivery history, and dead delivery handling. Architecture/contracts are frozen,
 the V010 endpoint/subscription schema is complete, and endpoint lifecycle, URL
 policy, and secret cryptography are implemented. Merchant-scoped dashboard APIs
 now persist, list, retrieve, update, soft-disable, and rotate endpoint secrets
-with optimistic concurrency protection. HTTP delivery remains pending. The
+with optimistic concurrency protection. Automatic HTTP delivery remains pending. The
 complete six-event Payment/Refund source catalog now writes
 processing and known failure events atomically through Outbox, preserving
 UNKNOWN semantics and the existing success-only Ledger consumer.
@@ -199,7 +199,10 @@ now consumes all six types, creates immutable public snapshots and PENDING
 deliveries for matching ACTIVE subscriptions atomically, and deduplicates source
 events without recomputing subscriptions. Contradictory/malformed events follow
 bounded retry to the independent Webhook DLQ; Ledger remains success-only.
-Worker orchestration, HTTP delivery, and dashboard delivery APIs remain pending.
+HMAC signing and the bounded no-redirect HTTP adapter are implemented with exact
+body-byte signing, safe diagnostics, URL revalidation, and no response-body
+retention. Worker orchestration, automatic HTTP delivery, and dashboard delivery
+APIs remain pending.
 
 ### Phase 8 — Production engineering
 

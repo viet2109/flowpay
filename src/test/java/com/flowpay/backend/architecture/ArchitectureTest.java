@@ -133,6 +133,16 @@ class ArchitectureTest {
                     "com.flowpay.backend.infrastructure.messaging..");
 
     @ArchTest
+    static final ArchRule webhookHttpAdapterMustNotDependOnRepositories = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.webhook.infrastructure.http..")
+            .should().dependOnClassesThat().haveSimpleNameEndingWith("Repository");
+
+    @ArchTest
+    static final ArchRule webhookBusinessCoreMustNotUseHttpClientTechnology = noClasses()
+            .that().resideInAnyPackage("com.flowpay.backend.webhook.application..", "com.flowpay.backend.webhook.domain..")
+            .should().dependOnClassesThat().resideInAnyPackage("java.net.http..", "org.springframework.web.client..");
+
+    @ArchTest
     static final ArchRule merchantMustNotDependOnIdentityInfrastructure = noClasses()
             .that().resideInAPackage("com.flowpay.backend.merchant..")
             .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.identity.infrastructure..")
