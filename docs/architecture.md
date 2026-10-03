@@ -642,7 +642,26 @@ currently DELIVERING request may finish successfully; failure or expiry after
 disable becomes DEAD, never a new scheduled retry. Repeated disable is idempotent.
 Diagnostics are normalized application codes and bounded to 512 UTF-16 code
 units without splitting a surrogate pair; the storage bound is not a substitute
-for secret sanitization. Manual retry/dashboard delivery APIs remain P7-T12.
+for secret sanitization.
+
+P7-T12 exposes dashboard-JWT delivery list/detail and asynchronous manual retry.
+Webhook-owned SQL projections join the persisted event and endpoint, requiring
+both to belong to the authenticated merchant; bounded list queries avoid N+1
+aggregate loading. Responses map only explicit public fields through MapStruct,
+with attempt history ordered by attempt number and no source IDs, leases,
+versions, secrets, ciphertext, or merchant response bodies.
+
+Manual retry resolves an owned JDBC projection, then takes a shared endpoint
+lock before a delivery write lock in one application transaction. The projection
+does not populate JPA's persistence context, so the locked delivery is loaded
+fresh after any competing retry commits. Locked state must still be DEAD with
+an ACTIVE endpoint. Domain behavior schedules RETRYING immediately and keeps
+counts/history; the API returns 202 without calling the worker or HTTP client.
+Concurrent manual retries serialize and a loser receives WEBHOOK_INVALID_STATE.
+The originally observed attempt count is also rechecked, so a stale retry cannot
+schedule a newer DEAD attempt if the worker has already failed the winning retry.
+Endpoint disable uses its exclusive lock to prevent retry from scheduling after
+disable commits. Only the existing worker opens the next numbered attempt.
 
 Outbound delivery uses three separate boundaries:
 

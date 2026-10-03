@@ -637,6 +637,13 @@ Only a merchant-owned DEAD delivery whose endpoint remains ACTIVE can be
 manually scheduled for retry. Scheduling returns `202`, performs no synchronous
 HTTP, and preserves attempt count and history.
 
+The endpoint is locked before the delivery in the scheduling transaction. State
+is rechecked under those locks, so a concurrent retry cannot schedule twice and
+retry cannot bypass an endpoint disable that has committed. Invalid state
+returns `WEBHOOK_INVALID_STATE`; unowned/missing delivery IDs return the same
+`WEBHOOK_DELIVERY_NOT_FOUND` response. The worker, not the dashboard request,
+opens the next numbered attempt. Manual retry does not reset automatic limits.
+
 ### BR-WEB-012 — Endpoint URL safety
 
 Production endpoint URLs require HTTPS, a valid host, and no user-info or

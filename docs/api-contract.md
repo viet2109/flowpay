@@ -914,7 +914,12 @@ GET /api/v1/merchant/webhook-deliveries/{deliveryId}
 
 List query parameters are `status`, `endpointId`, `eventType`, `page`, and
 `size`. Defaults are page `0`, size `20`, maximum size `100`, ordered by
-`createdAt DESC`.
+`createdAt DESC`, then internal row ID descending as a stable tie-breaker (the
+internal ID is never returned). `status` accepts `PENDING`, `DELIVERING`,
+`DELIVERED`, `RETRYING`, or `DEAD`; `eventType` accepts the supported lowercase
+dot-separated public event names. Invalid filters or pagination return
+`400 VALIDATION_ERROR`. Unknown or foreign `endpointId` filters produce an empty
+list, without revealing whether that endpoint exists.
 
 A delivery summary exposes:
 
@@ -933,6 +938,9 @@ attemptNo, startedAt, finishedAt, httpStatus, durationMs, errorMessage
 Internal IDs, source integration-event IDs, entity versions, endpoint secrets,
 and ciphertext are never exposed.
 
+All delivery routes require dashboard JWT authentication, not merchant API keys.
+Unknown or cross-merchant delivery IDs return `404 WEBHOOK_DELIVERY_NOT_FOUND`.
+
 ### Manual retry
 
 ```http
@@ -950,6 +958,11 @@ Success:
 
 The response body contains the newly scheduled delivery summary. Attempt count
 and attempt history are not reset.
+
+A non-DEAD delivery, including DELIVERED, or a disabled endpoint returns
+`409 WEBHOOK_INVALID_STATE`. Concurrent requests recheck database-locked state;
+only one can schedule the same DEAD delivery. The worker later creates the next
+attempt number, rather than resetting the automatic retry budget or history.
 
 ## 15. Event types v1
 

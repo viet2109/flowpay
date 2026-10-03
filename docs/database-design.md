@@ -656,6 +656,15 @@ and duration remain NULL. Endpoint disable locks the endpoint exclusively and
 cancels all PENDING/RETRYING rows using bounded write-locked pages in that same
 transaction; it never skips scheduled rows or changes retained attempt history.
 
+P7-T12 needs no migration. Delivery history reads join only Webhook-owned
+delivery/event/endpoint tables and require matching merchant ownership on both
+the event and endpoint. List filters are bound SQL parameters; count and bounded
+page queries use the same ownership predicate, with created_at DESC/id DESC
+ordering. Detail history is ordered by attempt_no ASC. Manual scheduling locks
+the endpoint for share before the delivery for update, rechecks DEAD/ACTIVE and
+the observed attempt count, and updates only delivery state/version. No attempt
+row is inserted or changed until the worker later claims that scheduled retry.
+
 ### `webhook_delivery_attempts`
 
 ```text

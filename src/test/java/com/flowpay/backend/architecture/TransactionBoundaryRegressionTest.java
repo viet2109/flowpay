@@ -38,6 +38,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TransactionBoundaryRegressionTest {
 
     @Test
+    void webhookDashboardReadsAreReadOnlyAndManualRetryOwnsItsTransaction() throws Exception {
+        var queries = com.flowpay.backend.webhook.application.WebhookDeliveryQueryService.class;
+        assertThat(queries.getMethod("list", com.flowpay.backend.webhook.application.ListWebhookDeliveriesQuery.class)
+                .getAnnotation(Transactional.class).readOnly()).isTrue();
+        assertThat(queries.getMethod("get", String.class, String.class)
+                .getAnnotation(Transactional.class).readOnly()).isTrue();
+        assertTransactional(com.flowpay.backend.webhook.application.WebhookDeliveryRetryService.class,
+                "retry", String.class, String.class);
+    }
+
+    @Test
     void webhookDeliveryKeepsHttpBetweenIndependentClaimAndFinalizationTransactions() throws Exception {
         var execution = com.flowpay.backend.webhook.application.WebhookDeliveryExecutionService.class;
         assertNotTransactional(com.flowpay.backend.webhook.application.WebhookDeliveryWorker.class, "deliverBatch");
