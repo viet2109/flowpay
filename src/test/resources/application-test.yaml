@@ -22,6 +22,8 @@ flowpay:
     secret:
       encryption-key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
   messaging:
+    webhook-consumer:
+      enabled: false
     ledger-consumer:
       enabled: false
     outbox:

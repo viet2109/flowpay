@@ -79,7 +79,10 @@ public class WebhookEndpointManagementService implements WebhookEndpointManageme
     @Override
     @Transactional
     public void disable(String merchantPublicId, String endpointPublicId) {
-        WebhookEndpoint endpoint = ownedEndpoint(merchantPublicId, endpointPublicId);
+        long merchantId = merchantAccess.requireActiveMerchant(merchantPublicId).internalId();
+        WebhookEndpoint endpoint = repository.findByPublicIdAndMerchantIdForUpdate(endpointPublicId, merchantId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND,
+                        ErrorCode.WEBHOOK_ENDPOINT_NOT_FOUND, "The webhook endpoint was not found."));
         if (endpoint.status() == WebhookEndpointStatus.ACTIVE) {
             endpoint.disable(clock.instant());
             save(endpoint);

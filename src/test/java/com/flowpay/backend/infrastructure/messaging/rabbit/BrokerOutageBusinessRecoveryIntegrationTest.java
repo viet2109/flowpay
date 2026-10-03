@@ -191,19 +191,14 @@ class BrokerOutageBusinessRecoveryIntegrationTest extends PostgresIntegrationTes
         clock.advance(Duration.ofSeconds(2));
         OutboxRelayBatchResult recovered = relayService.relayDueEvents();
 
-        // Ledger still binds only success types. Without Webhook topology, the
-        // two processing events must remain retryable after mandatory returns.
-        assertThat(recovered).isEqualTo(new OutboxRelayBatchResult(4, 2, 2));
+        // Webhook routes processing events independently; Ledger still receives only successes.
+        assertThat(recovered).isEqualTo(new OutboxRelayBatchResult(4, 4, 0));
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
-            assertThat(countOutboxStatus("PUBLISHED")).isEqualTo(2L);
+            assertThat(countOutboxStatus("PUBLISHED")).isEqualTo(4L);
             assertThat(countRows("ledger_transactions")).isEqualTo(2L);
             assertThat(countRows("ledger_entries")).isEqualTo(4L);
         });
-        assertThat(countOutboxStatus("FAILED")).isEqualTo(2L);
-        assertThat(jdbcTemplate.queryForList("""
-                SELECT event_type FROM outbox_events WHERE status = 'FAILED'
-                """, String.class)).containsExactlyInAnyOrder(
-                "payment.processing.v1", "refund.processing.v1");
+        assertThat(countOutboxStatus("FAILED")).isZero();
         assertThat(paymentProvider.invocationCount()).isOne();
         assertThat(refundProvider.invocationCount()).isOne();
         assertThat(countRows("payment_intents")).isOne();

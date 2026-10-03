@@ -270,10 +270,10 @@ Completed tasks:
 - P7-T05 Complete Webhook source event catalog.
 - P7-T06 Webhook delivery migration.
 - P7-T07 WebhookEvent, Delivery, and Attempt domain/persistence.
+- P7-T08 RabbitMQ Webhook topology and event materialization.
 
 Remaining tasks:
 
-- P7-T08 RabbitMQ Webhook topology and event materialization.
 - P7-T09 HMAC signing and outbound HTTP adapter.
 - P7-T10 Delivery claim, lease, and attempt execution.
 - P7-T11 Retry, DEAD state, and stale-delivery recovery.

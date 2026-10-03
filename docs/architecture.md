@@ -523,9 +523,10 @@ persists processing events in the source transaction; known terminal failures
 persist failed events in finalization. UNKNOWN produces no terminal event.
 Refund processing is NEW-only, and rejected/replayed operations do not emit.
 The typed producer ports and Outbox writer require the caller transaction.
-Success V1 schemas and Ledger's success-only bindings are unchanged. Webhook
-queue provisioning is deferred to P7-T08; until then, mandatory returns for
-unrouted new types keep those rows retryable, with no effect on source commits.
+Success V1 schemas and Ledger's success-only bindings are unchanged. P7-T08
+provisions the independent durable `flowpay.webhook.events` queue with six
+explicit V1 bindings and `flowpay.webhook.events.dlq` via `webhook.dead` on the
+existing DLX. Processing/failed events are now routable without changing Ledger.
 
 Payloads contain only the explicit consumer facts above. Authentication and
 idempotency values, credentials, persistence entities/versions, and raw provider
@@ -559,6 +560,24 @@ delivery rows from the ACTIVE subscription snapshot in the same short
 transaction. An equivalent duplicate is acknowledged without recomputing
 subscriptions; a contradictory duplicate fails closed and follows bounded
 consumer retry/dead-letter handling.
+
+P7-T08 implements this materialization boundary. The listener ACK follows a
+successful application transaction. PostgreSQL `INSERT ... ON CONFLICT` on
+`source_event_id` arbitrates concurrent duplicates, and normalized source facts
+plus canonical public JSON values detect contradictions without comparing JSON
+property order or whitespace. Matching ACTIVE endpoint rows are selected with
+`FOR SHARE`; endpoint disable takes `FOR UPDATE`, serializing it against the
+subscription snapshot. Event snapshots persist even without subscribers.
+The public body retains the full source occurrence timestamp; database timestamp
+columns use microsecond precision. No current Payment/Refund queries, merchant
+HTTP calls, HMAC, or delivery retries occur in materialization.
+
+Webhook consumer retry has separate additive `flowpay.messaging.webhook-consumer`
+properties and mirrors Ledger's bounded defaults (three attempts, 500ms initial
+interval, multiplier two, five-second cap). Exhausted failures reject without
+requeue into the Webhook DLQ; consumer failure does not change Outbox publication
+state. Provision the Webhook queue/bindings before, or atomically with, enabling
+the four additional source publishers during deployment.
 
 Outbound delivery uses three separate boundaries:
 

@@ -90,7 +90,7 @@ class WebhookEndpointManagementServiceTest {
 
     @Test
     void translatesOptimisticConflictWithoutLeakingPersistenceDetails() {
-        when(repository.findByPublicIdAndMerchantId("wep_owned", 7)).thenReturn(Optional.of(endpoint()));
+        when(repository.findByPublicIdAndMerchantIdForUpdate("wep_owned", 7)).thenReturn(Optional.of(endpoint()));
         when(repository.save(any())).thenThrow(new OptimisticLockingFailureException("SQL private details"));
         assertConflict(() -> service.disable("mrc_owner", "wep_owned"));
     }

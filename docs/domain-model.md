@@ -450,8 +450,11 @@ duplicate fails closed. Payload and identity are immutable after materialization
 
 The implemented event repository exposes insert/read only, using PostgreSQL
 source-ID uniqueness for dedupe without aborting a materialization transaction.
-The immutable payload is a String snapshot; JSON serialization and semantic
-duplicate comparison belong to the subsequent materializer use case.
+The immutable payload is a String snapshot. P7-T08's transactional materializer
+serializes only normalized source facts into the public body and compares
+canonical JSON values and event metadata on redelivery. It creates PENDING
+deliveries only for the first ACTIVE subscription snapshot, holding shared
+endpoint row locks until commit; equivalent duplicates never repeat fan-out.
 
 ### WebhookDelivery — Aggregate Root
 

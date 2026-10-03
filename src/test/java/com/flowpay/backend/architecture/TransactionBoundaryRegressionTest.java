@@ -38,6 +38,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TransactionBoundaryRegressionTest {
 
     @Test
+    void webhookMaterializationMustCommitBeforeListenerAcknowledgement() throws Exception {
+        assertTransactional(com.flowpay.backend.webhook.application.WebhookEventMaterializationService.class,
+                "materialize", com.flowpay.backend.webhook.application.MaterializeWebhookEventCommand.class);
+        assertNotTransactional(com.flowpay.backend.infrastructure.messaging.rabbit.WebhookIntegrationEventListener.class,
+                "consume", org.springframework.amqp.core.Message.class);
+    }
+
+    @Test
     void paymentConfirmationMustKeepProviderBetweenTwoShortTransactions()
             throws Exception {
         assertNotTransactional(

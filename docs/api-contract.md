@@ -858,6 +858,39 @@ attempt, while the signature timestamp/signature may change. Cross-event orderin
 is not guaranteed, so merchants must deduplicate by `FlowPay-Event-Id` and
 tolerate out-of-order state notifications.
 
+Failure codes are trimmed and limited to 64 Unicode characters; failure messages
+are trimmed and limited to 255 Unicode characters, using only normalized source
+failure facts (never raw provider responses or exceptions). Non-failed events
+include both fields as JSON `null`. Payment bodies omit `orderId`: the frozen
+source V1 contract does not supply it, and Webhook does not query current state
+to enrich historical events. Public bodies never contain internal merchant IDs.
+
+Refund payload example:
+
+```json
+{
+  "id": "evt_01K...",
+  "type": "refund.succeeded",
+  "createdAt": "2026-08-18T03:05:00Z",
+  "data": {
+    "refund": {
+      "id": "re_01K...",
+      "paymentId": "pi_01K...",
+      "amount": 100000,
+      "currency": "VND",
+      "status": "SUCCEEDED",
+      "failureCode": null,
+      "failureMessage": null
+    }
+  }
+}
+```
+
+Processing/failed Refund variants use the corresponding type and status, just
+like Payment. An event is materialized once even with no ACTIVE subscribers.
+Delivery subscriptions are snapshotted on its first materialization; redelivery
+does not include endpoints configured afterward.
+
 ### Delivery history
 
 ```http

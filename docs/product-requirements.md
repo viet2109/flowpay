@@ -186,17 +186,20 @@ delivery history, and dead delivery handling. Architecture/contracts are frozen,
 the V010 endpoint/subscription schema is complete, and endpoint lifecycle, URL
 policy, and secret cryptography are implemented. Merchant-scoped dashboard APIs
 now persist, list, retrieve, update, soft-disable, and rotate endpoint secrets
-with optimistic concurrency protection. Event materialization and HTTP delivery
-remain pending. The complete six-event Payment/Refund source catalog now writes
+with optimistic concurrency protection. HTTP delivery remains pending. The
+complete six-event Payment/Refund source catalog now writes
 processing and known failure events atomically through Outbox, preserving
 UNKNOWN semantics and the existing success-only Ledger consumer.
 V011 now supplies the event/delivery/attempt schema with source-event dedupe,
 merchant ownership, public delivery identity, state/timestamp checks, lease
 indexes, and retained attempt history. Event/delivery/attempt domain and
 persistence are implemented with immutable event snapshots, attempt fencing,
-optimistic delivery locking, and one-time attempt completion. Rabbit
-materialization, worker orchestration, HTTP delivery, and dashboard delivery
-APIs remain pending.
+optimistic delivery locking, and one-time attempt completion. Rabbit materialization
+now consumes all six types, creates immutable public snapshots and PENDING
+deliveries for matching ACTIVE subscriptions atomically, and deduplicates source
+events without recomputing subscriptions. Contradictory/malformed events follow
+bounded retry to the independent Webhook DLQ; Ledger remains success-only.
+Worker orchestration, HTTP delivery, and dashboard delivery APIs remain pending.
 
 ### Phase 8 — Production engineering
 

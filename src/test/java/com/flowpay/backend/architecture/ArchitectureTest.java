@@ -125,6 +125,14 @@ class ArchitectureTest {
                     "com.flowpay.backend.payment..", "com.flowpay.backend.refund..");
 
     @ArchTest
+    static final ArchRule webhookCoreMustNotDependOnTransportOrSourceModules = noClasses()
+            .that().resideInAnyPackage("com.flowpay.backend.webhook.application..", "com.flowpay.backend.webhook.domain..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "org.springframework.amqp..", "com.rabbitmq..",
+                    "com.flowpay.backend.payment..", "com.flowpay.backend.refund..",
+                    "com.flowpay.backend.infrastructure.messaging..");
+
+    @ArchTest
     static final ArchRule merchantMustNotDependOnIdentityInfrastructure = noClasses()
             .that().resideInAPackage("com.flowpay.backend.merchant..")
             .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.identity.infrastructure..")
