@@ -618,8 +618,9 @@ recovery flow to handle.
 
 `flowpay.webhook.delivery-worker` defaults to enabled, one-second fixed delay,
 100 candidates, and a 30-second lease. The lease must strictly exceed the HTTP
-request timeout; durations and batch size must be positive. Tests disable the
-background worker and invoke batches explicitly. `flowpay.webhook.delivery`
+request timeout; durations and batch size must be positive. Focused worker tests
+disable background scheduling and invoke batches explicitly; the P7-T13 E2E
+suite enables the real scheduler with loopback-only receivers. `flowpay.webhook.delivery`
 defaults to `retry-delays=10s,30s,2m,10m,1h` and `retry-jitter-max=0.20`.
 P7-T11 completes expired-lease recovery and atomic endpoint-disable cancellation.
 Before each send batch, the worker selects a bounded batch of expired DELIVERING
@@ -791,6 +792,26 @@ different-key over-refund concurrency, fixed lock ordering, provider calls
 outside database transactions, and Payment/Phase 3 regression protection.
 
 RabbitMQ integration tests use RabbitMQ Testcontainers when messaging is implemented.
+
+P7-T13 adds `PhaseSevenWebhookEndToEndIntegrationTest`: real source application
+services invoked through merchant APIs, PostgreSQL/Flyway, the confirmed Outbox
+relay, both RabbitMQ consumers, the enabled delivery scheduler, and the production
+HTTP/signing adapters with a loopback-only receiver. Only external Payment/Refund
+provider ports have controlled outcomes. Endpoints and secrets come from the
+dashboard API; an independent HMAC implementation verifies the exact received
+bytes, and the receiver checks that claim/OPEN history are already committed.
+
+The suite covers all six public types, UNKNOWN without false terminal events,
+subset/multiple/disabled endpoints, equivalent broker republication, retained
+event identity/body, rotation on a future attempt, timeout retry, six failures
+to DEAD, and dashboard manual retry to success. Ledger consumes successes in
+parallel and retains balanced, duplicate-safe postings. HTTP assertions allow
+at-least-once delivery and do not promise cross-event ordering or exactly-once
+external processing. A test-only clock advances through the unchanged production
+retry delays/jitter; bounded eventual assertions replace arbitrary sleeps.
+Database cleanup precedes scheduler initialization, and listener/receiver cleanup
+prevents active work from crossing test boundaries. No production configuration,
+API, schema, event contract, or dependency changes are required.
 
 ### Architecture tests
 
