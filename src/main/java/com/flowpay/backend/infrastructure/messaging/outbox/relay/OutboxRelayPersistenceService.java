@@ -1,6 +1,7 @@
 package com.flowpay.backend.infrastructure.messaging.outbox.relay;
 
 import com.flowpay.backend.infrastructure.messaging.outbox.OutboxRepository;
+import com.flowpay.backend.infrastructure.messaging.outbox.metrics.OutboxMetrics;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +14,7 @@ import java.util.List;
 public class OutboxRelayPersistenceService {
 
     private final OutboxRepository outboxRepository;
+    private final OutboxMetrics metrics;
 
     @Transactional(readOnly = true)
     public List<OutboxRelaySnapshot> findDue(Instant dueAt, int batchSize) {
@@ -23,7 +25,9 @@ public class OutboxRelayPersistenceService {
 
     @Transactional
     public boolean markPublished(String eventId, Instant publishedAt) {
-        return outboxRepository.markPublished(eventId, publishedAt);
+        boolean changed = outboxRepository.markPublished(eventId, publishedAt);
+        if (changed) metrics.published();
+        return changed;
     }
 
     @Transactional

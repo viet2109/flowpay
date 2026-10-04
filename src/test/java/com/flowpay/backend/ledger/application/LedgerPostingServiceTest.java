@@ -1,5 +1,7 @@
 package com.flowpay.backend.ledger.application;
 
+import com.flowpay.backend.common.observability.MetricsRecorder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.flowpay.backend.common.money.Money;
 import com.flowpay.backend.ledger.domain.LedgerAccount;
 import com.flowpay.backend.ledger.domain.LedgerAccountStatus;
@@ -61,7 +63,8 @@ class LedgerPostingServiceTest {
                 accountProvisioningService,
                 transactionRepository,
                 publicIdGenerator,
-                Clock.fixed(CREATED_AT, ZoneOffset.UTC)
+                Clock.fixed(CREATED_AT, ZoneOffset.UTC),
+                new LedgerMetrics(new MetricsRecorder(new SimpleMeterRegistry()))
         );
         clearing = systemAccount(10L, VND);
         payable = merchantAccount(11L, 15L, VND);

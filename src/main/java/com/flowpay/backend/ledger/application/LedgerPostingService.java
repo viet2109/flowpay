@@ -32,6 +32,7 @@ public class LedgerPostingService implements LedgerPostingApi {
     private final LedgerTransactionRepository transactionRepository;
     private final LedgerTransactionPublicIdGenerator publicIdGenerator;
     private final Clock clock;
+    private final LedgerMetrics metrics;
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -115,6 +116,10 @@ public class LedgerPostingService implements LedgerPostingApi {
     }
 
     LedgerPostingResult claim(LedgerTransaction candidate) {
+        return metrics.observeClaim(candidate.postingType(), () -> claimUnobserved(candidate));
+    }
+
+    private LedgerPostingResult claimUnobserved(LedgerTransaction candidate) {
         LedgerTransaction persisted;
         try {
             persisted = transactionRepository.tryInsert(candidate).orElse(null);

@@ -1,11 +1,14 @@
 package com.flowpay.backend.infrastructure.messaging.outbox.relay;
 
+import com.flowpay.backend.common.observability.MetricsRecorder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.flowpay.backend.infrastructure.messaging.FlowPayMessagingProperties;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationResult;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationStatus;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventTransportPublisher;
 import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvelope;
 import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvelopeMapper;
+import com.flowpay.backend.infrastructure.messaging.outbox.metrics.OutboxMetrics;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -39,7 +42,8 @@ class OutboxRelayServiceTest {
             backoffPolicy,
             new OutboxRelayFailureSummary(),
             properties,
-            Clock.fixed(NOW, ZoneOffset.UTC)
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            new OutboxMetrics(new MetricsRecorder(new SimpleMeterRegistry()))
     );
 
     @Test

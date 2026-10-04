@@ -296,8 +296,8 @@ acceptance criteria, and the mandatory implementation order.
 Status: `IN PROGRESS` as of 2026-10-04.
 
 Completed: P8-T01 baseline/design, P8-T02 production configuration, health and
-management security, and P8-T03 Payment/Refund/Idempotency metrics.
-Next: P8-T04 (not started).
+management security, P8-T03 Payment/Refund/Idempotency metrics, and P8-T04
+Outbox/Ledger/Webhook operational metrics. Next: P8-T05 (not started).
 
 The user selected staging Linux/container with no provider/external deployment.
 Phase 7 source `d348b10` was pushed and merged into remote main at `0b96400`;
@@ -316,7 +316,7 @@ phase branch before completion unless explicitly requested. Existing untracked
 | P8-T01 | Phase 7 Exit Gate and Production Engineering Freeze | Phase 7 DONE/FROZEN and merged | DONE |
 | P8-T02 | Production Configuration, Health and Management Security | P8-T01 | DONE |
 | P8-T03 | Payment, Refund and Idempotency Metrics | P8-T01, P8-T02 | DONE |
-| P8-T04 | Outbox, Ledger and Webhook Operational Metrics | P8-T03 | PLANNED |
+| P8-T04 | Outbox, Ledger and Webhook Operational Metrics | P8-T03 | DONE |
 | P8-T05 | HTTP Tracing and Safe Log Correlation | P8-T02 | PLANNED |
 | P8-T06 | Durable Outbox Trace Context | P8-T01, P8-T05 | PLANNED |
 | P8-T07 | Consumer and Webhook Worker Tracing | P8-T06 | PLANNED |
@@ -381,8 +381,33 @@ redaction, actual exporter outage, ArchUnit and transaction regressions. Default
 optional OTLP export is disabled except the owned outage fixture's explicit
 enablement. Required DB/broker tests ran. Compilation/static checks and
 `git diff --check` pass. No dependency/schema/API/event/state/locking/transaction
-change or external deployment. T04 remains unstarted; task commit stays local.
+change or external deployment. T04 was unstarted at the T03 checkpoint; task
+commit stays local.
 Phase/index/agent documents are not staged; `.env`/`.github/` remain untouched.
+
+P8-T04 adds cached owning Outbox/Webhook read-only projections, shared-DB count/
+age/freshness gauges, Outbox diagnostic confirmation attempts versus committed
+publication, Ledger decisions/duplicates versus committed postings and Webhook
+claim/HTTP/delivery/expired-lease observations. Counters retain after-commit and
+fencing semantics; diagnostic execution is separate. Catalog/units/labels and
+aggregation are frozen in production-engineering.md. Cadence defaults 30s,
+validated 10s–5m, monotonic single-flight; one aggregate statement per owner,
+2s statement timeout, no scrape-time DB access or ambient financial TX.
+Failures retain stale snapshots/age, not fabricated zeros. Sampling uses its
+separate scheduler without replacing business scheduling. Shared gauges must
+not be summed across replicas; exact queries can scan retained history, with
+actual staging cost owned by T14/T15.
+
+Final focused Java21/Maven3.9.16 gate: 186 tests in 19 classes, zero failures/
+errors/skips, 2m09s. Full clean verify: 1,287 tests in 180 suites, zero failures/
+errors/skips, 5m31s. Coverage includes known projection fixtures, real DDL-lock
+timeout, replica/cache/cadence/stale behavior, rollback after callback registration,
+redelivery/concurrency/conflict, late HTTP lease fencing and unavailable recording.
+Required DB/broker tests ran; optional default OTLP export disabled except the
+owned T03 HTTP 503 exporter fixture. Compilation/ArchUnit/transaction/static
+checks pass. No dependency/schema/index/API/event/state/locking/transaction or
+retry/lease budget change; no external deployment. Local phase/index corrections
+stay unstaged, .env/.github preserved; task commit remains local. P8-T05 unstarted.
 
 ## Agent task template
 

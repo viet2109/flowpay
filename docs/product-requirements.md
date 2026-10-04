@@ -214,7 +214,8 @@ these boundaries. Phase 6 remains DONE/FROZEN; Phase 8 hardening is not included
 ### Phase 8 — Production engineering
 
 Status: `IN PROGRESS` as of 2026-10-04; P8-T01 baseline/design, P8-T02
-production configuration/management and P8-T03 business metrics complete.
+production configuration/management, P8-T03 business metrics and P8-T04
+asynchronous operational metrics complete.
 
 Target selected by the user: reproducible staging on Linux/container, without
 a chosen provider or external deployment. The Phase 7 release is merged into
@@ -232,8 +233,14 @@ after-commit, not financial truth or HTTP success accounting; rollback/replay
 does not inflate them. UNKNOWN semantics are preserved. No new dependency,
 schema, business state/API/event, lock or transaction boundary is introduced.
 
-The remaining 15 tasks cover asynchronous operational metrics,
-synchronous/durable tracing, monitoring/alerts, Webhook DNS/egress enforcement,
+P8-T04 adds cached shared-DB Outbox/Webhook backlog/age projections plus bounded
+Outbox publication, Ledger posting/duplicate and Webhook attempt/HTTP/lease
+observations. Persisted success counters follow commit/fencing. Sampling is
+read-only, throttled, separate from financial orchestration and safe on failure;
+stale/shared gauge semantics and query costs are documented. No schema,
+business contract, retry budget, locking or transaction-boundary change.
+
+The remaining 14 tasks cover synchronous/durable tracing, monitoring/alerts, Webhook DNS/egress enforcement,
 auth/security review,
 CI/supply-chain gates, a constrained image, staged deployment, declared load and
 multi-instance failure drills, actual DB/broker/key restore and runbooks.

@@ -18,6 +18,7 @@ public class WebhookDeliveryWorker {
     private final WebhookSecretCipher cipher;
     private final WebhookDeliveryWorkerProperties properties;
     private final Clock clock;
+    private final WebhookMetrics metrics;
 
     public void deliverBatch() {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
@@ -45,6 +46,12 @@ public class WebhookDeliveryWorker {
     }
 
     private WebhookHttpDeliveryResult send(ClaimedWebhookDelivery claim) {
+        WebhookHttpDeliveryResult result = sendUnobserved(claim);
+        metrics.httpResult(result);
+        return result;
+    }
+
+    private WebhookHttpDeliveryResult sendUnobserved(ClaimedWebhookDelivery claim) {
         long start = System.nanoTime();
         try {
             return Objects.requireNonNull(http.send(new WebhookHttpDeliveryRequest(claim.url(), claim.eventPublicId(),

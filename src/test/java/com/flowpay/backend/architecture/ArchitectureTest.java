@@ -53,6 +53,15 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule sharedObservabilityMustNotReadModulePersistence = noClasses()
+            .that().resideInAnyPackage("com.flowpay.backend.common.observability..", "com.flowpay.backend.infrastructure.observability..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "..persistence..", "org.springframework.jdbc..", "jakarta.persistence..",
+                    "com.flowpay.backend.webhook.application..", "com.flowpay.backend.ledger.application..",
+                    "com.flowpay.backend.infrastructure.messaging.outbox.."
+            );
+
+    @ArchTest
     static final ArchRule businessCoreMustNotDependOnBusinessInfrastructure = noClasses()
             .that().resideInAnyPackage(BUSINESS_MODULES)
             .and().resideOutsideOfPackage("..infrastructure..")

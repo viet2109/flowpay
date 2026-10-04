@@ -1,5 +1,7 @@
 package com.flowpay.backend.webhook.application;
 
+import com.flowpay.backend.common.observability.MetricsRecorder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.flowpay.backend.webhook.domain.WebhookDelivery;
 import org.junit.jupiter.api.Test;
 import java.time.Clock;
@@ -101,6 +103,7 @@ class WebhookDeliveryWorkerTest {
 
     private WebhookDeliveryWorker worker(boolean enabled) {
         return new WebhookDeliveryWorker(execution, http, cipher,
-                new WebhookDeliveryWorkerProperties(enabled, Duration.ofSeconds(1), 2, Duration.ofSeconds(30)), clock);
+                new WebhookDeliveryWorkerProperties(enabled, Duration.ofSeconds(1), 2, Duration.ofSeconds(30)), clock,
+                new WebhookMetrics(new MetricsRecorder(new SimpleMeterRegistry())));
     }
 }

@@ -5,6 +5,7 @@ import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationR
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventTransportPublisher;
 import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvelope;
 import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvelopeMapper;
+import com.flowpay.backend.infrastructure.messaging.outbox.metrics.OutboxMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class OutboxRelayService {
     private final OutboxRelayFailureSummary failureSummary;
     private final FlowPayMessagingProperties properties;
     private final Clock clock;
+    private final OutboxMetrics metrics;
 
     public OutboxRelayBatchResult relayDueEvents() {
         int batchSize = properties.outbox().relay().batchSize();
@@ -58,6 +60,7 @@ public class OutboxRelayService {
         try {
             IntegrationEventEnvelope envelope = envelopeMapper.from(snapshot);
             IntegrationEventPublicationResult result = transportPublisher.publish(envelope);
+            metrics.attempt(result.status());
             if (result.confirmed()) {
                 return PublicationAttempt.success();
             }
@@ -65,6 +68,7 @@ public class OutboxRelayService {
                     failureSummary.forTransportStatus(result.status())
             );
         } catch (RuntimeException exception) {
+            metrics.attempt(null);
             return PublicationAttempt.failure(
                     failureSummary.forUnexpectedFailure(exception)
             );

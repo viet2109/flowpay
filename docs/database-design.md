@@ -796,3 +796,21 @@ Target functional MVP tables:
 16. webhook_events
 17. webhook_deliveries
 18. webhook_delivery_attempts
+
+## 12. Operational read-only projections (P8-T04)
+
+No migration or index change. Outbox's owning projection aggregates only
+PENDING/FAILED count and oldest created_at. Webhook's owning projection counts
+PENDING/RETRYING/DELIVERING/DEAD and the earliest due PENDING/RETRYING schedule,
+including disabled endpoints. Each uses one SELECT/one row, no payload/entity
+loading, cross-module join or explicit row lock. DB statement time produces
+non-negative ages. The existing status/schedule indexes can filter but exact
+counts/minima may still scan retained history depending on the plan.
+
+Projections feed cadence-limited per-instance caches; gauges represent shared DB
+snapshots and must not be summed across replicas. Scraping never queries DB.
+Statement timeout is 2s, separate from existing pool acquisition timeout;
+failed sampling retains stale values rather than fabricated zeros. See the
+tracked production-engineering catalog for cadence/freshness/aggregation and
+query-cost limits. T14/T15 own measured staging cost; any proposed index requires
+a separately reviewed forward migration, never edits to V009/V011.

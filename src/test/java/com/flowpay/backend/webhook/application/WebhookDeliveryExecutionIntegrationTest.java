@@ -1,5 +1,7 @@
 package com.flowpay.backend.webhook.application;
 
+import com.flowpay.backend.common.observability.MetricsRecorder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.flowpay.backend.testing.PostgresIntegrationTest;
 import com.flowpay.backend.webhook.domain.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -282,7 +284,8 @@ class WebhookDeliveryExecutionIntegrationTest extends PostgresIntegrationTest {
     void disabledWorkerDoesNotClaimOrSendAndAmbientTransactionIsRejected() {
         var delivery = delivery("disabled_worker", NOW);
         new WebhookDeliveryWorker(execution, http, cipher,
-                new WebhookDeliveryWorkerProperties(false, Duration.ofSeconds(1), 2, Duration.ofSeconds(30)), clock).deliverBatch();
+                new WebhookDeliveryWorkerProperties(false, Duration.ofSeconds(1), 2, Duration.ofSeconds(30)), clock,
+                new WebhookMetrics(new MetricsRecorder(new SimpleMeterRegistry()))).deliverBatch();
         assertThat(load(delivery).status()).isEqualTo(WebhookDeliveryStatus.PENDING);
         assertThatThrownBy(() -> tx(() -> { worker().deliverBatch(); return null; }))
                 .isInstanceOf(IllegalStateException.class);
@@ -291,7 +294,8 @@ class WebhookDeliveryExecutionIntegrationTest extends PostgresIntegrationTest {
 
     private WebhookDeliveryWorker worker() {
         return new WebhookDeliveryWorker(execution, http, cipher,
-                new WebhookDeliveryWorkerProperties(true, Duration.ofSeconds(1), 2, Duration.ofSeconds(30)), clock);
+                new WebhookDeliveryWorkerProperties(true, Duration.ofSeconds(1), 2, Duration.ofSeconds(30)), clock,
+                new WebhookMetrics(new MetricsRecorder(new SimpleMeterRegistry())));
     }
 
     private WebhookDelivery delivery(String suffix, Instant createdAt) {

@@ -1,5 +1,7 @@
 package com.flowpay.backend.infrastructure.messaging.rabbit;
 
+import com.flowpay.backend.common.observability.MetricsRecorder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.flowpay.backend.infrastructure.messaging.FlowPayMessagingProperties;
 import com.flowpay.backend.infrastructure.messaging.WebhookMessagingProperties;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventTransportPublisher;
@@ -180,7 +182,8 @@ class WebhookIntegrationEventConsumerIntegrationTest extends PostgresIntegration
         long deliveryId = jdbc.queryForObject("SELECT id FROM webhook_deliveries", Long.class);
         when(http.send(any())).thenReturn(WebhookHttpDeliveryResult.http(500, 1));
         var worker = new WebhookDeliveryWorker(execution, http, cipher,
-                new WebhookDeliveryWorkerProperties(true, Duration.ofSeconds(1), 100, Duration.ofSeconds(30)), clock);
+                new WebhookDeliveryWorkerProperties(true, Duration.ofSeconds(1), 100, Duration.ofSeconds(30)), clock,
+                new WebhookMetrics(new MetricsRecorder(new SimpleMeterRegistry())));
         for (int no = 1; no <= 6; no++) {
             worker.deliverBatch();
             var delivery = deliveries.findByInternalId(deliveryId).orElseThrow();

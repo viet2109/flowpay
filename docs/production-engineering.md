@@ -1,7 +1,8 @@
 # Production Engineering — Phase 8 Design Record
 
-Status: P8-T01 design/exit baseline, P8-T02 configuration/management and P8-T03
-business metrics implemented on 2026-10-04; Phase 8 IN PROGRESS. Remaining
+Status: P8-T01 design/exit baseline, P8-T02 configuration/management, P8-T03
+business metrics and P8-T04 asynchronous operational metrics implemented on
+2026-10-04; Phase 8 IN PROGRESS. Remaining
 runtime/operational controls are owned by subsequent tasks. Phase 7 remains
 DONE/FROZEN; the simulator functional MVP remains complete.
 
@@ -44,7 +45,7 @@ documentation-only preparation does not require repeating an unchanged suite.
 | Financial consistency | Source TX + Outbox, Idempotency, reserved refund capacity, append-only balanced unique Ledger | All tasks preserve it; T14-T16/T18 recheck invariants |
 | Source events | Six processing/success/known-failure facts; success V1 preserved; UNKNOWN non-terminal | T06-T07 add technical trace correlation, not business fields |
 | Webhook delivery | Immutable event/subscription snapshot; claim/OPEN/lease; exact-body signed no-TX HTTP; fenced finalize; jitter/DEAD/manual retry | T04/T07/T09/T14-T16 operational evidence |
-| Observability foundation | Actuator/Prometheus/OpenTelemetry foundation, request MDC; T03 committed Payment/Refund outcomes, provider duration and Idempotency decisions/reservations | T04-T08 own async metrics/tracing and monitoring deployment |
+| Observability foundation | Actuator/Prometheus/OpenTelemetry foundation, request MDC; T03 business metrics; T04 cached shared DB backlogs/ages and Outbox/Ledger/Webhook attempt/commit observations | T05-T08 own tracing and monitoring deployment; T14/T15 measure operational overhead |
 | Management security | T02: dedicated loopback-by-default listener; internal scrape allowed, public Actuator denied | T13 must prove private staging network/ingress enforcement |
 | URL/network safety | HTTPS/literal target checks, no redirects, bounded JDK HTTP; arbitrary DNS hostnames are not resolved by URL policy | T09 proves effective-destination and egress non-bypassability |
 | Health/shutdown | T02: DB + availability readiness, process liveness, bounded HTTP drain verified | T12-T15 prove image signals, workers and staged lifecycle |
@@ -177,6 +178,103 @@ boundary changed. T04 async operational metrics and later deployment/tracing
 gates are not implemented here. The task commit remains local to the phase
 branch; local phase/index/agent documents and pre-existing `.env`/`.github/` are
 excluded from task history.
+
+### P8-T04 catalog and sampling decision (frozen before instrumentation)
+
+| Name | Unit / bounded labels | Meaning and recording point |
+|---|---|---|
+| `flowpay.outbox.backlog` | Rows; `status=PENDING,FAILED` | Shared DB snapshot, includes future retry times |
+| `flowpay.outbox.oldest.unpublished.age` | Seconds; no labels | Age since oldest unpublished created_at, zero when empty |
+| `flowpay.outbox.publication.attempts` | Counter; `outcome=CONFIRMED,NEGATIVE_ACK,UNROUTABLE,CONFIRM_TIMEOUT,TRANSPORT_FAILURE,EXCEPTION` | Each relay execution's transport result, or envelope/transport exception; diagnostic, not committed publication |
+| `flowpay.outbox.published` | Counter; no labels | After commit, only a successful conditional unpublished-to-PUBLISHED update |
+| `flowpay.ledger.posting.decisions` | Counter; `type=PAYMENT_SUCCEEDED,REFUND_SUCCEEDED,REVERSAL`; `outcome=CREATED,DUPLICATE,CONFLICT,FAILURE` | Each repository posting claim's result/exception; not pre-claim provisioning or broker parse failures |
+| `flowpay.ledger.postings` | Counter; same three `type` values | CREATED claim only after owning transaction commits, never equivalent duplicate |
+| `flowpay.webhook.backlog` | Rows; `status=PENDING,RETRYING,DELIVERING,DEAD` | Shared DB snapshot, includes disabled endpoints and future schedules |
+| `flowpay.webhook.oldest.due.age` | Seconds; no labels | Lateness since earliest due next_attempt_at for PENDING/RETRYING, including disabled endpoints; zero when empty |
+| `flowpay.webhook.delivery.attempts` | Counter; no labels | After claim TX commits a new OPEN attempt; not proof HTTP was sent |
+| `flowpay.webhook.http.outcomes` | Counter; `outcome=HTTP_1XX,HTTP_2XX,HTTP_3XX,HTTP_4XX,HTTP_5XX,CONNECT_TIMEOUT,REQUEST_TIMEOUT,TLS_FAILURE,TRANSPORT_FAILURE,INTERRUPTED,INVALID_URL` | Each worker send execution's normalized result, including pre-send secret/adapter failure; survives later failed/fenced finalization |
+| `flowpay.webhook.delivered` | Counter; no labels | After fenced successful finalization commits; late/repeated result does not increment |
+| `flowpay.webhook.lease.recoveries` | Counter; no labels | After a fenced expired lease and its OPEN attempt are recovered/abandoned and committed |
+| `flowpay.metrics.sampling` | Counter; `component=OUTBOX,WEBHOOK`; `outcome=SUCCESS,FAILURE` | Projection executions, not skipped cadence calls |
+| `flowpay.metrics.sampling.duration` | Timer / seconds; same two `component` values | End-to-end projection execution, including connection acquisition and failure; existing fixed SLO buckets |
+| `flowpay.metrics.sample.age` | Seconds; same two `component` values | Monotonic elapsed time since last successful snapshot, NaN before first success |
+
+Counters/timers are process-local best-effort observations; sum instance rates,
+not financial amounts. Backlog/age gauges reflect the **same shared database**
+on every replica. Select one fresh replica or aggregate with max (not sum);
+replica snapshots are not atomic across instances or across the two regions.
+Bounded labels only: no IDs, tenant, event type, URL, status code, exception,
+payload or attempt number. Logical counters retain the commit/crash-window and
+restart limitations of T03; persisted attempt/state history remains truth.
+
+Sampling configuration: `flowpay.metrics.sampling.enabled` defaults true;
+`fixed-delay` defaults 30s and is validated between 10s and 5m, inclusive.
+The test profile disables autonomous sampling. Two isolated daemon scheduling threads use
+their explicitly named scheduler, not the business-worker scheduler. Initial
+delay equals the interval. Each owner also enforces monotonic minimum cadence
+and single-flight, including failed/manual refresh calls: at most one query per
+owner per interval per instance, no catch-up loops or scrape-time queries.
+
+Each owning projection issues one read-only aggregate SQL statement, returning
+one row of counts/minima, without explicit row locks, entities, cross-module joins or payload
+materialization. Outbox restricts PENDING/FAILED; Webhook restricts the four
+backlog states. Age uses database statement time, clamped non-negative.
+Statement query timeout is 2s, but connection acquisition uses the existing
+pool timeout and can take longer. Exact counts/minima are not constant-cost:
+work scales with matching backlog rows and may scan retained terminal history
+if PostgreSQL chooses a sequential scan. Existing status/schedule indexes may
+help filtering but do not guarantee a plan. No new schema/index or production-capacity claim.
+At default cadence two queries per instance per 30s; multi-instance DB cost
+scales with replicas and must be measured at T14/T15 before operational claims.
+
+Cache replacement is atomic after a successful projection. Before any successful
+sample all backlog/age gauges are NaN; an empty successful sample is zero.
+Failure retains the last successful snapshot and its growing sample age, emits
+only a bounded FAILURE observation, and does not log sensitive causes or mutate
+business state. Scraping reads cache only. Monitoring T08 must distinguish stale
+or never-sampled gauges from healthy zeros; disabled sampling is not empty DB.
+No financial transaction, locking/retry/lease/budget or API/event/schema changes.
+
+Gauge lifetime/observation follows the existing [Micrometer gauge model](https://docs.micrometer.io/micrometer/reference/concepts/gauges.html);
+explicit scheduling uses Spring's [named scheduler support](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/scheduling/annotation/Scheduled.html#scheduler()).
+Cadence, query timeout, cache semantics and aggregation above are FlowPay choices.
+T04 adds at most 52 custom meter identities before deployment common tags and
+the bounded timer series expansion. Cache refresh skips an ambient actual TX
+before attempting a query; observation cannot join financial orchestration.
+Failed gauge registration can leave a series absent until restart; missing,
+never-sampled and stale metrics are not healthy zero-backlog evidence.
+
+### P8-T04 verification record
+
+On 2026-10-04, Java21/Maven3.9.16 final focused verification passed 186 tests in
+19 classes (2m09s); full `clean verify` passed 1,287 tests in 180 suites, zero
+failures/errors/skips, 5m31s. The focused command includes cache/catalog/config,
+real PostgreSQL projection/outcome tests, Outbox Rabbit publication, Ledger
+consumer retry/duplicate/concurrency/reversal, Webhook worker/lease/security
+regressions and ArchUnit/transaction boundaries. Native Prometheus verifies
+bounded labels/units and bucket expansion. Compilation/static checks and
+`git diff --check` pass; no formatting plugin is configured.
+
+Known fixtures prove counts/ages, future-time clamps, disabled-endpoint inclusion,
+empty snapshots and two replicas reporting the same shared DB count. Repeated
+refresh/scrape calls do not requery inside cadence; fake monotonic time proves
+stale retention after failed sampling and no overlapping queries. An owned
+PostgreSQL DDL-lock fixture verifies the actual 2s statement timeout. Callback
+registration followed by beforeCommit failure proves publication, Webhook claim,
+delivery and lease-recovery counters remain absent after rollback. Ledger
+concurrent equivalent redelivery yields one committed posting; conflicts remain
+diagnostic failures, not new postings. A late HTTP 2xx is observable as an attempt
+but cannot inflate delivered after lease fencing. Throwing-registry fixtures
+preserve actual published/posted/delivered state and original results/exceptions.
+
+Default optional OTLP export is disabled for verification except the T03 owned
+HTTP 503 collector fixture, which explicitly enables real export in the full
+gate. All required PostgreSQL/RabbitMQ suites ran, no dev resource reset.
+The named metrics scheduler is verified not to replace the default business
+scheduler; disabled sampling removes only the metrics scheduler. No dependency,
+migration/index, API/event/state, business transaction/locking or retry/lease
+budget change. This is not measured staging/load/monitoring deployment evidence.
+T05 is next and unstarted; task commit stays local on the phase branch.
 
 ## 5. Trace correlation (T05-T07)
 

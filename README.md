@@ -9,7 +9,8 @@ data.
 Phases 0–7 are complete; Phase 7 Webhooks is DONE/FROZEN as of 2026-10-04 after
 its clean quality gate. The functional simulator MVP is complete. Phase 8
 production engineering has completed P8-T01's baseline/design, P8-T02's
-production configuration/management/probes and P8-T03's business metrics. Remaining hardening
+production configuration/management/probes, P8-T03's business metrics and
+P8-T04's asynchronous operational metrics. Remaining hardening
 and staging tasks are pending.
 
 ## Implemented flow
@@ -132,8 +133,20 @@ Provider timers count attempts separately; conflict decisions remain diagnostic
 even if an outer TX rolls back. Metrics recording/export failures do not change
 financial results. Labels are bounded enums, never tenant/IDs/amounts/payloads.
 See the [metric catalog and aggregation semantics](docs/production-engineering.md#p8-t03-metric-catalog-frozen-before-instrumentation).
-These process-local observations are not durable financial accounting; async
-backlog metrics and monitoring/dashboard deployment remain later tasks.
+These process-local observations are not durable financial accounting.
+
+P8-T04 adds Outbox/Webhook backlog and age gauges cached from owning read-only
+DB projections, plus Outbox publication, Ledger posting/duplicate and Webhook
+HTTP/claim/delivery/lease-recovery observations. Shared-DB gauges must not be
+summed across replicas; choose a fresh replica or max. Scrapes read cache only.
+Sampling defaults to 30s on its separate scheduler (validated 10s–5m), with
+2s statement timeout; connection acquisition can take the existing pool timeout.
+Use `METRICS_SAMPLING_ENABLED=false` to disable automatic sampling or
+`METRICS_SAMPLING_FIXED_DELAY` to configure cadence. Before first success gauges
+are NaN; failure retains stale values with `flowpay.metrics.sample.age`, never
+fabricated healthy zeros. Missing/stale telemetry requires separate monitoring.
+See the [operational catalog and cost limits](docs/production-engineering.md#p8-t04-catalog-and-sampling-decision-frozen-before-instrumentation).
+Dashboards, tracing and monitoring deployment remain later tasks.
 
 ## Verification
 
@@ -163,6 +176,12 @@ suites, zero failures/errors/skips. Coverage includes real commit/rollback,
 replay/conflict/concurrency, UNKNOWN, Prometheus cardinality/redaction and
 recording/export failure isolation using an owned OTLP HTTP 503 collector.
 
+P8-T04 passed 186 focused tests and full `clean verify`: 1,287 tests in 180
+suites, zero failures/errors/skips. Coverage includes durable counts/ages,
+cache/cadence/staleness, real SQL timeout, shared-replica semantics, callback
+rollback, concurrent duplicates, late-result fencing and recording outage.
+Query/load cost on Linux staging still requires its later measured gate.
+
 For a clean infrastructure smoke check, use a dedicated disposable Compose
 project with separate container names, volumes, and ports. The checked-in
 Compose file pins development container names, so `-p` alone is not isolation.
@@ -187,8 +206,8 @@ the repository's shared entry points.
 Phase 8 targets reproducible Linux/container staging; no provider, cloud account
 or external deployment has been selected. P8-T01 verifies the merged Phase 7
 baseline; P8-T02 implements production startup and management/probe controls;
-P8-T03 adds Payment/Refund/Idempotency metrics. Stronger egress/DNS-rebinding
-controls, asynchronous operational metrics/tracing, load testing,
+P8-T03 adds Payment/Refund/Idempotency metrics; P8-T04 adds asynchronous operational
+metrics. Stronger egress/DNS-rebinding controls, tracing, load testing,
 security/dependency review,
 packaging/staging, backup/recovery, and runbooks are still pending implementation.
 The functional simulator MVP is not a claim of

@@ -937,8 +937,32 @@ Counters are best-effort process-local observations, not durable accounting;
 registry/export failure cannot change financial results. Actual OTLP HTTP 503
 and throwing-registry fixtures verify failure isolation.
 
-OpenTelemetry synchronous/durable traces, async operational metrics and durable
-projections remain P8-T04-T07 work; this task adds none of those controls.
+P8-T04 adds Outbox-owned and Webhook-owned read-only projection ports/adapters.
+Each region returns one aggregate SQL row; no cross-module repository/entity
+access, payload scan/materialization, merchant endpoint or schema change. Owning
+metrics components cache the result; shared technical cache/recording code has
+no module/JDBC dependency (ArchUnit enforced). Scrapes never query the DB.
+Thirty-second sampling is cadence-limited/single-flight, skips caller TXs and
+uses a dedicated named two-thread scheduler without replacing business-worker
+scheduling. Statement timeout is 2s; pool acquisition still uses its own timeout.
+
+Shared-DB backlog/age gauges are replicated snapshots, not per-instance disjoint
+counts: choose a fresh replica or max, never sum. Initial unavailable values are
+NaN; failed sampling keeps the old snapshot with growing monotonic sample age
+and a bounded failure observation. Query cost scales with backlog and replicas;
+Java tests do not claim measured staging/load capacity.
+
+Outbox transport attempts are distinct from conditional PUBLISHED-after-commit.
+Ledger repository claim decisions separate equivalent duplicate/conflict/failure
+from newly committed posting (including reversal). Webhook OPEN-claim, delivered
+and expired-lease recovery counters follow commit/fencing; worker HTTP groups
+remain attempt diagnostics when finalization fails or a late result is fenced.
+Telemetry failures cannot mutate source/financial/delivery state. Existing
+transaction boundaries, locking, retry/lease budgets, events and APIs are intact.
+The exact scope/labels/units/aggregation limits are in production-engineering.md.
+
+OpenTelemetry synchronous/durable traces remain P8-T05-T07 work; monitoring,
+dashboards and staging/performance evidence remain later separate gates.
 
 ## 18. Dependency policy
 

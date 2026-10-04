@@ -23,6 +23,7 @@ public class WebhookDeliveryExecutionService {
     private final WebhookDeliveryFailurePolicy failurePolicy;
     private final WebhookDeliveryWorkerProperties properties;
     private final Clock clock;
+    private final WebhookMetrics metrics;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public List<WebhookDelivery> candidates() {
@@ -50,6 +51,7 @@ public class WebhookDeliveryExecutionService {
         attempt.abandon(now);
         attempts.complete(attempt);
         deliveries.save(delivery);
+        metrics.recovered();
         return true;
     }
 
@@ -67,6 +69,7 @@ public class WebhookDeliveryExecutionService {
         int attempt = delivery.claim(now, now.plus(properties.leaseTimeout()));
         deliveries.save(delivery);
         attempts.insert(WebhookDeliveryAttempt.open(deliveryId, attempt, now));
+        metrics.claimed();
         return Optional.of(new ClaimedWebhookDelivery(deliveryId, endpointId, attempt,
                 event.publicId(), endpoint.url(), endpoint.secretCiphertext(), event.payload()));
     }
@@ -95,6 +98,7 @@ public class WebhookDeliveryExecutionService {
         attempt.complete(result.httpStatus(), (int) Math.min(Integer.MAX_VALUE, result.durationMs()), result.errorMessage(), now);
         attempts.complete(attempt);
         deliveries.save(delivery);
+        if (result.successful()) metrics.delivered();
         return true;
     }
 
