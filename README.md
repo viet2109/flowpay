@@ -8,8 +8,8 @@ data.
 
 Phases 0–7 are complete; Phase 7 Webhooks is DONE/FROZEN as of 2026-10-04 after
 its clean quality gate. The functional simulator MVP is complete. Phase 8
-production engineering has completed P8-T01's baseline/design and P8-T02's
-production configuration, management isolation and probes. Remaining hardening
+production engineering has completed P8-T01's baseline/design, P8-T02's
+production configuration/management/probes and P8-T03's business metrics. Remaining hardening
 and staging tasks are pending.
 
 ## Implemented flow
@@ -123,6 +123,18 @@ not a whole-process deadline. Container signal/grace periods, worker shutdown
 and CPU/memory/JVM limits remain packaging/staging tasks. See the
 [configuration, listener and lifecycle contract](docs/production-engineering.md#6-production-configuration-and-management-t02).
 
+## Business metrics
+
+P8-T03 instruments committed Payment/Refund outcomes (including non-terminal
+UNKNOWN), per-call provider latency and Idempotency decision/reservation counts.
+Logical counters update only after commit; rollback/replay cannot inflate them.
+Provider timers count attempts separately; conflict decisions remain diagnostic
+even if an outer TX rolls back. Metrics recording/export failures do not change
+financial results. Labels are bounded enums, never tenant/IDs/amounts/payloads.
+See the [metric catalog and aggregation semantics](docs/production-engineering.md#p8-t03-metric-catalog-frozen-before-instrumentation).
+These process-local observations are not durable financial accounting; async
+backlog metrics and monitoring/dashboard deployment remain later tasks.
+
 ## Verification
 
 ```sh
@@ -145,6 +157,11 @@ P8-T02 passed focused configuration/security regressions and full `clean verify`
 1,227 tests in 173 suites, zero failures/errors/skips. The new prod-profile tests
 use real separate listeners, disposable DB/broker resources and synthetic
 temporary keys; deployment-network and image lifecycle proof remain later gates.
+
+P8-T03 passed 179 focused tests and full `clean verify`: 1,256 tests in 176
+suites, zero failures/errors/skips. Coverage includes real commit/rollback,
+replay/conflict/concurrency, UNKNOWN, Prometheus cardinality/redaction and
+recording/export failure isolation using an owned OTLP HTTP 503 collector.
 
 For a clean infrastructure smoke check, use a dedicated disposable Compose
 project with separate container names, volumes, and ports. The checked-in
@@ -169,8 +186,9 @@ the repository's shared entry points.
 
 Phase 8 targets reproducible Linux/container staging; no provider, cloud account
 or external deployment has been selected. P8-T01 verifies the merged Phase 7
-baseline; P8-T02 implements production startup and management/probe controls.
-Stronger egress/DNS-rebinding controls, operational metrics/tracing, load testing,
+baseline; P8-T02 implements production startup and management/probe controls;
+P8-T03 adds Payment/Refund/Idempotency metrics. Stronger egress/DNS-rebinding
+controls, asynchronous operational metrics/tracing, load testing,
 security/dependency review,
 packaging/staging, backup/recovery, and runbooks are still pending implementation.
 The functional simulator MVP is not a claim of

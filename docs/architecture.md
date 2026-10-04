@@ -918,7 +918,27 @@ already carried in MDC.
 
 Actuator and Micrometer provide health/metrics foundation.
 
-OpenTelemetry support may be configured for tracing, but business-specific metrics/traces are added when corresponding features exist.
+P8-T03 adds owning-application metrics for committed Payment/Refund normalized
+outcomes, per-call provider duration and Idempotency decisions/reservations.
+Outcome/reservation counters run only after the existing transaction commits;
+diagnostic decisions include replay/conflict even when an outer TX rolls back.
+UNKNOWN stays non-terminal; repeat Refund UNKNOWN observations use existing
+persisted metadata/row locking to avoid inflating logical counts. Equivalent
+HTTP replay invokes no provider or new logical outcome. No observation adds
+locks, transactions, schema, financial states or event fields.
+
+The common recorder contains technical recording/afterCommit failure isolation,
+not repository queries or business orchestration. Domain aggregates remain free
+of Micrometer/OpenTelemetry (ArchUnit enforced). Provider timing preserves the
+original result/exception and runs outside DB transactions. Bounded enum-only
+labels and fixed SLO buckets are frozen in `production-engineering.md`; there
+are no identity, money, URL, credential, failure-message or payload labels.
+Counters are best-effort process-local observations, not durable accounting;
+registry/export failure cannot change financial results. Actual OTLP HTTP 503
+and throwing-registry fixtures verify failure isolation.
+
+OpenTelemetry synchronous/durable traces, async operational metrics and durable
+projections remain P8-T04-T07 work; this task adds none of those controls.
 
 ## 18. Dependency policy
 

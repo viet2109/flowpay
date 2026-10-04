@@ -295,8 +295,9 @@ acceptance criteria, and the mandatory implementation order.
 
 Status: `IN PROGRESS` as of 2026-10-04.
 
-Completed: P8-T01 baseline/design and P8-T02 production configuration, health
-and management security. Next: P8-T03 (not started).
+Completed: P8-T01 baseline/design, P8-T02 production configuration, health and
+management security, and P8-T03 Payment/Refund/Idempotency metrics.
+Next: P8-T04 (not started).
 
 The user selected staging Linux/container with no provider/external deployment.
 Phase 7 source `d348b10` was pushed and merged into remote main at `0b96400`;
@@ -314,7 +315,7 @@ phase branch before completion unless explicitly requested. Existing untracked
 |---|---|---|---|
 | P8-T01 | Phase 7 Exit Gate and Production Engineering Freeze | Phase 7 DONE/FROZEN and merged | DONE |
 | P8-T02 | Production Configuration, Health and Management Security | P8-T01 | DONE |
-| P8-T03 | Payment, Refund and Idempotency Metrics | P8-T01, P8-T02 | PLANNED |
+| P8-T03 | Payment, Refund and Idempotency Metrics | P8-T01, P8-T02 | DONE |
 | P8-T04 | Outbox, Ledger and Webhook Operational Metrics | P8-T03 | PLANNED |
 | P8-T05 | HTTP Tracing and Safe Log Correlation | P8-T02 | PLANNED |
 | P8-T06 | Durable Outbox Trace Context | P8-T01, P8-T05 | PLANNED |
@@ -361,6 +362,27 @@ development resources. Local phase/index corrections stay unstaged; pre-existing
 The packaged executable JAR also rejects mixed prod/dev profiles before context
 initialization (exit 1 with the expected sanitized guard message); no deployment
 or database connection was used for that smoke check.
+
+P8-T03 freezes six bounded metric families before instrumentation. Owning
+application components observe Payment/Refund classifications after commit,
+provider execution latency and Idempotency diagnostic decisions versus committed
+NEW reservations. Rollback/equivalent replay do not inflate logical counters;
+UNKNOWN preserves existing financial semantics and repeated Refund UNKNOWN is
+deduplicated using persisted metadata under the existing row lock. Registry
+failure and an actual OTLP HTTP 503 collector do not change business results.
+The catalog, units, labels, SLO buckets and process-local/multi-instance limits
+are recorded in `production-engineering.md`; no DB sampling is added here.
+
+Verification on Java21/Maven3.9.16: 179 focused tests in 15 classes pass; full
+`clean verify` passes 1,256 tests in 176 suites, zero failures/errors/skips,
+5m29s. Coverage includes real PostgreSQL commit/rollback, provider success/known
+failure/UNKNOWN/exception, replay/conflict/concurrency, Prometheus cardinality/
+redaction, actual exporter outage, ArchUnit and transaction regressions. Default
+optional OTLP export is disabled except the owned outage fixture's explicit
+enablement. Required DB/broker tests ran. Compilation/static checks and
+`git diff --check` pass. No dependency/schema/API/event/state/locking/transaction
+change or external deployment. T04 remains unstarted; task commit stays local.
+Phase/index/agent documents are not staged; `.env`/`.github/` remain untouched.
 
 ## Agent task template
 

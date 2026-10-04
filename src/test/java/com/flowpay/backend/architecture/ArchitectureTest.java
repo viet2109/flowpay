@@ -45,6 +45,14 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule domainMustRemainFreeOfObservability = noClasses()
+            .that().resideInAPackage("..domain..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "io.micrometer..", "io.opentelemetry..", "com.flowpay.backend.common.observability.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule businessCoreMustNotDependOnBusinessInfrastructure = noClasses()
             .that().resideInAnyPackage(BUSINESS_MODULES)
             .and().resideOutsideOfPackage("..infrastructure..")

@@ -20,6 +20,7 @@ public class IdempotentRefundService {
     private final RefundResponseSnapshotMapper snapshotMapper;
     private final RefundResponseSnapshotCodec snapshotCodec;
     private final IdempotencyCompletionService completionService;
+    private final RefundMetrics metrics;
 
     public IdempotentRefundResult create(IdempotentRefundCommand command) {
         PrepareRefundResult preparation = preparationService.prepare(
@@ -34,9 +35,9 @@ public class IdempotentRefundService {
     }
 
     private IdempotentRefundResult executeNew(PreparedRefund prepared) {
-        RefundProviderResult providerResult = refundProvider.refund(
+        RefundProviderResult providerResult = metrics.measureProvider(() -> refundProvider.refund(
                 prepared.toProviderRequest()
-        );
+        ));
         FinalizedRefund finalized = finalizationService.finalizeRefund(
                 new FinalizeRefundCommand(
                         prepared.merchantInternalId(),

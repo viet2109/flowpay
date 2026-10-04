@@ -5,6 +5,8 @@ import com.flowpay.backend.idempotency.domain.IdempotencyOperation;
 import com.flowpay.backend.idempotency.domain.IdempotencyRecord;
 import com.flowpay.backend.idempotency.domain.IdempotencyRepository;
 import com.flowpay.backend.idempotency.domain.IdempotencyStatus;
+import com.flowpay.backend.common.observability.MetricsRecorder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,7 +47,8 @@ class IdempotencyAcquisitionServiceTest {
         service = new IdempotencyAcquisitionService(
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                properties(RETENTION)
+                properties(RETENTION),
+                new IdempotencyMetrics(new MetricsRecorder(new SimpleMeterRegistry()))
         );
     }
 

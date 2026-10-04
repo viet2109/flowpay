@@ -3,6 +3,8 @@ package com.flowpay.backend.payment.application;
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.common.money.Money;
+import com.flowpay.backend.common.observability.MetricsRecorder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.flowpay.backend.common.security.MerchantApiPrincipal;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransactionStatus;
@@ -62,7 +64,8 @@ class ConfirmPaymentServiceTest {
         service = new ConfirmPaymentService(
                 preparationService,
                 paymentProvider,
-                finalizationService
+                finalizationService,
+                new PaymentMetrics(new MetricsRecorder(new SimpleMeterRegistry()))
         );
     }
 

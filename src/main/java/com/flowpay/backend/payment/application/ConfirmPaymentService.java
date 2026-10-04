@@ -11,6 +11,7 @@ public class ConfirmPaymentService {
     private final PreparePaymentConfirmationService preparationService;
     private final PaymentProviderPort paymentProvider;
     private final FinalizePaymentConfirmationService finalizationService;
+    private final PaymentMetrics metrics;
 
     public FinalizedPaymentConfirmation confirm(ConfirmPaymentCommand command) {
         return executePrepared(prepare(command));
@@ -26,12 +27,12 @@ public class ConfirmPaymentService {
     }
 
     FinalizedPaymentConfirmation executePrepared(PreparedPaymentConfirmation prepared) {
-        PaymentProviderResult providerResult = paymentProvider.charge(
+        PaymentProviderResult providerResult = metrics.measureProvider(() -> paymentProvider.charge(
                 new PaymentProviderRequest(
                         prepared.paymentPublicId(),
                         Money.of(prepared.amountMinor(), prepared.currency())
                 )
-        );
+        ));
 
         return finalizationService.finalizeConfirmation(
                 new FinalizePaymentConfirmationCommand(

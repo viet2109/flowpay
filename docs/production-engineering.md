@@ -1,8 +1,8 @@
 # Production Engineering — Phase 8 Design Record
 
-Status: P8-T01 design/exit baseline and P8-T02 configuration/management implemented
-on 2026-10-04; Phase 8 IN PROGRESS. Remaining runtime/operational controls are
-owned by subsequent tasks. Phase 7 remains
+Status: P8-T01 design/exit baseline, P8-T02 configuration/management and P8-T03
+business metrics implemented on 2026-10-04; Phase 8 IN PROGRESS. Remaining
+runtime/operational controls are owned by subsequent tasks. Phase 7 remains
 DONE/FROZEN; the simulator functional MVP remains complete.
 
 This tracked document records shared scope and decision gates. The detailed
@@ -44,7 +44,7 @@ documentation-only preparation does not require repeating an unchanged suite.
 | Financial consistency | Source TX + Outbox, Idempotency, reserved refund capacity, append-only balanced unique Ledger | All tasks preserve it; T14-T16/T18 recheck invariants |
 | Source events | Six processing/success/known-failure facts; success V1 preserved; UNKNOWN non-terminal | T06-T07 add technical trace correlation, not business fields |
 | Webhook delivery | Immutable event/subscription snapshot; claim/OPEN/lease; exact-body signed no-TX HTTP; fenced finalize; jitter/DEAD/manual retry | T04/T07/T09/T14-T16 operational evidence |
-| Observability foundation | Actuator, Micrometer Prometheus registry, OpenTelemetry starter, X-Request-Id MDC | T03-T08 add and verify business/async observations |
+| Observability foundation | Actuator/Prometheus/OpenTelemetry foundation, request MDC; T03 committed Payment/Refund outcomes, provider duration and Idempotency decisions/reservations | T04-T08 own async metrics/tracing and monitoring deployment |
 | Management security | T02: dedicated loopback-by-default listener; internal scrape allowed, public Actuator denied | T13 must prove private staging network/ingress enforcement |
 | URL/network safety | HTTPS/literal target checks, no redirects, bounded JDK HTTP; arbitrary DNS hostnames are not resolved by URL policy | T09 proves effective-destination and egress non-bypassability |
 | Health/shutdown | T02: DB + availability readiness, process liveness, bounded HTTP drain verified | T12-T15 prove image signals, workers and staged lifecycle |
@@ -100,8 +100,83 @@ Sample durable projections at a bounded cadence. Distinguish per-instance
 gauges from shared-database values; never sum identical shared counts as though
 they were disjoint. Sampling/export failure must not change business outcomes.
 
-T03/T04 freeze exact meter names, labels and sampling/query costs before code.
-No migration/index is implicitly authorized by the metrics scope.
+### P8-T03 metric catalog (frozen before instrumentation)
+
+| Micrometer name | Type / unit | Exact bounded tags | Recording semantics |
+|---|---|---|---|
+| `flowpay.payment.confirmation.outcomes` | Counter / committed classifications | `outcome=SUCCESS,DECLINED,TECHNICAL_FAILURE,UNKNOWN` | After the existing finalization TX commits; no counter on rollback or HTTP replay |
+| `flowpay.refund.outcomes` | Counter / committed classifications | Same four `outcome` values | After finalization TX commits; UNKNOWN is the first ambiguous observation per Refund, not a terminal failure |
+| `flowpay.payment.provider.duration` | Timer / seconds in Prometheus | Above four `outcome` values plus `EXCEPTION` | One actual charge invocation, including thrown exceptions, even if later persistence fails |
+| `flowpay.refund.provider.duration` | Timer / seconds in Prometheus | Above four `outcome` values plus `EXCEPTION` | One actual refund invocation; equivalent HTTP replay invokes no provider/timer |
+| `flowpay.idempotency.decisions` | Counter / decision observations | `operation=PAYMENT_INTENT_CREATE,PAYMENT_INTENT_CONFIRM,REFUND_CREATE`; `decision=NEW,REPLAY,IN_PROGRESS,KEY_REUSED,NOT_FOUND` | Immediately once per returned acquire/findExisting decision, including conflicts in an outer TX that subsequently rolls back; NOT_FOUND is a lookup miss |
+| `flowpay.idempotency.reservations` | Counter / committed new reservations | The same three `operation` values | Only NEW and only after the actual insert/outer TX commits; no counter on rollback/replay |
+
+Counters use the standard Prometheus `_total` suffix. Timers expose seconds
+count/sum/max and fixed SLO buckets at 10ms, 50ms, 100ms, 500ms, 1s, 5s, 10s and
+30s (plus the backend's +Inf bucket); no client-side percentiles or automatic
+percentile histogram. The catalog has at most 36 custom meter identities before
+deployment-wide common tags; backend histogram series are an additional bounded
+expansion. There are no provider-name, currency, amount, tenant, resource, error
+code/message, request, Idempotency-key/hash or payload dimensions.
+
+Owning application components pass only normalized enums into their meters.
+A query-free shared recorder isolates registry registration/recording failures
+and registers afterCommit callbacks on existing actual transactions. It never
+creates a transaction/lock or records a committed counter outside an actual TX.
+Provider timers use a monotonic process clock, not the registry/exporter, and
+preserve the original result/exception. No raw diagnostic exception is logged.
+
+Payment UNKNOWN terminates the confirmation attempt, not the PaymentIntent.
+Refund remains PROCESSING on UNKNOWN; its existing persisted failure metadata
+distinguishes the first observation, under the existing refund row lock. A later
+terminal outcome may count separately; repeated UNKNOWN observations do not
+inflate its logical counter. No new business state, storage or dedupe cache is
+introduced. Decision counters are diagnostics, not numbers of accepted requests
+or unique persisted executions; a reservation can later be safely released.
+Logical outcomes refer to committed source facts, not HTTP success: a later
+snapshot/Idempotency completion failure does not erase an already committed
+outcome. Provider duration remains an attempt observation when finalization
+subsequently rolls back. Unexpected provider exceptions get only the timer's
+EXCEPTION label; they do not invent FAILED/UNKNOWN business facts. Meters are
+registered lazily, so an unobserved label combination may have no series yet.
+
+These are best-effort process-local counters: restarts/crashes/export failures
+can lose observations, including the DB-commit-to-callback crash window. Sum
+per-instance rates/increases for traffic/outcomes, and merge timer buckets for
+latency distributions; do not average per-instance percentiles or derive money,
+balances or exactly-once counts from metrics. The DB remains durable truth.
+T04 owns durable sampling/query cost and async meters; no such query, migration
+or index is authorized or introduced by T03.
+
+The implementation uses existing Micrometer [timer/SLO bucket](https://docs.micrometer.io/micrometer/reference/concepts/timers.html)
+and [registry recording/export semantics](https://docs.micrometer.io/micrometer/reference/concepts/meters.html),
+with Spring's [afterCommit synchronization](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/transaction/support/TransactionSynchronization.html#afterCommit()).
+The catalog, transaction points, UNKNOWN dedupe and failure isolation are FlowPay
+choices; they do not provide durable/exactly-once accounting.
+
+### P8-T03 verification record
+
+On 2026-10-04, Java21/Maven3.9.16 verification passed 179 focused tests in 15
+classes and full `clean verify`: 1,256 tests in 176 suites, zero failures/errors/
+skips, 5m29s. The focused gate covers the recorder/catalog, real PostgreSQL
+commit/rollback and same-key concurrency, existing Idempotency/finalization
+regressions, ArchUnit and transaction boundaries. All four normalized provider
+outcomes, replay/conflict, repeated Refund UNKNOWN and thrown provider exceptions
+are exercised; native Prometheus scraping verifies bounded labels/SLO buckets.
+
+The run disables optional default OTLP export, except the owned business-metrics
+fixture explicitly enables the real exporter against a disposable loopback HTTP
+503 collector. A throwing registry fixture also verifies successful financial
+operations, preserved original provider results/exceptions and safe diagnostics
+when recording is unavailable. Required PostgreSQL/RabbitMQ suites ran without
+skips; no development resources were reset. Compilation, architecture/transaction
+checks and `git diff --check` pass; no formatting plugin is configured.
+
+No dependency, schema, public API/event, financial state, locking or transaction
+boundary changed. T04 async operational metrics and later deployment/tracing
+gates are not implemented here. The task commit remains local to the phase
+branch; local phase/index/agent documents and pre-existing `.env`/`.github/` are
+excluded from task history.
 
 ## 5. Trace correlation (T05-T07)
 

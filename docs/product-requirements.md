@@ -213,8 +213,8 @@ these boundaries. Phase 6 remains DONE/FROZEN; Phase 8 hardening is not included
 
 ### Phase 8 — Production engineering
 
-Status: `IN PROGRESS` as of 2026-10-04; P8-T01 baseline/design and P8-T02
-production configuration/management complete.
+Status: `IN PROGRESS` as of 2026-10-04; P8-T01 baseline/design, P8-T02
+production configuration/management and P8-T03 business metrics complete.
 
 Target selected by the user: reproducible staging on Linux/container, without
 a chosen provider or external deployment. The Phase 7 release is merged into
@@ -226,7 +226,13 @@ process liveness and bounded HTTP graceful shutdown. Broker/telemetry outages
 do not block durable source + Outbox acceptance; no business contract changed.
 Staging network and container/worker lifecycle proof remain separate gates.
 
-The remaining 16 tasks cover committed-outcome and asynchronous metrics,
+P8-T03 adds bounded, failure-isolated Payment/Refund outcome and provider-latency
+metrics plus Idempotency decisions/committed reservations. Logical counters are
+after-commit, not financial truth or HTTP success accounting; rollback/replay
+does not inflate them. UNKNOWN semantics are preserved. No new dependency,
+schema, business state/API/event, lock or transaction boundary is introduced.
+
+The remaining 15 tasks cover asynchronous operational metrics,
 synchronous/durable tracing, monitoring/alerts, Webhook DNS/egress enforcement,
 auth/security review,
 CI/supply-chain gates, a constrained image, staged deployment, declared load and

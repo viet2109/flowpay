@@ -29,6 +29,7 @@ public class FinalizeRefundService {
     private final PaymentRefundApi paymentRefundApi;
     private final RefundIntegrationEventPublisher eventPublisher;
     private final Clock clock;
+    private final RefundMetrics metrics;
 
     @Transactional
     public FinalizedRefund finalizeRefund(FinalizeRefundCommand command) {
@@ -37,11 +38,15 @@ public class FinalizeRefundService {
                 command.merchantInternalId()
         ).orElseThrow(FinalizeRefundService::notFound);
         requireFinalizable(refund, command.providerResult());
+        boolean firstUnknownObservation = refund.failureCode() == null;
 
         Instant finalizedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
         applyOutcome(refund, command, finalizedAt);
         Refund saved = refundRepository.save(refund);
         publishTerminalRefund(saved, command.paymentPublicId(), finalizedAt);
+        if (command.providerResult().outcome() != RefundProviderOutcome.UNKNOWN || firstUnknownObservation) {
+            metrics.outcomeCommitted(command.providerResult().outcome());
+        }
         return toResult(saved, command.paymentPublicId());
     }
 

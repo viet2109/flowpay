@@ -1,6 +1,8 @@
 package com.flowpay.backend.refund.application;
 
 import com.flowpay.backend.common.money.Money;
+import com.flowpay.backend.common.observability.MetricsRecorder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.flowpay.backend.payment.application.PaymentRefundApi;
 import com.flowpay.backend.refund.application.event.RefundIntegrationEventPublisher;
 import com.flowpay.backend.refund.application.event.RefundFailedEventV1;
@@ -58,7 +60,8 @@ class FinalizeRefundServiceTest {
                 refundRepository,
                 paymentRefundApi,
                 eventPublisher,
-                Clock.fixed(FINALIZED_AT, ZoneOffset.UTC)
+                Clock.fixed(FINALIZED_AT, ZoneOffset.UTC),
+                new RefundMetrics(new MetricsRecorder(new SimpleMeterRegistry()))
         );
     }
 
