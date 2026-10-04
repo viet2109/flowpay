@@ -196,7 +196,7 @@ class OperationalMetricsIntegrationTest extends PostgresIntegrationTest {
     @EnumSource(IntegrationEventPublicationStatus.class)
     void shouldObserveTransportResultSeparatelyFromPersistedPublication(IntegrationEventPublicationStatus outcome) {
         outbox("relay", "PENDING", -1);
-        when(transport.publish(any())).thenReturn(IntegrationEventPublicationResult.of(outcome));
+        when(transport.publish(any(), any())).thenReturn(IntegrationEventPublicationResult.of(outcome));
         relay.relayDueEvents();
         assertThat(count("flowpay.outbox.publication.attempts", "outcome", outcome.name())).isEqualTo(1);
         assertThat(count("flowpay.outbox.published")).isEqualTo(outcome == IntegrationEventPublicationStatus.CONFIRMED ? 1 : 0);
@@ -207,7 +207,7 @@ class OperationalMetricsIntegrationTest extends PostgresIntegrationTest {
     @Test
     void shouldObserveRelayExceptionWithoutInventingPublication() {
         outbox("throwing", "PENDING", -1);
-        when(transport.publish(any())).thenThrow(new IllegalStateException("sensitive broker URL"));
+        when(transport.publish(any(), any())).thenThrow(new IllegalStateException("sensitive broker URL"));
         relay.relayDueEvents();
         assertThat(count("flowpay.outbox.publication.attempts", "outcome", "EXCEPTION")).isEqualTo(1);
         assertThat(count("flowpay.outbox.published")).isZero();
@@ -216,7 +216,7 @@ class OperationalMetricsIntegrationTest extends PostgresIntegrationTest {
     @Test
     void shouldNotCountConfirmedButRolledBackPublicationAsPublished() {
         outbox("relay_rollback", "PENDING", -1);
-        when(transport.publish(any())).thenReturn(IntegrationEventPublicationResult.of(IntegrationEventPublicationStatus.CONFIRMED));
+        when(transport.publish(any(), any())).thenReturn(IntegrationEventPublicationResult.of(IntegrationEventPublicationStatus.CONFIRMED));
         doAnswer(invocation -> { var result = invocation.callRealMethod(); rollbackBeforeCommit(); return result; })
                 .when(outboxRepository).markPublished(any(), any());
         relay.relayDueEvents();
@@ -229,7 +229,7 @@ class OperationalMetricsIntegrationTest extends PostgresIntegrationTest {
     void shouldKeepAllAsynchronousEffectsWhenRegistryCannotRecord() {
         RECORDING_UNAVAILABLE.set(true);
         outbox("telemetry_outage", "PENDING", -1);
-        when(transport.publish(any())).thenReturn(IntegrationEventPublicationResult.of(IntegrationEventPublicationStatus.CONFIRMED));
+        when(transport.publish(any(), any())).thenReturn(IntegrationEventPublicationResult.of(IntegrationEventPublicationStatus.CONFIRMED));
         relay.relayDueEvents();
         new TransactionTemplate(transactions).executeWithoutResult(tx -> ledger.postPaymentSucceeded(paymentCommand(100)));
         delivery("PENDING", -1);

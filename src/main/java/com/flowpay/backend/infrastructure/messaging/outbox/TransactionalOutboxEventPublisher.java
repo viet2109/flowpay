@@ -1,5 +1,6 @@
 package com.flowpay.backend.infrastructure.messaging.outbox;
 
+import com.flowpay.backend.infrastructure.messaging.trace.DurableTraceContext;
 import com.flowpay.backend.payment.application.event.PaymentIntegrationEventPublisher;
 import com.flowpay.backend.payment.application.event.PaymentSucceededEventV1;
 import com.flowpay.backend.payment.application.event.PaymentProcessingEventV1;
@@ -99,7 +100,8 @@ public class TransactionalOutboxEventPublisher
                 eventType,
                 serialize(payload),
                 occurredAt,
-                createdAt
+                createdAt,
+                DurableTraceContext.captureOrNull()
         ));
     }
 

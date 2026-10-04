@@ -504,6 +504,12 @@ entities or versions, or raw provider responses.
 
 ### BR-EVT-007 — Confirmed retryable publication
 
+Optional technical trace context is not an event fact or duplicate/contradiction
+criterion. P8-T06 persists source `traceparent` atomically with Outbox and reuses
+it on retry/restart as a Rabbit header only. Absent/invalid metadata is discarded
+without rejecting otherwise valid financial events. V1 JSON schemas and public
+Webhook body/signature/headers are unchanged; no baggage/tracestate is stored.
+
 An Outbox event becomes `PUBLISHED` only after a positive publisher confirm and
 successful routing. A negative acknowledgement, confirm timeout, broker error,
 or mandatory return leaves the event retryable. Concurrent relay publication

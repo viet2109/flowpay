@@ -518,6 +518,16 @@ payloads are:
 | `refund.processing.v1` | `REFUND` / refund public ID | Same scalar fields as refund success V1 |
 | `refund.failed.v1` | `REFUND` / refund public ID | Refund identity/Money/time fields plus normalized `failureCode`, `failureMessage` |
 
+P8-T06 stores optional source `traceparent` in the Outbox transaction (V012,
+nullable VARCHAR(55)), separately from all six payloads and the JSON envelope.
+Relay snapshots preserve it across retries/restarts; the publisher validates and
+adds only a Rabbit `traceparent` header. Legacy/invalid metadata is absent, never
+a business failure. No ambient relay-thread context is propagated or retained.
+No baggage/tracestate/request IDs, source-domain tracing dependencies, new
+transaction boundaries or changes to confirms/backoff/dedupe. T07 owns bounded
+publication/consumer/worker spans and parent/link policy; T06 adds no such spans
+and keeps the T05 exporter allow-list/zero-link limit unchanged.
+
 P7-T05 completes production source publication for all six types. Preparation
 persists processing events in the source transaction; known terminal failures
 persist failed events in finalization. UNKNOWN produces no terminal event.
@@ -980,7 +990,8 @@ DEBUG defaults are disabled. Policy and operational limits are documented in
 production-engineering.md. No second SDK, Java dependency, schema, payload,
 state, financial locking/transaction or authentication change is introduced.
 
-Durable Outbox/consumer/worker traces remain P8-T06-T07 work; monitoring,
+P8-T06 implements durable Outbox source-context propagation as described above;
+publication/consumer/worker spans remain P8-T07 work. Monitoring,
 dashboards and staging/performance evidence remain later separate gates.
 
 ## 18. Dependency policy
@@ -1005,10 +1016,10 @@ access. Diagnostic attempts/latency are distinct from committed outcomes.
 Metrics/traces/logs exclude secrets/bodies and unbounded identity labels, and
 collector/sampling failure cannot change financial outcomes.
 
-Durable W3C context is planned as validated nullable technical metadata under
-reviewed T06/T07 forward migrations, not a change to success V1, source facts or
-public signed Webhook bodies. Tracing preserves source/materialization/claim/
-HTTP/finalize boundaries and uses separate bounded consumer/attempt spans.
+P8-T06 implements validated nullable Outbox W3C metadata under reviewed V012,
+not a change to success V1, source facts or public signed Webhook bodies.
+T07 still owns reviewed Webhook storage and bounded asynchronous span relations.
+Source/materialization/claim/HTTP/finalize transaction boundaries are preserved.
 
 T02 implements a prod-only dedicated management listener (loopback:9091 by
 default) with local-connector-port authorization. Only internal GET/HEAD health,

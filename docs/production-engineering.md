@@ -1,8 +1,8 @@
 # Production Engineering — Phase 8 Design Record
 
 Status: P8-T01 design/exit baseline, P8-T02 configuration/management, P8-T03
-business metrics, P8-T04 asynchronous operational metrics and P8-T05 synchronous
-HTTP/provider/Webhook tracing implemented on
+business metrics, P8-T04 asynchronous operational metrics, P8-T05 synchronous
+HTTP/provider/Webhook tracing and P8-T06 durable Outbox trace metadata implemented on
 2026-10-04; Phase 8 IN PROGRESS. Remaining
 runtime/operational controls are owned by subsequent tasks. Phase 7 remains
 DONE/FROZEN; the simulator functional MVP remains complete.
@@ -44,7 +44,7 @@ documentation-only preparation does not require repeating an unchanged suite.
 | Area | Existing implementation | Phase 8 owner and required evidence |
 |---|---|---|
 | Financial consistency | Source TX + Outbox, Idempotency, reserved refund capacity, append-only balanced unique Ledger | All tasks preserve it; T14-T16/T18 recheck invariants |
-| Source events | Six processing/success/known-failure facts; success V1 preserved; UNKNOWN non-terminal | T06-T07 add technical trace correlation, not business fields |
+| Source events | Six processing/success/known-failure facts; success V1 preserved; UNKNOWN non-terminal; T06 durable source traceparent | T07 adds asynchronous span relations, not business fields |
 | Webhook delivery | Immutable event/subscription snapshot; claim/OPEN/lease; exact-body signed no-TX HTTP; fenced finalize; jitter/DEAD/manual retry | T04/T07/T09/T14-T16 operational evidence |
 | Observability foundation | Actuator/Prometheus/OpenTelemetry foundation, request MDC; T03 business metrics; T04 cached shared DB backlogs/ages and Outbox/Ledger/Webhook attempt/commit observations | T05-T08 own tracing and monitoring deployment; T14/T15 measure operational overhead |
 | Management security | T02: dedicated loopback-by-default listener; internal scrape allowed, public Actuator denied | T13 must prove private staging network/ingress enforcement |
@@ -329,9 +329,33 @@ ciphertext, signatures, sensitive exception text or unbounded user attributes.
 In-memory test exporters verify context isolation and sensitive-data exclusion.
 Collector outage must not fail a business operation.
 
-For restart-stable asynchronous causality, T06 reviews bounded nullable W3C
-trace-context fields owned by Outbox and writes them atomically with the source
-transaction. T07 reviews equivalent Webhook-owned technical storage if needed
+### Durable Outbox metadata decision (T06, reviewed before DDL)
+
+At the T06 design review the next unused migration was V012. It adds exactly
+`outbox_events.traceparent VARCHAR(55) NULL`, with no default, backfill, index or
+new business constraint. Existing V001-V011 checksums remain unchanged. Older
+writers omit the column and existing rows remain NULL; older readers ignore it.
+Length is bounded in PostgreSQL; format validation is fail-open in infrastructure
+on capture, rehydration and Rabbit publication, not a constraint that can reject
+an otherwise valid financial event. Noncanonical/malformed values become absent.
+
+Accept only canonical lowercase W3C version 00 with nonzero 32-hex trace ID,
+nonzero 16-hex span ID and flags 00/01. Persist the active source span identity
+including unsampled context in the same transaction as the Outbox insert; no
+active valid span means NULL. Never persist tracestate, baggage or request IDs.
+Tracing capture failures are ignored without logging input/exception content.
+
+Relay snapshots carry this technical value separately from the unchanged JSON
+envelope/payload. The confirmed publisher adds only a validated `traceparent`
+Rabbit header. Retry/restart reuse the stored source parent, not the ambient
+scheduler/thread context. T06 does not activate a scope or create publication
+spans, so there is no retained thread context or exporter-policy expansion.
+T07 owns per-publication/consumer/worker spans and their parent/link decisions.
+Trace metadata is not a business contradiction/dedupe fact and never enters
+the public Webhook body/signature/headers. Delivery/confirm/backoff/TX behavior
+remains unchanged, including when metadata is missing or corrupted.
+
+T07 reviews equivalent Webhook-owned technical storage if needed
 for delayed workers. These are separate additive forward migrations using the
 next actually unused versions, not reserved version numbers. Review concrete
 DDL, compatibility, validation and test coverage before applying them; never
@@ -339,14 +363,14 @@ edit V001-V011 or add trace fields to business payloads/public signed JSON.
 
 Rabbit transport headers carry validated optional context. Legacy/absent/bad
 context must not poison valid business processing or alter contradiction/dedupe
-facts. Producer, consumer, redelivery and worker attempts get bounded spans and
+facts. T07 will add bounded producer, consumer, redelivery and worker spans and
 explicit causal links/parent relationships; do not hold a request span or DB
 transaction open for retry delays. Clear context on reused threads. Outbound
 merchant Webhooks do not inherit internal tracing headers without an explicit
 separate contract review.
 
 This is FlowPay's design choice for the durable boundary. Header validation and
-span relationships are implemented against [W3C Trace Context](https://www.w3.org/TR/trace-context/)
+planned span relationships follow [W3C Trace Context](https://www.w3.org/TR/trace-context/)
 and the [OpenTelemetry messaging conventions](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/).
 Importing those specifications does not upgrade Java dependencies automatically.
 
@@ -376,9 +400,40 @@ pass. Compilation and diff/static checks pass; no format plugin is configured.
 No API, persistence, financial state/event, transaction/locking/retry change or
 external deployment. Sampling/queue loss and suppressed exporter diagnostics
 are documented limitations, not durable accounting or operational monitoring.
-T06/T07 durable causality and staging/load/collector deployment remain unstarted.
+At that checkpoint T06/T07 durable causality and staging/load/collector deployment were unstarted.
 Only documentation was finalized after the unchanged successful full gate;
 phase/index remain local-only and task commit is not pushed.
+
+### T06 verification checkpoint (2026-10-04)
+
+Final focused gates: 21 validation/migration/concurrent Rabbit cases in three
+classes (46.7s), plus 27 metrics/Ledger regression cases in two classes (51.7s),
+zero failures/errors/skips. Earlier broad 128-case coverage verified restart,
+rollback, HTTP source capture, consumer compatibility and architecture; fixture
+errors were corrected in the final focused gates. The first full run caught
+older one-argument mock stubs and V011-only schema expectations; assertions
+were retained and updated for the new transport signature/additive V012.
+The final full `clean verify` passed 1,331 tests in 187 suites, zero failures/
+errors/skips, 6m45s, and packaged `backend-0.0.1-SNAPSHOT.jar`.
+
+JDK21.0.12/Maven3.9.16, Boot4.1.0, owned PostgreSQL16.15/RabbitMQ4.3
+Testcontainers. Optional default OTLP metrics export was disabled; explicit
+owned exporter-outage fixtures ran, and no required DB/broker tests were skipped.
+Coverage includes fresh/upgrade and V001-V011 checksum/legacy-row preservation,
+nullable/bounded metadata, source rollback, malformed/absent/sample flags,
+16 source operations on four reused threads, 16 concurrent broker publications,
+actual application close/restart, lost-confirm retry with identical bytes and
+durable source headers despite unrelated ambient context, equal old/enriched
+delivery and unchanged Ledger/Webhook effects. Compilation/ArchUnit/transaction
+checks and diff/static checks pass; no format plugin is configured.
+
+Only nullable technical storage and optional internal transport metadata changed;
+no dependency, business API/V1 schema, state/locking/TX/retry or merchant HTTP
+change. T05 export policy is unchanged; T07 publication/consumer/worker spans
+and staging/collector/load evidence remain pending. Only documentation finalized
+after the successful gate, so the unchanged full suite is not repeated. This
+task is committed locally on the phase branch, not pushed; phase/index remain
+local-only and `.env`/`.github/` are preserved.
 
 ## 6. Production configuration and management (T02)
 

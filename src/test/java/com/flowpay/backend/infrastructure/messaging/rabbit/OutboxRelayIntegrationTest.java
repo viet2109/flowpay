@@ -469,7 +469,8 @@ class OutboxRelayIntegrationTest extends PostgresIntegrationTest {
 
         @Override
         public IntegrationEventPublicationResult publish(
-                IntegrationEventEnvelope envelope
+                IntegrationEventEnvelope envelope,
+                String traceparent
         ) {
             eventIds.add(envelope.eventId());
             transactionStates.add(
@@ -480,7 +481,7 @@ class OutboxRelayIntegrationTest extends PostgresIntegrationTest {
                         "amqp://admin:password@broker/vhost\nAuthorization: secret"
                 );
             }
-            IntegrationEventPublicationResult result = delegate.publish(envelope);
+            IntegrationEventPublicationResult result = delegate.publish(envelope, traceparent);
             if (result.confirmed()
                     && envelope.eventId().equals(ambiguousEventId.get())
                     && ambiguousResultsRemaining.getAndUpdate(value -> Math.max(0, value - 1))

@@ -215,10 +215,20 @@ class HttpTracingIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void realFinancialServicesCreateClientChildrenWithoutTransactionOrReplaySideEffects() throws Exception {
+        long previousId = jdbc.queryForObject("SELECT COALESCE(MAX(id), 0) FROM outbox_events", Long.class);
         var response = request("financial", "financial-request", parent(true));
         assertThat(response.statusCode()).isEqualTo(200);
         flush();
         var server = captured.spans().stream().filter(span -> span.getKind() == SpanKind.SERVER).findFirst().orElseThrow();
+        assertThat(jdbc.queryForList("SELECT traceparent FROM outbox_events WHERE id > ? AND aggregate_id IN "
+                + "(SELECT public_id FROM payment_intents WHERE merchant_id = "
+                + "(SELECT id FROM merchants WHERE public_id = 'mrc_tracing_fixture'))", String.class, previousId))
+                .hasSize(2).allSatisfy(parent -> {
+                    assertThat(parent).startsWith("00-" + server.getTraceId() + "-").endsWith("-01");
+                    String spanId = parent.substring(36, 52);
+                    assertThat(spanId.equals(server.getSpanId()) || captured.spans().stream().anyMatch(span ->
+                            span.getSpanId().equals(spanId) && hasAncestor(span, server.getSpanId()))).isTrue();
+                });
         assertThat(captured.spans()).filteredOn(span -> span.getKind() == SpanKind.CLIENT).hasSize(2)
                 .allSatisfy(span -> {
                     assertThat(span.getName()).isIn("payment.provider", "refund.provider");

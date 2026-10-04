@@ -297,8 +297,9 @@ Status: `IN PROGRESS` as of 2026-10-04.
 
 Completed: P8-T01 baseline/design, P8-T02 production configuration, health and
 management security, P8-T03 Payment/Refund/Idempotency metrics, P8-T04
-Outbox/Ledger/Webhook operational metrics and P8-T05 synchronous tracing.
-Next: P8-T06 (not started).
+Outbox/Ledger/Webhook operational metrics, P8-T05 synchronous tracing and
+P8-T06 durable Outbox trace context.
+Next: P8-T07 (not started).
 
 The user selected staging Linux/container with no provider/external deployment.
 Phase 7 source `d348b10` was pushed and merged into remote main at `0b96400`;
@@ -319,7 +320,7 @@ phase branch before completion unless explicitly requested. Existing untracked
 | P8-T03 | Payment, Refund and Idempotency Metrics | P8-T01, P8-T02 | DONE |
 | P8-T04 | Outbox, Ledger and Webhook Operational Metrics | P8-T03 | DONE |
 | P8-T05 | HTTP Tracing and Safe Log Correlation | P8-T02 | DONE |
-| P8-T06 | Durable Outbox Trace Context | P8-T01, P8-T05 | PLANNED |
+| P8-T06 | Durable Outbox Trace Context | P8-T01, P8-T05 | DONE |
 | P8-T07 | Consumer and Webhook Worker Tracing | P8-T06 | PLANNED |
 | P8-T08 | Monitoring Stack, Dashboards and Alerts | P8-T02, P8-T03, P8-T04, P8-T05, P8-T06, P8-T07 | PLANNED |
 | P8-T09 | Webhook SSRF, DNS-Rebinding and Egress Protection | P8-T01, P8-T02 | PLANNED |
@@ -434,8 +435,32 @@ missing collector, Webhook body/header preservation, security/TX regressions.
 No dependency/schema/API/event/state/lock/TX/retry change or deployment.
 Only documentation finalized after that gate; ignored phase/index corrections
 stay local, .env/.github preserved. Commit stays local on the existing phase
-branch. P8-T06 durable Outbox tracing is next and unstarted; no end-to-end
+branch. At the T05 checkpoint P8-T06 was next and unstarted; no end-to-end
 async tracing, collector/staging/performance acceptance claimed.
+
+### T06 completion evidence (2026-10-04)
+
+Reviewed V012 adds `outbox_events.traceparent VARCHAR(55) NULL` only, no
+backfill/default/index/business constraint; V001-V011 unchanged. Infrastructure
+captures valid source identity/sample flags in the existing source TX, drops
+absent/bad context fail-open and carries it through persisted snapshots/retries
+as a Rabbit header only. Serialized V1 payload/envelope bytes, business dedupe,
+confirm/backoff/TX behavior and public signed Webhook HTTP remain unchanged.
+No ambient relay context, baggage/tracestate persistence, new dependency or
+export policy/span expansion. T07 owns publication/consumer/worker tracing.
+
+Final focused gates: 21 tests/three classes (46.7s) and 27 metrics/Ledger tests/
+two classes (51.7s), zero failures/errors/skips. Earlier 128-case broad run and
+first full run exposed test fixture/mock-signature/schema expectations, corrected
+without weakening business assertions. Final clean verify: 1,331 tests/187
+suites, zero failures/errors/skips, 6m45s, Java21.0.12/Maven3.9.16, packaged JAR.
+All required owned PostgreSQL/RabbitMQ suites ran, including actual app restart,
+source rollback, 16 operations/four reused threads, old/enriched duplicates and
+concurrent Rabbit confirms/headers. Compilation/architecture/transaction/static
+checks pass. No deployment, business state/locking or retry-budget change.
+Tracked docs synchronized; local phase/index corrected and unstaged. `.env`/
+`.github/` preserved. Commit stays local on the phase branch; no push/merge.
+P8-T07 is next, not started; Phase 8 is not complete.
 
 ## Agent task template
 

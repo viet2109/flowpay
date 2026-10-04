@@ -102,7 +102,8 @@ class WebhookIntegrationEventConsumerIntegrationTest extends PostgresIntegration
         for (var type : WebhookEventType.values()) {
             var event = envelope(type, 10000);
             assertThat(publisher.publish(event).confirmed()).isTrue();
-            assertThat(publisher.publish(event).confirmed()).isTrue();
+            assertThat(publisher.publish(event,
+                    "00-" + "a".repeat(32) + "-" + "b".repeat(16) + "-01").confirmed()).isTrue();
         }
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
             assertThat(count("webhook_events")).isEqualTo(6);
@@ -115,7 +116,8 @@ class WebhookIntegrationEventConsumerIntegrationTest extends PostgresIntegration
         for (var type : WebhookEventType.values()) {
             var saved = events.findBySourceEventId("ievt_" + type.name()).orElseThrow();
             assertThat(saved.occurredAt()).isEqualTo(OCCURRED);
-            assertThat(saved.payload()).doesNotContain("merchantInternalId", "orderId", "ievt_");
+            assertThat(saved.payload()).doesNotContain("merchantInternalId", "orderId", "ievt_",
+                    "traceparent", "tracestate", "baggage");
         }
         assertThat(queueSize(webhook.topology().webhookDeadLetterQueue())).isZero();
         assertThat(queueSize(messaging.topology().ledgerDeadLetterQueue())).isZero();

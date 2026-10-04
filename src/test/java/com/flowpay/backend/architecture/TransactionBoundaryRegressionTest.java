@@ -178,7 +178,8 @@ class TransactionBoundaryRegressionTest {
         assertNotTransactional(
                 ConfirmedRabbitIntegrationEventPublisher.class,
                 "publish",
-                IntegrationEventEnvelope.class
+                IntegrationEventEnvelope.class,
+                String.class
         );
     }
 
@@ -234,9 +235,9 @@ class TransactionBoundaryRegressionTest {
     private static void assertNotTransactional(
             Class<?> type,
             String methodName,
-            Class<?> parameterType
+            Class<?>... parameterTypes
     ) throws NoSuchMethodException {
-        Method method = type.getDeclaredMethod(methodName, parameterType);
+        Method method = type.getDeclaredMethod(methodName, parameterTypes);
         assertThat(type.getAnnotation(Transactional.class))
                 .as("%s class-level transaction", type.getSimpleName())
                 .isNull();

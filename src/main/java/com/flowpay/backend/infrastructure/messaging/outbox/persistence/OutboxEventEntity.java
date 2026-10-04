@@ -68,4 +68,7 @@ class OutboxEventEntity {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "traceparent", length = 55, updatable = false)
+    private String traceparent;
 }

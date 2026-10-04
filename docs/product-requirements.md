@@ -214,8 +214,9 @@ these boundaries. Phase 6 remains DONE/FROZEN; Phase 8 hardening is not included
 ### Phase 8 — Production engineering
 
 Status: `IN PROGRESS` as of 2026-10-04; P8-T01 baseline/design, P8-T02
-production configuration/management, P8-T03 business metrics and P8-T04
-asynchronous operational metrics complete.
+production configuration/management, P8-T03 business metrics, P8-T04
+asynchronous operational metrics, P8-T05 synchronous tracing and P8-T06 durable
+Outbox trace context complete.
 
 Target selected by the user: reproducible staging on Linux/container, without
 a chosen provider or external deployment. The Phase 7 release is merged into
@@ -246,7 +247,14 @@ Collector failure does not change financial results, and signed merchant HTTP
 does not receive internal context headers. Root sampling and opt-in export are
 explicit. No dependency, schema, payload or financial transaction change.
 
-The remaining 13 tasks cover durable tracing, monitoring/alerts, Webhook DNS/egress enforcement,
+P8-T06 adds reviewed nullable technical Outbox metadata (V012) and validated
+source traceparent propagation in Rabbit headers across retry/restart. Legacy/
+malformed context is ignored; no baggage/tracestate, V1 payload/public Webhook
+change, dependency or financial TX/locking/retry change. Full clean verify
+passes 1,331 tests/187 suites with zero failures/errors/skips. Publication,
+consumer and delayed-worker spans still belong to T07, not this task.
+
+The remaining 12 tasks cover asynchronous tracing, monitoring/alerts, Webhook DNS/egress enforcement,
 auth/security review,
 CI/supply-chain gates, a constrained image, staged deployment, declared load and
 multi-instance failure drills, actual DB/broker/key restore and runbooks.

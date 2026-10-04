@@ -5,6 +5,7 @@ import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationR
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationStatus;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventTransportPublisher;
 import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvelope;
+import com.flowpay.backend.infrastructure.messaging.trace.DurableTraceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;
@@ -38,12 +39,15 @@ public class ConfirmedRabbitIntegrationEventPublisher
     private final FlowPayMessagingProperties properties;
 
     @Override
-    public IntegrationEventPublicationResult publish(IntegrationEventEnvelope envelope) {
+    public IntegrationEventPublicationResult publish(
+            IntegrationEventEnvelope envelope,
+            String traceparent
+    ) {
         IntegrationEventEnvelope event = Objects.requireNonNull(
                 envelope,
                 "envelope must not be null"
         );
-        Message message = toMessage(event);
+        Message message = toMessage(event, traceparent);
         CorrelationData correlation = new CorrelationData(event.eventId());
         try {
             rabbitTemplate.send(
@@ -76,7 +80,7 @@ public class ConfirmedRabbitIntegrationEventPublisher
         return correlation.getFuture().get(timeout.toNanos(), TimeUnit.NANOSECONDS);
     }
 
-    private Message toMessage(IntegrationEventEnvelope envelope) {
+    private Message toMessage(IntegrationEventEnvelope envelope, String traceparent) {
         MessageProperties messageProperties = new MessageProperties();
         messageProperties.setDeliveryMode(MessageDeliveryMode.PERSISTENT);
         messageProperties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
@@ -85,6 +89,10 @@ public class ConfirmedRabbitIntegrationEventPublisher
         messageProperties.setHeader(EVENT_TYPE_HEADER, envelope.eventType());
         messageProperties.setHeader(AGGREGATE_TYPE_HEADER, envelope.aggregateType());
         messageProperties.setHeader(AGGREGATE_ID_HEADER, envelope.aggregateId());
+        String validated = DurableTraceContext.validatedOrNull(traceparent);
+        if (validated != null) {
+            messageProperties.setHeader("traceparent", validated);
+        }
         try {
             return new Message(
                     objectMapper.writeValueAsBytes(envelope),

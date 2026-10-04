@@ -59,7 +59,9 @@ public class OutboxRelayService {
     private PublicationAttempt publish(OutboxRelaySnapshot snapshot) {
         try {
             IntegrationEventEnvelope envelope = envelopeMapper.from(snapshot);
-            IntegrationEventPublicationResult result = transportPublisher.publish(envelope);
+            IntegrationEventPublicationResult result = transportPublisher.publish(
+                    envelope, snapshot.traceparent()
+            );
             metrics.attempt(result.status());
             if (result.confirmed()) {
                 return PublicationAttempt.success();

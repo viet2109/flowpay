@@ -9,6 +9,11 @@ import com.flowpay.backend.refund.application.event.RefundSucceededEventV1;
 import com.flowpay.backend.refund.application.event.RefundProcessingEventV1;
 import com.flowpay.backend.refund.application.event.RefundFailedEventV1;
 import com.flowpay.backend.testing.PostgresIntegrationTest;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
+import io.opentelemetry.api.trace.TraceFlags;
+import io.opentelemetry.api.trace.TraceState;
+import io.opentelemetry.context.Scope;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +38,9 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -98,6 +106,7 @@ class TransactionalOutboxEventPublisherIntegrationTest extends PostgresIntegrati
         assertThat(event.publishedAt()).isNull();
         assertThat(event.retryCount()).isZero();
         assertThat(event.lastError()).isNull();
+        assertThat(event.traceparent()).isNull();
 
         JsonNode payload = objectMapper.readTree(event.payload());
         assertThat(payload).isEqualTo(objectMapper.readTree("""
@@ -189,6 +198,50 @@ class TransactionalOutboxEventPublisherIntegrationTest extends PostgresIntegrati
     }
 
     @Test
+    void shouldCaptureSourceContextAndIgnoreCorruptedStoredMetadata() {
+        String parent = "00-" + "a".repeat(32) + "-" + "b".repeat(16) + "-01";
+        try (Scope ignored = sourceSpan(1).makeCurrent()) {
+            inTransaction(() -> paymentPublisher.publish(paymentEvent("pi_traced_source")));
+        }
+        OutboxEvent source = singleDueEvent(CREATED_AT);
+        assertThat(source.traceparent()).isEqualTo(parent);
+        jdbcTemplate.update("UPDATE outbox_events SET traceparent = 'malformed' WHERE event_id = ?",
+                source.eventId());
+        assertThat(singleDueEvent(CREATED_AT).traceparent()).isNull();
+        assertThat(Span.current().getSpanContext().isValid()).isFalse();
+    }
+
+    @Test
+    void shouldKeepConcurrentSourceContextsIsolatedOnReusedThreads() throws Exception {
+        try (var callers = Executors.newFixedThreadPool(4)) {
+            var futures = IntStream.rangeClosed(1, 16).mapToObj(index -> callers.submit(() -> {
+                try (Scope ignored = sourceSpan(index).makeCurrent()) {
+                    inTransaction(() -> paymentPublisher.publish(paymentEvent("pi_trace_" + index)));
+                }
+                assertThat(Span.current().getSpanContext().isValid()).isFalse();
+                return index;
+            })).toList();
+            for (var future : futures) future.get(15, TimeUnit.SECONDS);
+        }
+        List<OutboxEvent> events = outboxRepository.findDueUnpublished(CREATED_AT, 20);
+        assertThat(events).hasSize(16).allSatisfy(event -> {
+            int index = Integer.parseInt(event.aggregateId().substring("pi_trace_".length()));
+            SpanContext expected = sourceSpan(index).getSpanContext();
+            assertThat(event.traceparent()).isEqualTo("00-" + expected.getTraceId() + "-"
+                    + expected.getSpanId() + (expected.isSampled() ? "-01" : "-00"));
+            assertThat(event.payload()).doesNotContain("traceparent", "tracestate", "baggage");
+        });
+    }
+
+    private static Span sourceSpan(int index) {
+        return Span.wrap(SpanContext.create(
+                index == 1 ? "a".repeat(32) : String.format("%032x", index),
+                "b".repeat(16),
+                index % 2 == 1 ? TraceFlags.getSampled() : TraceFlags.getDefault(),
+                TraceState.getDefault()));
+    }
+
+    @Test
     void shouldRollBackSourceMutationAndOutboxInsertTogether() {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
 
@@ -200,7 +253,11 @@ class TransactionalOutboxEventPublisherIntegrationTest extends PostgresIntegrati
                     SOURCE_MARKER,
                     CREATED_AT.atOffset(ZoneOffset.UTC),
                     CREATED_AT.atOffset(ZoneOffset.UTC));
-            paymentPublisher.publish(paymentEvent("pi_rollback"));
+            try (Scope ignored = sourceSpan(1).makeCurrent()) {
+                paymentPublisher.publish(paymentEvent("pi_rollback"));
+                assertThat(jdbcTemplate.queryForObject("SELECT traceparent FROM outbox_events",
+                        String.class)).isEqualTo("00-" + "a".repeat(32) + "-" + "b".repeat(16) + "-01");
+            }
             throw new ForcedSourceRollbackException();
         })).isInstanceOf(ForcedSourceRollbackException.class);
 

@@ -492,6 +492,7 @@ published_at        TIMESTAMPTZ NULL
 retry_count         INTEGER NOT NULL DEFAULT 0
 last_error          TEXT NULL
 created_at          TIMESTAMPTZ NOT NULL
+traceparent         VARCHAR(55) NULL
 ```
 
 Status:
@@ -517,6 +518,14 @@ CHECK (
 `event_id`; `PUBLISHED` is terminal for normal relay selection. Aggregate IDs
 are source public IDs and have no polymorphic foreign key. V009 creates no
 historical Payment, Refund, or Ledger backfill rows.
+
+P8-T06 / V012 adds nullable `traceparent` only; no default, backfill, index,
+business constraint or modification to V001-V011. Legacy inserts omit it.
+Infrastructure accepts canonical W3C version 00, nonzero trace/span IDs and
+flags 00/01; absent/malformed stored values are ignored without failing events.
+Capture shares the source transaction; publication/failure updates preserve it.
+No tracestate/baggage/request ID is stored. It is transport metadata, not part
+of payload JSON, business identity, dedupe or the signed public Webhook body.
 
 Worker index:
 
@@ -770,6 +779,12 @@ Phase 7:
 ```text
 V010__webhook_configuration.sql
 V011__webhook_delivery.sql
+```
+
+Phase 8:
+
+```text
+V012__outbox_trace_context.sql
 ```
 
 Migration numbering may be extended, but an already-applied shared migration is never edited to retrofit a later design change.

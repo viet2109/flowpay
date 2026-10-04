@@ -1,6 +1,7 @@
 package com.flowpay.backend.infrastructure.messaging.outbox.relay;
 
 import com.flowpay.backend.infrastructure.messaging.outbox.OutboxEvent;
+import com.flowpay.backend.infrastructure.messaging.trace.DurableTraceContext;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -12,10 +13,12 @@ public record OutboxRelaySnapshot(
         String eventType,
         String payload,
         Instant occurredAt,
-        int retryCount
+        int retryCount,
+        String traceparent
 ) {
 
     public OutboxRelaySnapshot {
+        traceparent = DurableTraceContext.validatedOrNull(traceparent);
         eventId = requireText(eventId, "eventId");
         aggregateType = requireText(aggregateType, "aggregateType");
         aggregateId = requireText(aggregateId, "aggregateId");
@@ -36,7 +39,8 @@ public record OutboxRelaySnapshot(
                 source.eventType(),
                 source.payload(),
                 source.occurredAt(),
-                source.retryCount()
+                source.retryCount(),
+                source.traceparent()
         );
     }
 

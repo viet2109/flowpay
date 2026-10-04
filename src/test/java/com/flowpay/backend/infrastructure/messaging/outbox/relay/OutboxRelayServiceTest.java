@@ -65,7 +65,7 @@ class OutboxRelayServiceTest {
                 "amqp://user:password@broker\nAuthorization: secret"
         ));
         when(envelopeMapper.from(succeeding)).thenReturn(envelope);
-        when(transportPublisher.publish(envelope)).thenReturn(
+        when(transportPublisher.publish(envelope, null)).thenReturn(
                 IntegrationEventPublicationResult.of(
                         IntegrationEventPublicationStatus.CONFIRMED
                 )
@@ -92,7 +92,8 @@ class OutboxRelayServiceTest {
                 "payment.succeeded.v1",
                 "{\"occurredAt\":\"2026-09-02T05:00:00Z\"}",
                 Instant.parse("2026-09-02T05:00:00Z"),
-                retryCount
+                retryCount,
+                null
         );
     }
 

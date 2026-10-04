@@ -10,7 +10,8 @@ Phases 0–7 are complete; Phase 7 Webhooks is DONE/FROZEN as of 2026-10-04 afte
 its clean quality gate. The functional simulator MVP is complete. Phase 8
 production engineering has completed P8-T01's baseline/design, P8-T02's
 production configuration/management/probes, P8-T03's business metrics and
-P8-T04's asynchronous operational metrics and P8-T05's synchronous tracing.
+P8-T04's asynchronous operational metrics, P8-T05's synchronous tracing and
+P8-T06's durable Outbox trace context.
 Remaining hardening
 and staging tasks are pending.
 
@@ -168,8 +169,13 @@ not a rate-limit control. Unsampled IDs still correlate logs but have no exporte
 trace. Export is asynchronous/bounded and may drop spans on outage/overflow;
 no financial result depends on it. Keep request/SQL/transport DEBUG logging off.
 See the [tracing privacy/configuration policy](docs/production-engineering.md#synchronous-tracing-policy-t05).
-Durable Outbox/consumer/worker causality remains P8-T06/T07; this is not yet
-end-to-end asynchronous tracing or deployed collector evidence.
+P8-T06 persists validated optional source `traceparent` atomically with Outbox
+(V012, nullable VARCHAR(55)). Retry/restart retain it as a Rabbit header only,
+not JSON event fields or merchant HTTP headers. Missing/invalid metadata does
+not block valid business events; no baggage/tracestate is persisted. The relay
+never substitutes ambient scheduler context. P8-T07 still owns publication,
+consumer and delayed-worker spans; this is not yet end-to-end asynchronous
+tracing or deployed collector evidence.
 
 ## Verification
 
@@ -212,6 +218,13 @@ isolation, sampling/malformed context, sensitive-data exclusion in spans/logs,
 real financial work during exporter outage, and Webhook body/header preservation.
 PostgreSQL/RabbitMQ suites ran; no deployed collector/staging claim.
 
+P8-T06 final focused gates passed 21 trace/migration/concurrent Rabbit tests
+and 27 metrics/Ledger regressions after correcting old fixtures. Full clean
+verify: 1,331 tests/187 suites, zero failures/errors/skips, 6m45s. Includes actual
+application restart, rollback, sampled/unsampled/absent/bad context, concurrent
+isolation, byte-identical retried envelopes and old/enriched consumer duplicates.
+V001-V011 remain unchanged; V012 adds optional technical Outbox metadata only.
+
 For a clean infrastructure smoke check, use a dedicated disposable Compose
 project with separate container names, volumes, and ports. The checked-in
 Compose file pins development container names, so `-p` alone is not isolation.
@@ -237,8 +250,9 @@ Phase 8 targets reproducible Linux/container staging; no provider, cloud account
 or external deployment has been selected. P8-T01 verifies the merged Phase 7
 baseline; P8-T02 implements production startup and management/probe controls;
 P8-T03 adds Payment/Refund/Idempotency metrics; P8-T04 adds asynchronous operational
-metrics; P8-T05 adds synchronous HTTP/provider/Webhook tracing.
-Stronger egress/DNS-rebinding controls, durable tracing, load testing,
+metrics; P8-T05 adds synchronous HTTP/provider/Webhook tracing and P8-T06
+adds durable Outbox source context. P8-T07 asynchronous spans,
+stronger egress/DNS-rebinding controls, load testing,
 security/dependency review,
 packaging/staging, backup/recovery, and runbooks are still pending implementation.
 The functional simulator MVP is not a claim of
