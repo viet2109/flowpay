@@ -293,20 +293,50 @@ acceptance criteria, and the mandatory implementation order.
 
 ## Phase 8 — Production Engineering
 
-Status: `NOT STARTED`. Begin only on an explicit follow-up assignment.
+Status: `IN PROGRESS` as of 2026-10-04.
 
-Post-functional-MVP hardening:
+Completed: P8-T01 Phase 7 exit gate and production-engineering design freeze.
 
-- richer domain metrics.
-- tracing propagation.
-- dashboards.
-- load tests.
-- security review.
-- dependency/security scanning.
-- production Docker image.
-- deployment.
-- backup/recovery documentation.
-- operational runbook.
+The user selected staging Linux/container with no provider/external deployment.
+Phase 7 source `d348b10` was pushed and merged into remote main at `0b96400`;
+the merge and initial phase branch match the tested tree. A fresh JDK21/Maven
+3.9.16 `clean verify` passed 1,173 tests in 171 suites with zero failures/errors/
+skips. Selected regressions ran inside that full gate, not a separate focused
+command. Only documentation changes in P8-T01, so an unchanged full suite is
+not repeated for the final documentation commit.
+
+Work continues on `feature/phase-8-production-engineering`. Do not push the
+phase branch before completion unless explicitly requested. Existing untracked
+`.env` and `.github/` remain user-owned and excluded from this task.
+
+| Task | Name | Depends on | Status |
+|---|---|---|---|
+| P8-T01 | Phase 7 Exit Gate and Production Engineering Freeze | Phase 7 DONE/FROZEN and merged | DONE |
+| P8-T02 | Production Configuration, Health and Management Security | P8-T01 | PLANNED |
+| P8-T03 | Payment, Refund and Idempotency Metrics | P8-T01, P8-T02 | PLANNED |
+| P8-T04 | Outbox, Ledger and Webhook Operational Metrics | P8-T03 | PLANNED |
+| P8-T05 | HTTP Tracing and Safe Log Correlation | P8-T02 | PLANNED |
+| P8-T06 | Durable Outbox Trace Context | P8-T01, P8-T05 | PLANNED |
+| P8-T07 | Consumer and Webhook Worker Tracing | P8-T06 | PLANNED |
+| P8-T08 | Monitoring Stack, Dashboards and Alerts | P8-T02, P8-T03, P8-T04, P8-T05, P8-T06, P8-T07 | PLANNED |
+| P8-T09 | Webhook SSRF, DNS-Rebinding and Egress Protection | P8-T01, P8-T02 | PLANNED |
+| P8-T10 | API and Authentication Security Review | P8-T01, P8-T02 | PLANNED |
+| P8-T11 | CI Verification and Supply-Chain Gates | P8-T01, P8-T10 | PLANNED |
+| P8-T12 | Production Container Image | P8-T02, P8-T11 | PLANNED |
+| P8-T13 | Isolated Linux Staging Deployment | P8-T08, P8-T09, P8-T10, P8-T11, P8-T12 | PLANNED |
+| P8-T14 | Load, Stress and Soak Verification | P8-T13 | PLANNED |
+| P8-T15 | Multi-Instance and Operational Failure Drills | P8-T13, P8-T14 | PLANNED |
+| P8-T16 | Backup, Restore and Disaster-Recovery Drill | P8-T13, P8-T15 | PLANNED |
+| P8-T17 | Operational Runbooks and Release Checklist | P8-T08, P8-T13, P8-T14, P8-T15, P8-T16 | PLANNED |
+| P8-T18 | Production Engineering Quality Gate and Documentation Freeze | P8-T01 through P8-T17 | PLANNED |
+
+See the tracked [production-engineering design record](production-engineering.md)
+for frozen scope and implementation gates, and the local
+`phase-8-production-engineering.md` plan for complete assignment requirements.
+Runtime controls, concrete proxy/tool versions, technical trace migrations and
+numeric performance/recovery acceptance are owned by their tasks; preparation
+does not claim they are already implemented or measured. No financial/API/event
+schema/locking change or external provisioning is introduced by P8-T01.
 
 ## Agent task template
 

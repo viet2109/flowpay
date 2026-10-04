@@ -897,8 +897,9 @@ migration verification; Compose health alone does not verify schema/application
 behavior. Only the disposable gate project's resources are eligible for cleanup.
 
 The gate does not claim exactly-once HTTP, ordered delivery, real-money
-processing, or production readiness. Phase 8 network/operations/security/load
-hardening remains unstarted and requires a separate assignment.
+processing, or production readiness. At that gate, Phase 8 network/operations/
+security/load hardening had not started. Its subsequently assigned design and
+task boundaries are recorded in `production-engineering.md`.
 
 ## 17. Logging and observability
 
@@ -926,3 +927,35 @@ Do not add technology only to increase stack size.
 Current MVP foundation includes technologies justified by planned MVP features.
 
 Potential later additions such as Redis, Kafka, Resilience4j, Spring Modulith, Spring Batch, ShedLock, QueryDSL, OpenSearch, or WebFlux require an explicit problem/use case before adoption.
+
+## 19. Phase 8 production-engineering design boundary
+
+P8-T01 establishes the Linux/container staging design after the verified Phase 7
+release was merged into remote main. It changes documentation only: no new
+runtime library, schema, public API/event, state machine, locking or transaction
+boundary is introduced. See `production-engineering.md` for the shared design
+record and `task-roadmap.md` for the 18 task owners/dependencies.
+
+Owning modules provide after-commit logical observations and bounded durable
+projections; shared observability does not acquire cross-module repository
+access. Diagnostic attempts/latency are distinct from committed outcomes.
+Metrics/traces/logs exclude secrets/bodies and unbounded identity labels, and
+collector/sampling failure cannot change financial outcomes.
+
+Durable W3C context is planned as validated nullable technical metadata under
+reviewed T06/T07 forward migrations, not a change to success V1, source facts or
+public signed Webhook bodies. Tracing preserves source/materialization/claim/
+HTTP/finalize boundaries and uses separate bounded consumer/attempt spans.
+
+T02 owns internal-only management access and workload-specific probes. T09 owns
+effective-destination/egress protection, initially using a reviewed proxy/network
+path with the existing JDK client. Actual DNS/IPv4/IPv6/TLS/bypass evidence is
+required; a preliminary lookup alone is not network-hardening acceptance.
+Security/API defects, new Java dependencies and concrete trace DDL require their
+recorded reviews before implementation, not incidental changes during telemetry.
+
+Staging, load, multi-instance failure and DB/broker/key restore evidence remain
+separate from Java unit/integration tests. Performance and recovery targets are
+declared before their respective acceptance runs on recorded artifacts/resources.
+No external hosting/cloud provisioning, destructive dev reset, automatic DLQ
+replay, PUBLISHED reset or provider reconciliation is authorized by this design.

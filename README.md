@@ -8,7 +8,8 @@ data.
 
 Phases 0–7 are complete; Phase 7 Webhooks is DONE/FROZEN as of 2026-10-04 after
 its clean quality gate. The functional simulator MVP is complete. Phase 8
-production engineering has not started.
+production engineering has started with P8-T01's verified baseline/design;
+runtime hardening tasks remain pending.
 
 ## Implemented flow
 
@@ -124,14 +125,18 @@ explicit approval: it irreversibly deletes that project's persistent data.
 - [Database design](docs/database-design.md)
 - [API contract](docs/api-contract.md)
 - [Task roadmap](docs/task-roadmap.md)
+- [Production engineering design and decision gates](docs/production-engineering.md)
 
 Phase documents and `docs/README.md` are local-only planning/reference files,
 not published documentation. The root README and linked tracked documents are
 the repository's shared entry points.
 
-Phase 8 remains future work: stronger egress/DNS-rebinding controls, operational
-metrics/tracing, load testing, security/dependency review, deployment,
-backup/recovery, and runbooks. The functional simulator MVP is not a claim of
+Phase 8 targets reproducible Linux/container staging; no provider, cloud account
+or external deployment has been selected. P8-T01 verifies the merged Phase 7
+baseline and records the task/design gates. Stronger egress/DNS-rebinding
+controls, operational metrics/tracing, load testing, security/dependency review,
+packaging/staging, backup/recovery, and runbooks are still pending implementation.
+The functional simulator MVP is not a claim of
 production readiness, real payment processing, guaranteed cross-event ordering,
 or exactly-once external HTTP delivery. Endpoint re-enable, dual-secret grace,
 custom headers/templates/retry schedules, and automatic DLQ replay are not
