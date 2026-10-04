@@ -29,7 +29,8 @@ class DefaultWebhookUrlPolicyTest {
         when(client.followRedirects()).thenReturn(HttpClient.Redirect.NEVER);
         when(client.connectTimeout()).thenReturn(Optional.of(timeout));
         var adapter = new JdkWebhookHttpClientAdapter(client, signer, productionPolicy,
-                new WebhookHttpProperties(timeout, Duration.ofSeconds(5)));
+                new WebhookHttpProperties(timeout, Duration.ofSeconds(5)),
+                new com.flowpay.backend.common.observability.ExternalCallTracing(io.micrometer.tracing.Tracer.NOOP));
         clearInvocations(client);
         for (String target : new String[]{"http://127.0.0.1/webhooks", "https://localhost/webhooks",
                 "https://127.0.0.1/webhooks", "https://[::1]/webhooks", "https://10.0.0.1/webhooks",

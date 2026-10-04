@@ -97,11 +97,11 @@ class JdkWebhookHttpClientAdapterTest {
     @Test
     void refusesMismatchedTimeoutOrRedirectConfiguration() {
         when(client.followRedirects()).thenReturn(HttpClient.Redirect.ALWAYS);
-        assertThatThrownBy(() -> new JdkWebhookHttpClientAdapter(client, signer, policy, properties))
+        assertThatThrownBy(() -> new JdkWebhookHttpClientAdapter(client, signer, policy, properties, tracing()))
                 .isInstanceOf(IllegalArgumentException.class);
         when(client.followRedirects()).thenReturn(HttpClient.Redirect.NEVER);
         when(client.connectTimeout()).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> new JdkWebhookHttpClientAdapter(client, signer, policy, properties))
+        assertThatThrownBy(() -> new JdkWebhookHttpClientAdapter(client, signer, policy, properties, tracing()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -134,6 +134,10 @@ class JdkWebhookHttpClientAdapterTest {
         when(policy.validate(request.url())).thenReturn(request.url());
         // A fixture header, not a logged signature or a real credential.
         when(signer.signatureHeader(anyLong(), anyString(), any())).thenReturn("t=1700000000,v1=fixture");
-        return new JdkWebhookHttpClientAdapter(client, signer, policy, properties);
+        return new JdkWebhookHttpClientAdapter(client, signer, policy, properties, tracing());
+    }
+
+    private static com.flowpay.backend.common.observability.ExternalCallTracing tracing() {
+        return new com.flowpay.backend.common.observability.ExternalCallTracing(io.micrometer.tracing.Tracer.NOOP);
     }
 }

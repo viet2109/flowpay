@@ -240,7 +240,13 @@ read-only, throttled, separate from financial orchestration and safe on failure;
 stale/shared gauge semantics and query costs are documented. No schema,
 business contract, retry budget, locking or transaction-boundary change.
 
-The remaining 14 tasks cover synchronous/durable tracing, monitoring/alerts, Webhook DNS/egress enforcement,
+P8-T05 adds synchronous HTTP/provider/Webhook tracing using the installed SDK,
+bounded privacy-safe export and distinct request/trace/span log correlation.
+Collector failure does not change financial results, and signed merchant HTTP
+does not receive internal context headers. Root sampling and opt-in export are
+explicit. No dependency, schema, payload or financial transaction change.
+
+The remaining 13 tasks cover durable tracing, monitoring/alerts, Webhook DNS/egress enforcement,
 auth/security review,
 CI/supply-chain gates, a constrained image, staged deployment, declared load and
 multi-instance failure drills, actual DB/broker/key restore and runbooks.

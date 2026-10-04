@@ -1,5 +1,6 @@
 package com.flowpay.backend.refund.application;
 
+import com.flowpay.backend.common.observability.ExternalCallTracing;
 import com.flowpay.backend.idempotency.application.IdempotencyCompletionCommand;
 import com.flowpay.backend.idempotency.application.IdempotencyCompletionService;
 import com.flowpay.backend.idempotency.application.IdempotencyKeyReusedException;
@@ -21,6 +22,7 @@ public class IdempotentRefundService {
     private final RefundResponseSnapshotCodec snapshotCodec;
     private final IdempotencyCompletionService completionService;
     private final RefundMetrics metrics;
+    private final ExternalCallTracing tracing;
 
     public IdempotentRefundResult create(IdempotentRefundCommand command) {
         PrepareRefundResult preparation = preparationService.prepare(
@@ -35,8 +37,10 @@ public class IdempotentRefundService {
     }
 
     private IdempotentRefundResult executeNew(PreparedRefund prepared) {
-        RefundProviderResult providerResult = metrics.measureProvider(() -> refundProvider.refund(
-                prepared.toProviderRequest()
+        RefundProviderResult providerResult = metrics.measureProvider(() -> tracing.call(
+                ExternalCallTracing.Operation.REFUND_PROVIDER,
+                () -> refundProvider.refund(prepared.toProviderRequest()),
+                result -> ExternalCallTracing.Outcome.valueOf(result.outcome().name())
         ));
         FinalizedRefund finalized = finalizationService.finalizeRefund(
                 new FinalizeRefundCommand(

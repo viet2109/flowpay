@@ -120,7 +120,8 @@ class IdempotentRefundServiceTest {
                 snapshotMapper,
                 snapshotCodec,
                 completionService,
-                new RefundMetrics(new MetricsRecorder(new SimpleMeterRegistry()))
+                new RefundMetrics(new MetricsRecorder(new SimpleMeterRegistry())),
+                new com.flowpay.backend.common.observability.ExternalCallTracing(io.micrometer.tracing.Tracer.NOOP)
         );
     }
 

@@ -10,7 +10,8 @@ Phases 0–7 are complete; Phase 7 Webhooks is DONE/FROZEN as of 2026-10-04 afte
 its clean quality gate. The functional simulator MVP is complete. Phase 8
 production engineering has completed P8-T01's baseline/design, P8-T02's
 production configuration/management/probes, P8-T03's business metrics and
-P8-T04's asynchronous operational metrics. Remaining hardening
+P8-T04's asynchronous operational metrics and P8-T05's synchronous tracing.
+Remaining hardening
 and staging tasks are pending.
 
 ## Implemented flow
@@ -146,7 +147,29 @@ Use `METRICS_SAMPLING_ENABLED=false` to disable automatic sampling or
 are NaN; failure retains stale values with `flowpay.metrics.sample.age`, never
 fabricated healthy zeros. Missing/stale telemetry requires separate monitoring.
 See the [operational catalog and cost limits](docs/production-engineering.md#p8-t04-catalog-and-sampling-decision-frozen-before-instrumentation).
-Dashboards, tracing and monitoring deployment remain later tasks.
+Dashboards and monitoring deployment remain later tasks.
+
+## Synchronous tracing
+
+P8-T05 reuses Boot's installed Micrometer/OpenTelemetry SDK for incoming HTTP,
+Payment/Refund provider calls and Webhook HTTP CLIENT spans. Logs correlate
+`requestId`, `traceId` and `spanId` separately; the existing X-Request-Id/error
+contract is unchanged. Export accepts only fixed names and bounded HTTP method,
+status-class or normalized outcome attributes, never URLs, bodies, secrets,
+exception text, arbitrary baggage, events or links. Webhook signed HTTP receives
+no internal tracing headers. External calls remain outside DB transactions.
+
+No collector is required by default. To enable trace export to an owned collector,
+set `TRACING_EXPORT_ENABLED=true` and `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` to its
+full HTTP `/v1/traces` endpoint. Roots default to 10% sampling in prod; set
+`TRACING_SAMPLING_PROBABILITY` (0..1) as needed. Dev sampling stays off unless
+`TRACING_SAMPLER=parent-based-trace-id-ratio` is set. Parent sampling is honored,
+not a rate-limit control. Unsampled IDs still correlate logs but have no exported
+trace. Export is asynchronous/bounded and may drop spans on outage/overflow;
+no financial result depends on it. Keep request/SQL/transport DEBUG logging off.
+See the [tracing privacy/configuration policy](docs/production-engineering.md#synchronous-tracing-policy-t05).
+Durable Outbox/consumer/worker causality remains P8-T06/T07; this is not yet
+end-to-end asynchronous tracing or deployed collector evidence.
 
 ## Verification
 
@@ -182,6 +205,13 @@ cache/cadence/staleness, real SQL timeout, shared-replica semantics, callback
 rollback, concurrent duplicates, late-result fencing and recording outage.
 Query/load cost on Linux staging still requires its later measured gate.
 
+P8-T05 passed the final 22-test tracing/correlation gate and an earlier
+249-test broader regression gate. Full `clean verify`: 1,307 tests in 184
+suites, zero failures/errors/skips, 5m53s. Coverage includes pooled-thread
+isolation, sampling/malformed context, sensitive-data exclusion in spans/logs,
+real financial work during exporter outage, and Webhook body/header preservation.
+PostgreSQL/RabbitMQ suites ran; no deployed collector/staging claim.
+
 For a clean infrastructure smoke check, use a dedicated disposable Compose
 project with separate container names, volumes, and ports. The checked-in
 Compose file pins development container names, so `-p` alone is not isolation.
@@ -207,7 +237,8 @@ Phase 8 targets reproducible Linux/container staging; no provider, cloud account
 or external deployment has been selected. P8-T01 verifies the merged Phase 7
 baseline; P8-T02 implements production startup and management/probe controls;
 P8-T03 adds Payment/Refund/Idempotency metrics; P8-T04 adds asynchronous operational
-metrics. Stronger egress/DNS-rebinding controls, tracing, load testing,
+metrics; P8-T05 adds synchronous HTTP/provider/Webhook tracing.
+Stronger egress/DNS-rebinding controls, durable tracing, load testing,
 security/dependency review,
 packaging/staging, backup/recovery, and runbooks are still pending implementation.
 The functional simulator MVP is not a claim of

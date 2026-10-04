@@ -1,6 +1,7 @@
 package com.flowpay.backend.webhook.infrastructure.http;
 
 import com.flowpay.backend.webhook.application.*;
+import com.flowpay.backend.common.observability.ExternalCallTracing;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -19,14 +20,17 @@ public class JdkWebhookHttpClientAdapter implements WebhookHttpClientPort {
     private final WebhookSigner signer;
     private final WebhookUrlPolicy urlPolicy;
     private final WebhookHttpProperties properties;
+    private final ExternalCallTracing tracing;
 
     // Explicit constructor preserves qualified client injection and fail-closed configuration validation.
     public JdkWebhookHttpClientAdapter(@Qualifier(WebhookHttpConfiguration.HTTP_CLIENT) HttpClient client,
-            WebhookSigner signer, WebhookUrlPolicy urlPolicy, WebhookHttpProperties properties) {
+            WebhookSigner signer, WebhookUrlPolicy urlPolicy, WebhookHttpProperties properties,
+            ExternalCallTracing tracing) {
         this.client = Objects.requireNonNull(client);
         this.signer = Objects.requireNonNull(signer);
         this.urlPolicy = Objects.requireNonNull(urlPolicy);
         this.properties = Objects.requireNonNull(properties);
+        this.tracing = Objects.requireNonNull(tracing);
         if (client.followRedirects() != HttpClient.Redirect.NEVER
                 || !client.connectTimeout().equals(java.util.Optional.of(properties.connectTimeout()))) {
             throw new IllegalArgumentException("Webhook HTTP client requires no redirects and configured connect timeout");
@@ -39,6 +43,13 @@ public class JdkWebhookHttpClientAdapter implements WebhookHttpClientPort {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("Webhook HTTP must run outside a database transaction");
         }
+        return tracing.call(ExternalCallTracing.Operation.WEBHOOK_HTTP, () -> sendOutsideTransaction(request),
+                result -> result.httpStatus() != null
+                        ? ExternalCallTracing.Outcome.valueOf("HTTP_" + result.httpStatus() / 100 + "XX")
+                        : ExternalCallTracing.Outcome.valueOf(result.failure().name()));
+    }
+
+    private WebhookHttpDeliveryResult sendOutsideTransaction(WebhookHttpDeliveryRequest request) {
         long started = System.nanoTime();
         URI target;
         try {

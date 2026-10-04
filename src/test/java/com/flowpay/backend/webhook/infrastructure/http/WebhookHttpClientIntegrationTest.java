@@ -177,7 +177,8 @@ class WebhookHttpClientIntegrationTest {
         client = HttpClient.newBuilder().connectTimeout(connect).followRedirects(HttpClient.Redirect.NEVER).build();
         // Controlled loopback fixture. Production uses the separately verified DefaultWebhookUrlPolicy.
         adapter = new JdkWebhookHttpClientAdapter(client, new HmacSha256WebhookSigner(), url -> url,
-                new WebhookHttpProperties(connect, request));
+                new WebhookHttpProperties(connect, request),
+                new com.flowpay.backend.common.observability.ExternalCallTracing(io.micrometer.tracing.Tracer.NOOP));
     }
 
     private WebhookHttpDeliveryRequest request(String url) {

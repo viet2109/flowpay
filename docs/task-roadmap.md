@@ -296,8 +296,9 @@ acceptance criteria, and the mandatory implementation order.
 Status: `IN PROGRESS` as of 2026-10-04.
 
 Completed: P8-T01 baseline/design, P8-T02 production configuration, health and
-management security, P8-T03 Payment/Refund/Idempotency metrics, and P8-T04
-Outbox/Ledger/Webhook operational metrics. Next: P8-T05 (not started).
+management security, P8-T03 Payment/Refund/Idempotency metrics, P8-T04
+Outbox/Ledger/Webhook operational metrics and P8-T05 synchronous tracing.
+Next: P8-T06 (not started).
 
 The user selected staging Linux/container with no provider/external deployment.
 Phase 7 source `d348b10` was pushed and merged into remote main at `0b96400`;
@@ -317,7 +318,7 @@ phase branch before completion unless explicitly requested. Existing untracked
 | P8-T02 | Production Configuration, Health and Management Security | P8-T01 | DONE |
 | P8-T03 | Payment, Refund and Idempotency Metrics | P8-T01, P8-T02 | DONE |
 | P8-T04 | Outbox, Ledger and Webhook Operational Metrics | P8-T03 | DONE |
-| P8-T05 | HTTP Tracing and Safe Log Correlation | P8-T02 | PLANNED |
+| P8-T05 | HTTP Tracing and Safe Log Correlation | P8-T02 | DONE |
 | P8-T06 | Durable Outbox Trace Context | P8-T01, P8-T05 | PLANNED |
 | P8-T07 | Consumer and Webhook Worker Tracing | P8-T06 | PLANNED |
 | P8-T08 | Monitoring Stack, Dashboards and Alerts | P8-T02, P8-T03, P8-T04, P8-T05, P8-T06, P8-T07 | PLANNED |
@@ -407,7 +408,34 @@ Required DB/broker tests ran; optional default OTLP export disabled except the
 owned T03 HTTP 503 exporter fixture. Compilation/ArchUnit/transaction/static
 checks pass. No dependency/schema/index/API/event/state/locking/transaction or
 retry/lease budget change; no external deployment. Local phase/index corrections
-stay unstaged, .env/.github preserved; task commit remains local. P8-T05 unstarted.
+stay unstaged, .env/.github preserved; task commit remains local. P8-T05 was
+unstarted at the T04 checkpoint.
+
+### T05 completion evidence (2026-10-04)
+
+P8-T05 reuses Boot's installed SDK/bridge, HTTP observations and asynchronous
+batch processor. Incoming propagation is traceparent-only; request/trace/span
+IDs stay distinct. Scoped provider/Webhook CLIENT spans carry bounded outcomes
+and preserve external-call transaction boundaries/results. Final exporter
+allow-list removes URLs, credentials, bodies, arbitrary attributes/resource/
+scope, events, links, tracestate and exception descriptions. Console MDC has
+traceId/spanId; no internal headers enter signed merchant Webhook HTTP.
+Export is opt-in, sampling/queue/timeouts are explicit, dev sampling defaults
+off. Export outage can lose telemetry, not change a committed financial result.
+
+Final focused tracing gate: 22 tests/five classes, 1m06s; earlier broader
+regression gate: 249 tests/19 classes, 1m43s. The added provider-exception fixture
+was corrected and rerun in the final focused gate. Full clean verify: 1,307 tests
+in 184 suites, 5m53s, zero failures/errors/skips on JDK21/Maven3.9.16 with all
+required PostgreSQL/RabbitMQ suites. Includes real HTTP sampled/unsampled/
+malformed context, 24 requests/four pooled threads, safe export/log correlation,
+provider ancestry/replay/exception, collector HTTP 503/throwing export and
+missing collector, Webhook body/header preservation, security/TX regressions.
+No dependency/schema/API/event/state/lock/TX/retry change or deployment.
+Only documentation finalized after that gate; ignored phase/index corrections
+stay local, .env/.github preserved. Commit stays local on the existing phase
+branch. P8-T06 durable Outbox tracing is next and unstarted; no end-to-end
+async tracing, collector/staging/performance acceptance claimed.
 
 ## Agent task template
 

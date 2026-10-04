@@ -1,7 +1,8 @@
 # Production Engineering — Phase 8 Design Record
 
 Status: P8-T01 design/exit baseline, P8-T02 configuration/management, P8-T03
-business metrics and P8-T04 asynchronous operational metrics implemented on
+business metrics, P8-T04 asynchronous operational metrics and P8-T05 synchronous
+HTTP/provider/Webhook tracing implemented on
 2026-10-04; Phase 8 IN PROGRESS. Remaining
 runtime/operational controls are owned by subsequent tasks. Phase 7 remains
 DONE/FROZEN; the simulator functional MVP remains complete.
@@ -274,9 +275,52 @@ The named metrics scheduler is verified not to replace the default business
 scheduler; disabled sampling removes only the metrics scheduler. No dependency,
 migration/index, API/event/state, business transaction/locking or retry/lease
 budget change. This is not measured staging/load/monitoring deployment evidence.
-T05 is next and unstarted; task commit stays local on the phase branch.
+T05 was next and unstarted at the T04 checkpoint; task commit stays local on the phase branch.
 
 ## 5. Trace correlation (T05-T07)
+
+### Synchronous tracing policy (T05)
+
+Reuse Boot 4.1.0's Micrometer/OpenTelemetry bridge and auto-configured SDK; do
+not create a second SDK or servlet SERVER span. HTTP server observations retain
+their existing metric tags, but omit high-cardinality URL attributes and use a
+fixed span name. The export allow-list admits only HTTP method/status class and
+normalized external-call outcomes. Existing framework/Security INTERNAL spans
+remain present but carry no other export attributes. Span names are fixed (`http.server`,
+`payment.provider`, `refund.provider`, `webhook.http`, or `internal`). Export
+removes events, links, status descriptions, tracestate, arbitrary attributes,
+and arbitrary resource/instrumentation attributes. Resource service.name is
+`flowpay`. Expanding this policy requires review, including T06/T07 causal links.
+
+Incoming propagation accepts W3C traceparent only, not baggage, tracestate or B3.
+Malformed context starts a new trace. The parent-based ratio sampler defaults
+to 10% for roots and honors sampled/unsampled parents; remote sampled input is
+not an abuse/rate-limit control. IDs can correlate unsampled work without export.
+X-Request-Id remains a separate validated client correlation value, not a span
+attribute or sampling decision; callers must not put secrets in correlation IDs.
+Boot's scoped MDC provides traceId/spanId; the console pattern includes them
+beside requestId. Instrumentation never records/logs throwable messages or bodies.
+
+Provider and Webhook calls use scoped CLIENT spans outside DB transactions,
+preserve results/exceptions/interruption and restore context in finally. Webhook
+HTTP uses the existing JDK transport: no tracing/baggage/request-ID headers are
+injected, and signed headers/body/timeouts/redirect rules remain unchanged.
+This is synchronous tracing only; delayed jobs have no durable causality yet.
+
+OTLP trace export is opt-in with `TRACING_EXPORT_ENABLED=true` and
+`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` pointing to an operator-owned full HTTP
+`/v1/traces` endpoint. Default disabled; no collector is required to run FlowPay.
+`TRACING_SAMPLING_PROBABILITY` sets the root ratio (0..1). Boot properties are
+`management.opentelemetry.tracing.export.otlp.*`, not the older Boot namespace.
+The exporter enable switch is `management.tracing.export.otlp.enabled`.
+Dev keeps sampling off by default; set `TRACING_SAMPLER=parent-based-trace-id-ratio`
+to opt in (test remains always-off except explicit tracing fixtures).
+Batch queue/batch limits are 2048/512, delay 5s, export timeout 3s; HTTP connect
+timeout is 1s and request timeout 2s. SDK limits are 16 attributes/128 characters,
+zero events/links. Async export can drop telemetry on outage/overflow and cannot
+roll back a financial result. Exporter diagnostics are suppressed because third-
+party logs can contain collector URLs/exception text; collector monitoring is
+separate future work. Do not enable request/body/transport DEBUG logging in prod.
 
 Reuse the installed tracing foundation and verify its actual Boot configuration.
 Keep X-Request-Id, trace/span identity, business event identity and attempt
@@ -305,6 +349,36 @@ This is FlowPay's design choice for the durable boundary. Header validation and
 span relationships are implemented against [W3C Trace Context](https://www.w3.org/TR/trace-context/)
 and the [OpenTelemetry messaging conventions](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/).
 Importing those specifications does not upgrade Java dependencies automatically.
+
+### T05 verification checkpoint (2026-10-04)
+
+Final focused tracing/correlation gate: 22 tests in five classes, zero failures/
+errors/skips, 1m06s. The earlier broader regression gate passed 249 tests in
+19 classes (1m43s); the added provider-exception fixture was corrected and rerun
+in the final focused gate. Full clean verify passed 1,307 tests in 184 suites,
+zero failures/errors/skips, 5m53s. JDK 21.0.12/Maven 3.9.16, Boot 4.1.0,
+Micrometer Tracing 1.7.0 and OTel 1.62.0; owned PostgreSQL 16.15/RabbitMQ 4.3
+Testcontainers, not development resources. Optional default OTLP metrics export
+was disabled on the command; explicit owned metric/trace outage fixtures enabled
+real export. The packaged artifact includes the verified runtime tracing bridge;
+no Java dependency or scope was added/promoted.
+
+Coverage includes sampled/unsampled and malformed incoming context, configured
+root ratios, concurrent isolation across 24 requests/four reused Tomcat threads,
+MDC cleanup outside servlet filters, provider parent ancestry/replay/exception,
+real committed Payment/Refund work during collector HTTP 503/throwing export,
+missing collector connection refusal, and exact Webhook body/no internal headers.
+In-memory exported SpanData and real OTLP payloads exclude synthetic sensitive
+values; safe INFO/error logs preserve correlation without exception content.
+Existing security/API/transaction, broker/migration and architecture regressions
+pass. Compilation and diff/static checks pass; no format plugin is configured.
+
+No API, persistence, financial state/event, transaction/locking/retry change or
+external deployment. Sampling/queue loss and suppressed exporter diagnostics
+are documented limitations, not durable accounting or operational monitoring.
+T06/T07 durable causality and staging/load/collector deployment remain unstarted.
+Only documentation was finalized after the unchanged successful full gate;
+phase/index remain local-only and task commit is not pushed.
 
 ## 6. Production configuration and management (T02)
 

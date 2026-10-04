@@ -65,7 +65,8 @@ class ConfirmPaymentServiceTest {
                 preparationService,
                 paymentProvider,
                 finalizationService,
-                new PaymentMetrics(new MetricsRecorder(new SimpleMeterRegistry()))
+                new PaymentMetrics(new MetricsRecorder(new SimpleMeterRegistry())),
+                new com.flowpay.backend.common.observability.ExternalCallTracing(io.micrometer.tracing.Tracer.NOOP)
         );
     }
 

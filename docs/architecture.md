@@ -961,7 +961,26 @@ Telemetry failures cannot mutate source/financial/delivery state. Existing
 transaction boundaries, locking, retry/lease budgets, events and APIs are intact.
 The exact scope/labels/units/aggregation limits are in production-engineering.md.
 
-OpenTelemetry synchronous/durable traces remain P8-T05-T07 work; monitoring,
+P8-T05 reuses the installed Boot Micrometer/OpenTelemetry bridge and its SDK,
+servlet observations and batch processor. The server convention omits raw URL
+attributes without changing HTTP metric tags; every configured exporter is
+wrapped with a final bounded allow-list. Names/resource/scope are fixed, and
+events/links/status descriptions/arbitrary attributes/tracestate are removed.
+Incoming propagation reads W3C traceparent only, never baggage or B3. Root
+sampling/export configuration and console MDC fields are explicit. Request IDs
+remain independent of trace IDs and the public contract is unchanged.
+
+Provider application calls and the existing Webhook JDK transport have scoped
+CLIENT spans outside DB transactions, with normalized outcomes only. Scope
+cleanup restores context; telemetry failure preserves results/exceptions and
+interruption. No context headers are added to signed Webhook HTTP. Domain code
+remains telemetry-free. OTLP export is opt-in, asynchronous/bounded and can lose
+telemetry during outage; third-party exporter diagnostics and unsafe request/SQL
+DEBUG defaults are disabled. Policy and operational limits are documented in
+production-engineering.md. No second SDK, Java dependency, schema, payload,
+state, financial locking/transaction or authentication change is introduced.
+
+Durable Outbox/consumer/worker traces remain P8-T06-T07 work; monitoring,
 dashboards and staging/performance evidence remain later separate gates.
 
 ## 18. Dependency policy

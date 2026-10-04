@@ -34,13 +34,15 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         String requestId = resolveRequestId(request.getHeader(HEADER_NAME));
+        String previousRequestId = MDC.get(MDC_KEY);
         MDC.put(MDC_KEY, requestId);
         response.setHeader(HEADER_NAME, requestId);
 
         try {
             filterChain.doFilter(request, response);
         } finally {
-            MDC.remove(MDC_KEY);
+            if (previousRequestId == null) MDC.remove(MDC_KEY);
+            else MDC.put(MDC_KEY, previousRequestId);
         }
     }
 
