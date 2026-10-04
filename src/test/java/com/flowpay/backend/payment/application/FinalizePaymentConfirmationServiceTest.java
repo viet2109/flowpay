@@ -5,6 +5,7 @@ import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.common.money.Money;
 import com.flowpay.backend.payment.application.event.PaymentIntegrationEventPublisher;
 import com.flowpay.backend.payment.application.event.PaymentSucceededEventV1;
+import com.flowpay.backend.payment.application.event.PaymentFailedEventV1;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
@@ -103,8 +104,13 @@ class FinalizePaymentConfirmationServiceTest {
                             COMPLETED_AT
                     )
             );
-        } else {
+        } else if (providerResult.outcome() == ProviderOutcome.UNKNOWN) {
             verifyNoInteractions(eventPublisher);
+        } else {
+            verify(eventPublisher).publish(new PaymentFailedEventV1(
+                    payment.merchantId(), payment.publicId(), payment.amount().amountMinor(),
+                    payment.amount().currency().getCurrencyCode(),
+                    providerResult.failureCode(), providerResult.failureMessage(), COMPLETED_AT));
         }
         assertThat(result).isEqualTo(new FinalizedPaymentConfirmation(
                 "pi_finalize",

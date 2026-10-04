@@ -1,6 +1,8 @@
 package com.flowpay.backend.infrastructure.messaging.rabbit;
 
 import com.flowpay.backend.infrastructure.messaging.FlowPayMessagingProperties;
+import com.flowpay.backend.infrastructure.messaging.WebhookMessagingProperties;
+import com.flowpay.backend.webhook.domain.WebhookEventType;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationStatus;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventTransportPublisher;
 import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvelope;
@@ -67,6 +69,9 @@ class RabbitMessagingIntegrationTest extends PostgresIntegrationTest {
     private FlowPayMessagingProperties properties;
 
     @Autowired
+    private WebhookMessagingProperties webhookProperties;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @DynamicPropertySource
@@ -114,7 +119,8 @@ class RabbitMessagingIntegrationTest extends PostgresIntegrationTest {
                 .containsEntry("x-dead-letter-routing-key", names.deadLetterRoutingKey());
 
         List<Binding> bindings = flowPayEventTopology.getDeclarablesByType(Binding.class);
-        assertThat(bindings)
+        assertThat(bindings.stream().filter(binding -> Set.of(names.ledgerQueue(), names.ledgerDeadLetterQueue())
+                .contains(binding.getDestination())))
                 .extracting(Binding::getExchange, Binding::getDestination, Binding::getRoutingKey)
                 .containsExactlyInAnyOrder(
                         org.assertj.core.groups.Tuple.tuple(
@@ -135,6 +141,25 @@ class RabbitMessagingIntegrationTest extends PostgresIntegrationTest {
                 );
         assertThat(bindings).extracting(Binding::getRoutingKey)
                 .doesNotContain("#", "*");
+
+        var webhookNames = webhookProperties.topology();
+        Queue webhookQueue = queueNamed(queues, webhookNames.webhookQueue());
+        assertDurableQueue(webhookQueue);
+        assertDurableQueue(queueNamed(queues, webhookNames.webhookDeadLetterQueue()));
+        assertThat(queues).hasSize(4);
+        assertThat(webhookQueue.getArguments())
+                .containsEntry("x-dead-letter-exchange", names.deadLetterExchange())
+                .containsEntry("x-dead-letter-routing-key", webhookNames.webhookDeadLetterRoutingKey());
+        assertThat(bindings.stream().filter(binding -> binding.getDestination().equals(webhookNames.webhookQueue())))
+                .extracting(Binding::getRoutingKey)
+                .containsExactlyInAnyOrder(java.util.Arrays.stream(WebhookEventType.values())
+                        .map(type -> type.value() + ".v1").toArray(String[]::new));
+        assertThat(bindings.stream().filter(binding -> binding.getDestination().equals(webhookNames.webhookDeadLetterQueue())))
+                .extracting(Binding::getExchange, Binding::getRoutingKey)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(names.deadLetterExchange(),
+                        webhookNames.webhookDeadLetterRoutingKey()));
+        assertThat(bindings).hasSize(10);
+        assertThat(webhookProperties.webhookConsumer().retry()).isEqualTo(properties.ledgerConsumer().retry());
 
         assertThat(rabbitAdmin.getQueueProperties(names.ledgerQueue())).isNotNull();
         assertThat(rabbitAdmin.getQueueProperties(names.ledgerDeadLetterQueue())).isNotNull();

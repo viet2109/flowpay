@@ -420,6 +420,15 @@ Status:
 - `ACTIVE`
 - `DISABLED`
 
+Creation produces an ACTIVE endpoint with a required, non-empty set drawn from
+the six canonical public event types. Only ACTIVE endpoints may replace their
+URL, subscription set, or encrypted secret. Disable is a one-way soft state
+transition in Phase 7; disabled endpoints cannot be mutated or re-enabled.
+
+The aggregate persists only versioned secret ciphertext. The generated raw
+`whsec_...` value is deliberately outside aggregate state and normal read
+models.
+
 ### WebhookEvent — Aggregate Root
 
 Immutable public event payload.
@@ -428,10 +437,24 @@ Fields:
 
 - internal ID
 - public ID (`evt_...`)
+- source integration-event ID
+- merchant ID
 - event type
 - resource type/id
 - JSON payload
 - occurred/created timestamps
+
+Source event ID is the deduplication identity. An equivalent duplicate returns
+the existing event without recomputing endpoint subscriptions; a contradictory
+duplicate fails closed. Payload and identity are immutable after materialization.
+
+The implemented event repository exposes insert/read only, using PostgreSQL
+source-ID uniqueness for dedupe without aborting a materialization transaction.
+The immutable payload is a String snapshot. P7-T08's transactional materializer
+serializes only normalized source facts into the public body and compares
+canonical JSON values and event metadata on redelivery. It creates PENDING
+deliveries only for the first ACTIVE subscription snapshot, holding shared
+endpoint row locks until commit; equivalent duplicates never repeat fan-out.
 
 ### WebhookDelivery — Aggregate Root
 
@@ -439,11 +462,14 @@ Represents delivery of one webhook event to one endpoint.
 
 Fields:
 
+- internal ID
+- public ID (`wdl_...`)
 - event ID
 - endpoint ID
 - status
 - attempt count
 - next-attempt timestamp
+- lease-expiry timestamp
 - delivered timestamp
 - last HTTP status/error
 - version
@@ -457,11 +483,43 @@ Status:
 - `RETRYING`
 - `DEAD`
 
+Claim is valid only for due PENDING/RETRYING deliveries, increments the attempt
+count, and replaces the schedule with a future lease. Completion requires
+DELIVERING plus the current attempt number; successful completion requires HTTP
+2xx. Failure schedules RETRYING or transitions to DEAD. Manual DEAD → RETRYING
+preserves attempt count/history. Mutable delivery persistence uses `@Version`
+to reject competing claims and stale detached results. Repository due/expired
+queries return bounded candidates, not claims; worker use cases must lock and
+recheck eligibility in their own short transaction.
+
+Lease expiry is explicit domain behavior, valid only for the current DELIVERING
+attempt at or after its lease deadline. It transitions to RETRYING with a
+policy-provided next timestamp or DEAD when no retry is eligible, retains attempt
+count, and records `DELIVERY_LEASE_EXPIRED`. Stopping scheduled work after
+endpoint disable records `ENDPOINT_DISABLED` without inventing an attempt.
+Delivery and attempt diagnostic strings are bounded to 512 UTF-16 code units,
+with surrogate pairs preserved; application paths supply fixed normalized codes.
+
 ### WebhookDeliveryAttempt — Child/history record
 
 Records one concrete delivery attempt.
 
-It is append-only diagnostic history.
+It stores attempt number, start/finish timestamps, HTTP status or normalized
+error, and duration. It is append-only diagnostic history; the attempt number is
+also the fencing token that prevents a stale worker result from overwriting a
+newer attempt.
+
+An attempt opens without result metadata and completes once with a status or
+normalized error. Persistence inserts open attempts and conditionally completes
+them with `WHERE finished_at IS NULL`, matching immutable identity/start fields.
+There is no generic save/delete API for history. Delivery and attempt writes
+join the caller-owned claim/finalization transaction; a lost competing completion
+cannot overwrite finished history.
+
+Abandonment is a one-time completion with `DELIVERY_LEASE_EXPIRED` and known
+finish time, but NULL HTTP status and duration because the worker's actual HTTP
+outcome/timing are unknown. Recovery commits that completion with the delivery
+transition and fences later results from the abandoned attempt.
 
 ## 9. Cross-module relationships
 

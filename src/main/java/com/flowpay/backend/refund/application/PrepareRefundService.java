@@ -10,12 +10,15 @@ import com.flowpay.backend.merchant.application.MerchantAccessApi;
 import com.flowpay.backend.payment.application.PaymentRefundApi;
 import com.flowpay.backend.payment.application.PaymentRefundReservation;
 import com.flowpay.backend.refund.domain.Refund;
+import com.flowpay.backend.refund.application.event.RefundIntegrationEventPublisher;
+import com.flowpay.backend.refund.application.event.RefundProcessingEventV1;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +30,7 @@ public class PrepareRefundService {
     private final PaymentRefundApi paymentRefundApi;
     private final RefundPublicIdGenerator refundPublicIdGenerator;
     private final RefundRepository refundRepository;
+    private final RefundIntegrationEventPublisher eventPublisher;
     private final Clock clock;
 
     @Transactional
@@ -69,7 +73,7 @@ public class PrepareRefundService {
                 command.amountMinor()
         );
         String refundPublicId = refundPublicIdGenerator.nextId();
-        Instant preparedAt = clock.instant();
+        Instant preparedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
         Refund refund = Refund.create(
                 refundPublicId,
                 merchant.internalId(),
@@ -81,6 +85,10 @@ public class PrepareRefundService {
         );
         refund.startProcessing(preparedAt);
         Refund saved = refundRepository.save(refund);
+        eventPublisher.publish(new RefundProcessingEventV1(
+                saved.merchantId(), saved.publicId(), reservation.paymentPublicId(),
+                saved.amount().amountMinor(), saved.amount().currency().getCurrencyCode(), preparedAt
+        ));
 
         return PrepareRefundResult.prepared(new PreparedRefund(
                 executionId,

@@ -512,7 +512,21 @@ payloads are:
 | Event type | Aggregate | Payload fields |
 |---|---|---|
 | `payment.succeeded.v1` | `PAYMENT_INTENT` / payment public ID | `merchantInternalId`, `paymentPublicId`, `amountMinor`, `currency`, `occurredAt` |
+| `payment.processing.v1` | `PAYMENT_INTENT` / payment public ID | Same scalar fields as payment success V1 |
+| `payment.failed.v1` | `PAYMENT_INTENT` / payment public ID | Payment identity/Money/time fields plus normalized `failureCode`, `failureMessage` |
 | `refund.succeeded.v1` | `REFUND` / refund public ID | `merchantInternalId`, `refundPublicId`, `paymentPublicId`, `amountMinor`, `currency`, `occurredAt` |
+| `refund.processing.v1` | `REFUND` / refund public ID | Same scalar fields as refund success V1 |
+| `refund.failed.v1` | `REFUND` / refund public ID | Refund identity/Money/time fields plus normalized `failureCode`, `failureMessage` |
+
+P7-T05 completes production source publication for all six types. Preparation
+persists processing events in the source transaction; known terminal failures
+persist failed events in finalization. UNKNOWN produces no terminal event.
+Refund processing is NEW-only, and rejected/replayed operations do not emit.
+The typed producer ports and Outbox writer require the caller transaction.
+Success V1 schemas and Ledger's success-only bindings are unchanged. P7-T08
+provisions the independent durable `flowpay.webhook.events` queue with six
+explicit V1 bindings and `flowpay.webhook.events.dlq` via `webhook.dead` on the
+existing DLX. Processing/failed events are now routable without changing Ledger.
 
 Payloads contain only the explicit consumer facts above. Authentication and
 idempotency values, credentials, persistence entities/versions, and raw provider
@@ -536,6 +550,141 @@ operation rather than an automatic loop.
 The Payment and Refund cutovers are complete. Their production success paths no
 longer call Ledger directly; the verified Outbox writer, confirmed publisher,
 relay, and Ledger consumer own eventual Ledger posting.
+
+Phase 7 adds Webhook as a second, independent consumer of the same exchange. It
+preserves the two success V1 contracts and adds explicit
+`payment.processing.v1`, `payment.failed.v1`, `refund.processing.v1`, and
+`refund.failed.v1` contracts. The Webhook consumer materializes each source
+event exactly once in PostgreSQL by source event ID and creates zero or more
+delivery rows from the ACTIVE subscription snapshot in the same short
+transaction. An equivalent duplicate is acknowledged without recomputing
+subscriptions; a contradictory duplicate fails closed and follows bounded
+consumer retry/dead-letter handling.
+
+P7-T08 implements this materialization boundary. The listener ACK follows a
+successful application transaction. PostgreSQL `INSERT ... ON CONFLICT` on
+`source_event_id` arbitrates concurrent duplicates, and normalized source facts
+plus canonical public JSON values detect contradictions without comparing JSON
+property order or whitespace. Matching ACTIVE endpoint rows are selected with
+`FOR SHARE`; endpoint disable takes `FOR UPDATE`, serializing it against the
+subscription snapshot. Event snapshots persist even without subscribers.
+The public body retains the full source occurrence timestamp; database timestamp
+columns use microsecond precision. No current Payment/Refund queries, merchant
+HTTP calls, HMAC, or delivery retries occur in materialization.
+
+Webhook consumer retry has separate additive `flowpay.messaging.webhook-consumer`
+properties and mirrors Ledger's bounded defaults (three attempts, 500ms initial
+interval, multiplier two, five-second cap). Exhausted failures reject without
+requeue into the Webhook DLQ; consumer failure does not change Outbox publication
+state. Provision the Webhook queue/bindings before, or atomically with, enabling
+the four additional source publishers during deployment.
+
+P7-T09 supplies the stateless `WebhookSigner`, immutable transient HTTP request,
+normalized HTTP result, and dedicated JDK HTTP adapter behind `WebhookHttpClientPort`.
+HMAC-SHA256 signs the ASCII Unix-seconds prefix plus `.` and the exact outbound
+body bytes. The adapter uses the same bytes in its POST, revalidates the URL,
+disables redirects, and rejects calls with an active database transaction.
+Configurable `flowpay.webhook.http.connect-timeout` / `request-timeout` default
+to two / five seconds and must be positive. It performs one client invocation,
+not a retry loop; HTTP 2xx is success and every other final status is failure.
+Transport/timeout/TLS/interruption diagnostics are fixed codes, never exception
+messages. Request `toString()` redacts URL, body, and plaintext secret.
+Response handling completes at headers and closes the body stream without
+reading/draining it, so an oversized or indefinitely slow merchant response body
+cannot extend an otherwise acknowledged attempt. No response body is retained.
+P7-T10 supplies delivery claiming, persisted attempt finalization, and scheduling.
+
+`WebhookDeliveryWorker` selects a bounded ACTIVE-endpoint candidate batch in a
+short transaction that skips contended delivery/endpoint rows. Candidates are
+not claims: each is rechecked and claimed in its own independent transaction
+immediately before sending, so later items do not consume their lease waiting
+behind earlier HTTP calls. Claim locks the endpoint for share first, then locks
+the delivery `FOR UPDATE SKIP LOCKED`, increments the attempt, and atomically
+inserts its OPEN history row. Finalization uses the same endpoint-before-delivery
+lock order, checks DELIVERING plus expected attempt number, and commits the
+delivery transition and one-time history completion together. Duplicate or
+stale results are ignored without overwriting history.
+
+The immutable send snapshot contains the persisted event body and current
+endpoint URL/encrypted secret; decryption and UTF-8 encoding happen after claim
+commit. Rotation/update/disable cannot change that in-flight snapshot. 2xx
+finalizes DELIVERED; other outcomes delegate to `WebhookDeliveryFailurePolicy`.
+Its initial implementation uses the approved five retry delays with deterministic
+additive jitter keyed by public delivery ID and next attempt number; a sixth
+failure, or a failure after endpoint disable, becomes DEAD. Transport diagnostics
+are fixed codes only, and elapsed milliseconds are bounded to the persisted INT.
+Persistence failure never triggers an inline resend; it leaves a lease for the
+recovery flow to handle.
+
+`flowpay.webhook.delivery-worker` defaults to enabled, one-second fixed delay,
+100 candidates, and a 30-second lease. The lease must strictly exceed the HTTP
+request timeout; durations and batch size must be positive. Focused worker tests
+disable background scheduling and invoke batches explicitly; the P7-T13 E2E
+suite enables the real scheduler with loopback-only receivers. `flowpay.webhook.delivery`
+defaults to `retry-delays=10s,30s,2m,10m,1h` and `retry-jitter-max=0.20`.
+P7-T11 completes expired-lease recovery and atomic endpoint-disable cancellation.
+Before each send batch, the worker selects a bounded batch of expired DELIVERING
+rows, including disabled endpoints, while skipping contended delivery/endpoint
+locks. Each recovery has its own short transaction: lock endpoint before
+delivery, recheck lease/status/expected attempt, close the OPEN attempt with
+`DELIVERY_LEASE_EXPIRED`, and use the same failure policy to schedule RETRYING or
+mark DEAD. It does not increment attempt count, send HTTP, or fabricate HTTP
+status/duration for the abandoned worker. Those unknown history fields remain
+NULL. A recovered attempt's late result cannot overwrite the recovered schedule
+or later attempt. Failure to persist one recovery rolls it back and does not
+prevent unrelated recovery or due delivery processing.
+
+Endpoint disable holds the endpoint's exclusive row lock and invokes a MANDATORY
+cancellation use case in that same transaction. Scheduled PENDING/RETRYING rows
+are read in bounded pages with write locks (no SKIP LOCKED) and stopped through
+domain behavior; endpoint and all pages commit or roll back together. History,
+attempt counts, DELIVERING, DELIVERED, and existing DEAD rows are retained. A
+currently DELIVERING request may finish successfully; failure or expiry after
+disable becomes DEAD, never a new scheduled retry. Repeated disable is idempotent.
+Diagnostics are normalized application codes and bounded to 512 UTF-16 code
+units without splitting a surrogate pair; the storage bound is not a substitute
+for secret sanitization.
+
+P7-T12 exposes dashboard-JWT delivery list/detail and asynchronous manual retry.
+Webhook-owned SQL projections join the persisted event and endpoint, requiring
+both to belong to the authenticated merchant; bounded list queries avoid N+1
+aggregate loading. Responses map only explicit public fields through MapStruct,
+with attempt history ordered by attempt number and no source IDs, leases,
+versions, secrets, ciphertext, or merchant response bodies.
+
+Manual retry resolves an owned JDBC projection, then takes a shared endpoint
+lock before a delivery write lock in one application transaction. The projection
+does not populate JPA's persistence context, so the locked delivery is loaded
+fresh after any competing retry commits. Locked state must still be DEAD with
+an ACTIVE endpoint. Domain behavior schedules RETRYING immediately and keeps
+counts/history; the API returns 202 without calling the worker or HTTP client.
+Concurrent manual retries serialize and a loser receives WEBHOOK_INVALID_STATE.
+The originally observed attempt count is also rechecked, so a stale retry cannot
+schedule a newer DEAD attempt if the worker has already failed the winning retry.
+Endpoint disable uses its exclusive lock to prevent retry from scheduling after
+disable commits. Only the existing worker opens the next numbered attempt.
+
+Outbound delivery uses three separate boundaries:
+
+```text
+materialize event/deliveries TX
+→ claim delivery + open attempt TX
+→ signed HTTP POST with no database transaction
+→ fenced result-finalization TX
+```
+
+The claim increments `attemptCount`, stores a lease, and uses that attempt number
+as a fencing token. Expired leases are recoverable and may produce an external
+duplicate, which is part of the documented at-least-once contract. Endpoint
+disable, claim, and materialization coordinate through database row locks; an
+already in-flight request uses its immutable URL/secret/body snapshot and may
+finish, while future claims use the latest ACTIVE endpoint configuration.
+
+FlowPay guarantees stable identity and body per public Webhook event, but not
+ordering across separate events for the same aggregate. Merchants deduplicate by
+`FlowPay-Event-Id` and tolerate processing/terminal events arriving out of
+order. Webhook delivery failure cannot roll back or mutate Payment, Refund,
+Ledger, or an already published Outbox record.
 
 ## 13. Synchronous query versus asynchronous side effect
 
@@ -644,6 +793,47 @@ outside database transactions, and Payment/Phase 3 regression protection.
 
 RabbitMQ integration tests use RabbitMQ Testcontainers when messaging is implemented.
 
+P7-T13 adds `PhaseSevenWebhookEndToEndIntegrationTest`: real source application
+services invoked through merchant APIs, PostgreSQL/Flyway, the confirmed Outbox
+relay, both RabbitMQ consumers, the enabled delivery scheduler, and the production
+HTTP/signing adapters with a loopback-only receiver. Only external Payment/Refund
+provider ports have controlled outcomes. Endpoints and secrets come from the
+dashboard API; an independent HMAC implementation verifies the exact received
+bytes, and the receiver checks that claim/OPEN history are already committed.
+
+The suite covers all six public types, UNKNOWN without false terminal events,
+subset/multiple/disabled endpoints, equivalent broker republication, retained
+event identity/body, rotation on a future attempt, timeout retry, six failures
+to DEAD, and dashboard manual retry to success. Ledger consumes successes in
+parallel and retains balanced, duplicate-safe postings. HTTP assertions allow
+at-least-once delivery and do not promise cross-event ordering or exactly-once
+external processing. A test-only clock advances through the unchanged production
+retry delays/jitter; bounded eventual assertions replace arbitrary sleeps.
+Database cleanup precedes scheduler initialization, and listener/receiver cleanup
+prevents active work from crossing test boundaries. No production configuration,
+API, schema, event contract, or dependency changes are required.
+
+P7-T14 adds `WebhookDeliveryHardeningIntegrationTest` with real PostgreSQL and
+loopback HTTP but explicitly invoked workers. Bounded receiver barriers exercise
+rotation/disable during an in-flight request and an old HTTP outcome arriving
+after lease recovery and a later attempt's success. A result-persistence fault
+after a merchant's successful acknowledgement proves that recovery can resend
+the identical event ID/body without rewriting the abandoned attempt's unknown
+HTTP outcome. Independent HMAC checks verify old/new secret snapshots; captured
+logs and persisted diagnostics exclude secrets, ciphertext, signatures, and
+injected sensitive exception text. Authenticated ciphertext tampering prevents
+HTTP while unrelated deliveries still progress.
+
+The materialization concurrency test verifies one source-event snapshot with
+the complete matching endpoint set, rather than only one endpoint. RabbitMQ
+verification distinguishes delivery DEAD from materializer DLQ and proves that
+equivalent broker redelivery cannot revive DEAD. HTTP/URL tests retain bounded
+timeouts and no redirects, and verify production URL rejection before signing
+or network invocation. Existing claim/recovery, dashboard manual-retry races,
+tenant isolation, and architecture tests remain part of the regression gate.
+These tests do not add locks, weaken production URL policy, or promise exactly-once
+external processing; DNS-rebinding/egress controls remain Phase 8 work.
+
 ### Architecture tests
 
 ArchUnit should enforce critical package dependencies, including:
@@ -652,6 +842,63 @@ ArchUnit should enforce critical package dependencies, including:
 - API does not access persistence.
 - modules do not import another module's infrastructure.
 - no forbidden cross-module repository/entity dependencies.
+
+P7-T15 explicitly bans Payment/Refund/Ledger dependencies on Webhook, source
+implementation access from Webhook, and messaging access to Webhook HTTP or
+persistence implementations and aggregates. The existing typed materialization
+boundary permits only its two public event/resource enum values in addition to
+Webhook application contracts; it does not expose aggregates. Merchant reads
+are limited to `MerchantAccessApi` / `ActiveMerchantSnapshot`. Controllers cannot
+invoke delivery execution or cryptography ports, and materialization cannot
+perform HTTP/signing. All earlier ArchUnit rules remain in place.
+
+Transaction regressions resolve all five delivery persistence boundaries by
+exact signature and require independent write-capable transactions; removing
+or renaming a boundary can no longer silently skip an assertion. The real
+Phase 7 E2E fixture also checks that successful Payment/Refund provider calls
+have no active DB transaction. Its financial-isolation regression compares
+complete Payment, Transaction, Refund, Ledger, and published Outbox snapshots
+(including versions/timestamps/payloads) through delivery retries, DEAD, and
+manual retry. Original Create/Confirm/Refund Idempotency responses replay without
+another provider call or financial mutation. Prior UNKNOWN, refund-capacity,
+success-only Ledger routing, tenant/security, and public API regressions remain
+part of the full verification gate.
+
+### Phase 7 quality gate
+
+P7-T16 completed on 2026-10-04. Phase 7 is DONE/FROZEN and the functional
+simulator MVP is complete; Phase 6 remains DONE/FROZEN. No new API, schema,
+event contract, dependency, transaction boundary, or locking strategy was needed.
+Applied V010/V011 migrations remain unchanged; later shared-schema corrections
+require reviewed forward migrations.
+
+Verification used JDK 21 and Maven 3.9.16: 59 focused Webhook migration tests,
+then `clean verify` with 1,173 tests, zero failures/errors/skips. Optional OTLP
+metrics export was disabled for this local run; no business worker, consumer,
+or infrastructure test was excluded by run-specific overrides. No test-skip
+flag was supplied.
+
+| Acceptance area | Existing verification evidence |
+|---|---|
+| V001–V011, upgrade preservation, constraints/indexes | `WebhookConfigurationMigrationTest`, `WebhookDeliveryMigrationTest`, earlier migration suites |
+| Endpoint lifecycle, JWT/tenant isolation, encrypted secret, URL policy | `WebhookEndpointApiTest`, cryptography and URL-policy suites |
+| Six source events, unchanged success V1, snapshot/dedupe, independent DLQ | `SourceEventLifecycleIntegrationTest`, `WebhookIntegrationEventConsumerIntegrationTest`, `WebhookEventMaterializationIntegrationTest` |
+| Exact-body HMAC, bounded no-redirect HTTP | `HmacSha256WebhookSignerTest`, `WebhookHttpClientIntegrationTest` |
+| Claim/attempt/lease, stale fencing, jitter/DEAD, disable/rotation, manual retry/history | `WebhookDeliveryExecutionIntegrationTest`, `WebhookDeliveryRecoveryIntegrationTest`, `WebhookDeliveryHardeningIntegrationTest`, `WebhookDeliveryApiTest` |
+| DB + Rabbit + HTTP, financial isolation and earlier phase regressions | `PhaseSevenWebhookEndToEndIntegrationTest`, `PhaseSixEndToEndIntegrationTest`, Payment/Refund/Idempotency/Ledger suites |
+| Module boundaries and no external call inside DB transactions | `ArchitectureTest`, `TransactionBoundaryRegressionTest` |
+
+The clean infrastructure smoke check used a disposable Compose project with
+fresh isolated PostgreSQL 16.15/RabbitMQ 4.3 volumes and healthy services. The
+checked-in Compose definition pins development container names; merely changing
+`-p` would not isolate that definition. Development volumes were not reset.
+Testcontainers separately provided fresh test databases/brokers, including
+migration verification; Compose health alone does not verify schema/application
+behavior. Only the disposable gate project's resources are eligible for cleanup.
+
+The gate does not claim exactly-once HTTP, ordered delivery, real-money
+processing, or production readiness. Phase 8 network/operations/security/load
+hardening remains unstarted and requires a separate assignment.
 
 ## 17. Logging and observability
 

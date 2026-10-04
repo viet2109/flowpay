@@ -4,6 +4,8 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import org.springframework.web.bind.annotation.RestController;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
@@ -79,6 +81,126 @@ class ArchitectureTest {
             .that().areAnnotatedWith(RestController.class)
             .should().dependOnClassesThat().resideInAPackage("..infrastructure..")
             .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule financialModulesMustNotDependOnWebhook = noClasses()
+            .that().resideInAnyPackage("com.flowpay.backend.payment..",
+                    "com.flowpay.backend.refund..", "com.flowpay.backend.ledger..")
+            .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.webhook..");
+
+    @ArchTest
+    static final ArchRule webhookMustNotAccessSourceImplementationDetails = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.webhook..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.flowpay.backend.payment.api..", "com.flowpay.backend.payment.domain..",
+                    "com.flowpay.backend.payment.infrastructure..", "com.flowpay.backend.refund.api..",
+                    "com.flowpay.backend.refund.domain..", "com.flowpay.backend.refund.infrastructure..",
+                    "com.flowpay.backend.ledger..");
+
+    @ArchTest
+    static final ArchRule messagingMustUseOnlyWebhookApplicationContractAndPublicEventValues = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.infrastructure.messaging..")
+            .should().dependOnClassesThat(DescribedPredicate.<JavaClass>describe(
+                    "Webhook HTTP/persistence implementation or non-contract domain types",
+                    type -> type.getPackageName().startsWith("com.flowpay.backend.webhook.api.")
+                            || type.getPackageName().equals("com.flowpay.backend.webhook.api")
+                            || type.getPackageName().startsWith("com.flowpay.backend.webhook.infrastructure.")
+                            || type.getPackageName().equals("com.flowpay.backend.webhook.infrastructure")
+                            || (type.getPackageName().startsWith("com.flowpay.backend.webhook.domain")
+                            && !java.util.Set.of("com.flowpay.backend.webhook.domain.WebhookEventType",
+                            "com.flowpay.backend.webhook.domain.WebhookResourceType").contains(type.getName()))));
+
+    @ArchTest
+    static final ArchRule webhookControllersMustNotOrchestrateDeliveryOrCryptography = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.webhook.api..")
+            .and().areAnnotatedWith(RestController.class)
+            .should().dependOnClassesThat(DescribedPredicate.<JavaClass>describe(
+                    "Webhook delivery execution or cryptography internals",
+                    type -> java.util.Set.of(
+                            "com.flowpay.backend.webhook.application.WebhookHttpClientPort",
+                            "com.flowpay.backend.webhook.application.WebhookSigner",
+                            "com.flowpay.backend.webhook.application.WebhookSecretCipher",
+                            "com.flowpay.backend.webhook.application.WebhookDeliveryWorker",
+                            "com.flowpay.backend.webhook.application.WebhookDeliveryExecutionService"
+                    ).contains(type.getName())));
+
+    @ArchTest
+    static final ArchRule webhookMustUseOnlyMerchantAccessContract = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.webhook..")
+            .should().dependOnClassesThat(DescribedPredicate.<JavaClass>describe(
+                    "Merchant application internals outside the public access contract",
+                    type -> type.getPackageName().startsWith("com.flowpay.backend.merchant.application")
+                            && !java.util.Set.of("com.flowpay.backend.merchant.application.MerchantAccessApi",
+                            "com.flowpay.backend.merchant.application.ActiveMerchantSnapshot").contains(type.getName())));
+
+    @ArchTest
+    static final ArchRule webhookMaterializationMustNotPerformDeliveryOrCryptography = noClasses()
+            .that().haveFullyQualifiedName("com.flowpay.backend.webhook.application.WebhookEventMaterializationService")
+            .should().dependOnClassesThat(DescribedPredicate.<JavaClass>describe(
+                    "Webhook HTTP or signing components",
+                    type -> java.util.Set.of("WebhookHttpClientPort", "WebhookSigner", "WebhookSecretCipher",
+                            "WebhookDeliveryWorker", "WebhookDeliveryExecutionService").contains(type.getSimpleName())
+                            && type.getPackageName().startsWith("com.flowpay.backend.webhook.")));
+
+    @ArchTest
+    static final ArchRule webhookMustUseOnlyMerchantPublicApplicationApi = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.webhook..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.flowpay.backend.merchant.domain..",
+                    "com.flowpay.backend.merchant.infrastructure..")
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule webhookMustNotAccessAnotherModulesRepositories = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.webhook..")
+            .should().dependOnClassesThat(DescribedPredicate.<JavaClass>describe(
+                    "business repositories outside Webhook",
+                    type -> type.getPackageName().startsWith("com.flowpay.backend.")
+                            && !type.getPackageName().startsWith("com.flowpay.backend.webhook.")
+                            && type.getSimpleName().endsWith("Repository")));
+
+    @ArchTest
+    static final ArchRule webhookJpaEntitiesMustRemainPackagePrivate = classes()
+            .that().resideInAPackage("com.flowpay.backend.webhook.infrastructure.persistence..")
+            .and().haveSimpleNameEndingWith("Entity")
+            .should().notBePublic();
+
+    @ArchTest
+    static final ArchRule webhookJpaRepositoriesMustRemainPackagePrivate = classes()
+            .that().resideInAPackage("com.flowpay.backend.webhook.infrastructure.persistence..")
+            .and().haveSimpleNameEndingWith("JpaRepository")
+            .should().notBePublic();
+
+    @ArchTest
+    static final ArchRule webhookDomainMustRemainTechnologyIndependent = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.webhook.domain..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "org.springframework..", "jakarta.persistence..", "org.hibernate..",
+                    "tools.jackson..", "com.fasterxml.jackson..", "java.net.http..");
+
+    @ArchTest
+    static final ArchRule webhookDomainMustNotImportSourceBusinessModules = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.webhook.domain..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.flowpay.backend.payment..", "com.flowpay.backend.refund..");
+
+    @ArchTest
+    static final ArchRule webhookCoreMustNotDependOnTransportOrSourceModules = noClasses()
+            .that().resideInAnyPackage("com.flowpay.backend.webhook.application..", "com.flowpay.backend.webhook.domain..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "org.springframework.amqp..", "com.rabbitmq..",
+                    "com.flowpay.backend.payment..", "com.flowpay.backend.refund..",
+                    "com.flowpay.backend.infrastructure.messaging..");
+
+    @ArchTest
+    static final ArchRule webhookHttpAdapterMustNotDependOnRepositories = noClasses()
+            .that().resideInAPackage("com.flowpay.backend.webhook.infrastructure.http..")
+            .should().dependOnClassesThat().haveSimpleNameEndingWith("Repository");
+
+    @ArchTest
+    static final ArchRule webhookBusinessCoreMustNotUseHttpClientTechnology = noClasses()
+            .that().resideInAnyPackage("com.flowpay.backend.webhook.application..", "com.flowpay.backend.webhook.domain..")
+            .should().dependOnClassesThat().resideInAnyPackage("java.net.http..", "org.springframework.web.client..");
 
     @ArchTest
     static final ArchRule merchantMustNotDependOnIdentityInfrastructure = noClasses()

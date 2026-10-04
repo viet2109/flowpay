@@ -713,6 +713,14 @@ Payment/Refund access behaves as not found.
 
 Dashboard JWT required.
 
+All endpoint identifiers are public `wep_...` IDs. Unknown and cross-merchant
+resources both return `404`.
+
+Production URLs require HTTPS, a valid host, and no user-info or fragment.
+Obvious private/local/metadata/non-routable literal targets are rejected. The
+explicit development/test localhost switch is not production egress protection;
+DNS-rebinding and network-egress hardening remain Phase 8 work.
+
 ### Create endpoint
 
 ```http
@@ -730,13 +738,51 @@ POST /api/v1/merchant/webhook-endpoints
 }
 ```
 
-Create response returns the webhook secret once.
+Returns `201` with `Location: /api/v1/merchant/webhook-endpoints/{endpointId}`.
+The raw secret is returned only in this response:
+
+```json
+{
+  "data": {
+    "id": "wep_01K...",
+    "url": "https://example.com/api/webhooks/flowpay",
+    "status": "ACTIVE",
+    "events": ["payment.failed", "payment.succeeded", "refund.succeeded"],
+    "secret": "whsec_...",
+    "createdAt": "2026-09-13T03:00:00Z",
+    "updatedAt": "2026-09-13T03:00:00Z"
+  }
+}
+```
+
+### List and retrieve
+
+```http
+GET /api/v1/merchant/webhook-endpoints
+GET /api/v1/merchant/webhook-endpoints/{endpointId}
+```
+
+Endpoint reads return `id`, `url`, `status`, sorted `events`, `createdAt`, and
+`updatedAt`. They never return the raw secret or encrypted secret.
+
+List returns `{ "data": [...] }` (not paginated), includes ACTIVE and DISABLED
+endpoints, and orders by `createdAt DESC` with an internal ID tie-breaker.
 
 ### Update
 
 ```http
 PATCH /api/v1/merchant/webhook-endpoints/{endpointId}
 ```
+
+`url` and `events` are optional, but at least one must be supplied. When present,
+`events` replaces the complete non-empty subscription set. Only ACTIVE endpoints
+can be updated.
+
+Omit a field to leave it unchanged; explicit `null` values are invalid.
+Event names must exactly match the six canonical public event names; duplicates
+are invalid. PATCH and secret rotation on DISABLED endpoints return
+`409 WEBHOOK_INVALID_STATE`. Concurrent mutation conflicts also return
+`409 WEBHOOK_INVALID_STATE`; reload the endpoint before retrying.
 
 ### Disable
 
@@ -746,6 +792,15 @@ DELETE /api/v1/merchant/webhook-endpoints/{endpointId}
 
 Returns `204` and changes status to `DISABLED`.
 
+The status change and cancellation of all PENDING/RETRYING deliveries commit
+atomically. Cancelled deliveries become DEAD with `ENDPOINT_DISABLED`, their
+next schedule is cleared, and attempt counts/history are preserved. Already
+DELIVERING requests may finish successfully; failure or lease expiry after
+disable becomes DEAD instead of scheduling another retry.
+
+Repeating DELETE for an already DISABLED endpoint also returns `204`.
+Endpoint configuration and subscriptions are retained; there is no re-enable API.
+
 ### Rotate secret
 
 ```http
@@ -753,6 +808,19 @@ POST /api/v1/merchant/webhook-endpoints/{endpointId}/rotate-secret
 ```
 
 Returns the new raw secret once.
+
+Rotation affects later claims only: an in-flight request retains the secret
+captured for that attempt. There is no dual-secret grace period or re-enable API.
+
+```json
+{
+  "data": {
+    "id": "wep_01K...",
+    "secret": "whsec_...",
+    "updatedAt": "2026-09-13T03:05:00Z"
+  }
+}
+```
 
 ## 14. Webhook delivery
 
@@ -775,10 +843,11 @@ Payload:
   "data": {
     "payment": {
       "id": "pi_01K...",
-      "orderId": "ORDER-001",
       "amount": 500000,
       "currency": "VND",
-      "status": "SUCCEEDED"
+      "status": "SUCCEEDED",
+      "failureCode": null,
+      "failureMessage": null
     }
   }
 }
@@ -792,9 +861,72 @@ Algorithm:
 
 `HMAC-SHA256`
 
-Default timestamp tolerance:
+Merchant-side verification timestamp tolerance:
 
 `5 minutes`
+
+FlowPay signs the ASCII Unix-seconds timestamp, a literal `.`, and the exact body
+bytes sent in the POST. Outbound requests also send
+`User-Agent: FlowPay-Webhooks/1.0`. Redirects are never followed. All HTTP 2xx
+statuses acknowledge delivery; other final statuses, connection/request timeouts,
+TLS, and transport errors fail the attempt. Configurable connection/request
+timeouts default to two/five seconds. Merchant response bodies are not read or
+retained; acknowledgement is based on the final response status/headers.
+
+`createdAt` is the source event occurrence time. Processing/failed variants use
+the matching event type and status; failed variants contain only bounded,
+normalized failure fields. The same event ID and exact body are reused for every
+attempt, while the signature timestamp/signature may change. Cross-event ordering
+is not guaranteed, so merchants must deduplicate by `FlowPay-Event-Id` and
+tolerate out-of-order state notifications.
+
+Failure codes are trimmed and limited to 64 Unicode characters; failure messages
+are trimmed and limited to 255 Unicode characters, using only normalized source
+failure facts (never raw provider responses or exceptions). Non-failed events
+include both fields as JSON `null`. Payment bodies omit `orderId`: the frozen
+source V1 contract does not supply it, and Webhook does not query current state
+to enrich historical events. Public bodies never contain internal merchant IDs.
+
+Refund payload example:
+
+```json
+{
+  "id": "evt_01K...",
+  "type": "refund.succeeded",
+  "createdAt": "2026-08-18T03:05:00Z",
+  "data": {
+    "refund": {
+      "id": "re_01K...",
+      "paymentId": "pi_01K...",
+      "amount": 100000,
+      "currency": "VND",
+      "status": "SUCCEEDED",
+      "failureCode": null,
+      "failureMessage": null
+    }
+  }
+}
+```
+
+Processing/failed Refund variants use the corresponding type and status, just
+like Payment. An event is materialized once even with no ACTIVE subscribers.
+Delivery subscriptions are snapshotted on its first materialization; redelivery
+does not include endpoints configured afterward.
+
+External delivery is at-least-once, not exactly-once. Deliveries progress through
+PENDING/DELIVERING to DELIVERED, RETRYING, or DEAD. The initial attempt is immediate;
+five base retry delays (10s, 30s, 2m, 10m, 1h) have deterministic additive 0–20%
+jitter and give six normal attempts. HTTP 429/410, other non-2xx statuses, and
+transport failures use the same policy; no automatic Retry-After or endpoint
+disable behavior is implemented.
+
+Expired leases can cause another HTTP request with the same event ID/body. The
+abandoned attempt is retained with `DELIVERY_LEASE_EXPIRED` and unknown HTTP
+status/duration as null; late results cannot overwrite it or a newer attempt.
+DEAD deliveries are not automatically claimed. Their manual retry path below
+allows an additional attempt without resetting the automatic budget/history.
+Delivery DEAD is not the materializer RabbitMQ DLQ, and delivery failure never
+changes Payment/Refund/Ledger or a published Outbox record.
 
 ### Delivery history
 
@@ -803,19 +935,57 @@ GET /api/v1/merchant/webhook-deliveries
 GET /api/v1/merchant/webhook-deliveries/{deliveryId}
 ```
 
+List query parameters are `status`, `endpointId`, `eventType`, `page`, and
+`size`. Defaults are page `0`, size `20`, maximum size `100`, ordered by
+`createdAt DESC`, then internal row ID descending as a stable tie-breaker (the
+internal ID is never returned). `status` accepts `PENDING`, `DELIVERING`,
+`DELIVERED`, `RETRYING`, or `DEAD`; `eventType` accepts the supported lowercase
+dot-separated public event names. Invalid filters or pagination return
+`400 VALIDATION_ERROR`. Unknown or foreign `endpointId` filters produce an empty
+list, without revealing whether that endpoint exists.
+
+A delivery summary exposes:
+
+```text
+id, endpointId, eventId, eventType, resourceType, resourceId,
+status, attemptCount, nextAttemptAt, deliveredAt,
+lastHttpStatus, lastError, createdAt, updatedAt
+```
+
+The detail response adds attempts ordered by `attemptNo ASC`, each containing:
+
+```text
+attemptNo, startedAt, finishedAt, httpStatus, durationMs, errorMessage
+```
+
+Internal IDs, source integration-event IDs, entity versions, endpoint secrets,
+and ciphertext are never exposed.
+
+All delivery routes require dashboard JWT authentication, not merchant API keys.
+Unknown or cross-merchant delivery IDs return `404 WEBHOOK_DELIVERY_NOT_FOUND`.
+
 ### Manual retry
 
 ```http
 POST /api/v1/merchant/webhook-deliveries/{deliveryId}/retry
 ```
 
-Intended for dead/failed deliveries.
+Allowed only for a merchant-owned DEAD delivery whose endpoint remains ACTIVE.
+It schedules asynchronous retry and does not perform outbound HTTP inline.
 
 Success:
 
 ```http
 202 Accepted
 ```
+
+The response body contains the newly scheduled delivery summary. Attempt count
+and attempt history are not reset.
+
+A non-DEAD delivery, including DELIVERED, or a disabled endpoint returns
+`409 WEBHOOK_INVALID_STATE`. Concurrent requests recheck database-locked state;
+only one can schedule the same DEAD delivery. The worker later creates the next
+attempt number, rather than resetting the automatic retry budget or history.
 
 ## 15. Event types v1
 
@@ -892,6 +1062,7 @@ Webhook:
 
 - `WEBHOOK_ENDPOINT_NOT_FOUND`
 - `WEBHOOK_INVALID_STATE`
+- `WEBHOOK_DELIVERY_NOT_FOUND`
 
 Rate limiting:
 

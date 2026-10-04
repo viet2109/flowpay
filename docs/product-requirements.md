@@ -178,9 +178,42 @@ idempotent eventual Ledger posting for versioned Payment/Refund success events.
 
 ### Phase 7 — Webhooks
 
-Endpoint configuration, subscriptions, event creation, signed delivery, retry/backoff, delivery history, and dead delivery handling.
+Status: `DONE/FROZEN` as of 2026-10-04 after P7-T16's clean quality gate.
+The functional simulator MVP is complete; production readiness is not implied.
+
+The complete six-event Payment/Refund catalog writes processing, success, and
+known failure facts atomically through Outbox, preserving UNKNOWN semantics and
+the existing success-only Ledger consumer. V010/V011 implement endpoint,
+subscription, immutable event, leased delivery, and retained attempt schemas.
+Dashboard JWT APIs create/list/get/update/soft-disable endpoints and rotate
+AES-256-GCM-protected signing secrets, with tenant ownership and concurrency
+protection. Secrets are returned once on create/rotate, never on reads.
+
+RabbitMQ materialization handles all six types, snapshots ACTIVE subscriptions
+only once per source event, and commits event/delivery rows before ACK. Equivalent
+redelivery does not recompute subscriptions; malformed/contradictory messages
+follow bounded consumer retry to the independent Webhook DLQ.
+
+The enabled worker claims each due delivery and OPEN attempt transactionally,
+sends exact-body HMAC-signed HTTP outside a DB transaction with URL revalidation,
+bounded timeouts and no redirects, then fences finalization by attempt number.
+Five jittered retry delays give six normal attempts; exhausted deliveries become
+DEAD. Expired leases recover abandoned attempts without fabricating HTTP results.
+Disabling an endpoint atomically cancels scheduled work; an in-flight request may
+finish with its claimed URL/secret snapshot. Later attempts use current secrets.
+
+Dashboard delivery list/detail APIs expose filters, pagination, safe diagnostics
+and ordered attempt history. Manual retry returns 202, requires an owned DEAD
+delivery and ACTIVE endpoint, and retains counts/history without synchronous
+HTTP. External delivery is at-least-once with stable event ID/body and merchant
+dedupe, not guaranteed ordering or exactly-once processing. Delivery failures
+do not mutate Payment, Refund, Ledger, or published Outbox records. Clean
+migration, E2E, crash/concurrency, security and architecture regressions cover
+these boundaries. Phase 6 remains DONE/FROZEN; Phase 8 hardening is not included.
 
 ### Phase 8 — Production engineering
+
+Status: `NOT STARTED`.
 
 Hardening after the functional MVP: richer tracing/metrics, load testing, security hardening, deployment improvements, and operational tooling.
 

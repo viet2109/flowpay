@@ -71,7 +71,7 @@ class PrepareRefundIntegrationTest extends PostgresIntegrationTest {
     void cleanData() {
         dropRefundInsertFailureTrigger();
         jdbcTemplate.update("""
-                TRUNCATE TABLE refunds, idempotency_records, payment_transactions,
+                TRUNCATE TABLE outbox_events, refunds, idempotency_records, payment_transactions,
                     payment_intents, merchant_members, merchant_api_keys, refresh_tokens,
                     merchants, users RESTART IDENTITY CASCADE
                 """);

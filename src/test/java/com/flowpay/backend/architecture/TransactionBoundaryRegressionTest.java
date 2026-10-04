@@ -38,6 +38,53 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TransactionBoundaryRegressionTest {
 
     @Test
+    void webhookDashboardReadsAreReadOnlyAndManualRetryOwnsItsTransaction() throws Exception {
+        var queries = com.flowpay.backend.webhook.application.WebhookDeliveryQueryService.class;
+        assertThat(queries.getMethod("list", com.flowpay.backend.webhook.application.ListWebhookDeliveriesQuery.class)
+                .getAnnotation(Transactional.class).readOnly()).isTrue();
+        assertThat(queries.getMethod("get", String.class, String.class)
+                .getAnnotation(Transactional.class).readOnly()).isTrue();
+        assertTransactional(com.flowpay.backend.webhook.application.WebhookDeliveryRetryService.class,
+                "retry", String.class, String.class);
+    }
+
+    @Test
+    void webhookDeliveryKeepsHttpBetweenIndependentClaimAndFinalizationTransactions() throws Exception {
+        var execution = com.flowpay.backend.webhook.application.WebhookDeliveryExecutionService.class;
+        assertNotTransactional(com.flowpay.backend.webhook.application.WebhookDeliveryWorker.class, "deliverBatch");
+        assertRequiresNew(execution, "candidates");
+        assertRequiresNew(execution, "expiredCandidates");
+        assertRequiresNew(execution, "claim", long.class, long.class);
+        assertRequiresNew(execution, "recoverExpired", long.class, long.class, int.class);
+        assertRequiresNew(execution, "finalizeResult",
+                com.flowpay.backend.webhook.application.ClaimedWebhookDelivery.class,
+                com.flowpay.backend.webhook.application.WebhookHttpDeliveryResult.class);
+    }
+
+    @Test
+    void webhookCancellationMustJoinEndpointDisableTransaction() throws Exception {
+        var service = com.flowpay.backend.webhook.application.WebhookDeliveryCancellationService.class;
+        assertThat(service.getMethod("cancelScheduled", long.class).getAnnotation(Transactional.class).propagation())
+                .isEqualTo(Propagation.MANDATORY);
+        assertTransactional(com.flowpay.backend.webhook.application.WebhookEndpointManagementService.class,
+                "disable", String.class, String.class);
+    }
+
+    @Test
+    void webhookHttpAdapterMustNotOwnADatabaseTransaction() throws Exception {
+        assertNotTransactional(com.flowpay.backend.webhook.infrastructure.http.JdkWebhookHttpClientAdapter.class,
+                "send", com.flowpay.backend.webhook.application.WebhookHttpDeliveryRequest.class);
+    }
+
+    @Test
+    void webhookMaterializationMustCommitBeforeListenerAcknowledgement() throws Exception {
+        assertTransactional(com.flowpay.backend.webhook.application.WebhookEventMaterializationService.class,
+                "materialize", com.flowpay.backend.webhook.application.MaterializeWebhookEventCommand.class);
+        assertNotTransactional(com.flowpay.backend.infrastructure.messaging.rabbit.WebhookIntegrationEventListener.class,
+                "consume", org.springframework.amqp.core.Message.class);
+    }
+
+    @Test
     void paymentConfirmationMustKeepProviderBetweenTwoShortTransactions()
             throws Exception {
         assertNotTransactional(
@@ -169,6 +216,19 @@ class TransactionBoundaryRegressionTest {
         assertThat(method.getAnnotation(Transactional.class))
                 .as("%s.%s transaction boundary", type.getSimpleName(), methodName)
                 .isNotNull();
+    }
+
+    private static void assertRequiresNew(Class<?> type, String methodName, Class<?>... parameterTypes)
+            throws NoSuchMethodException {
+        // Exact lookup also fails if a boundary is renamed/removed, rather than silently skipping it.
+        Method method = type.getDeclaredMethod(methodName, parameterTypes);
+        assertThat(method.getAnnotation(Transactional.class))
+                .as("%s.%s independent write-capable transaction", type.getSimpleName(), methodName)
+                .isNotNull()
+                .satisfies(annotation -> {
+                    assertThat(annotation.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+                    assertThat(annotation.readOnly()).isFalse();
+                });
     }
 
     private static void assertNotTransactional(

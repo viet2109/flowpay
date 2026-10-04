@@ -4,6 +4,7 @@ import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.payment.application.event.PaymentIntegrationEventPublisher;
 import com.flowpay.backend.payment.application.event.PaymentSucceededEventV1;
+import com.flowpay.backend.payment.application.event.PaymentFailedEventV1;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
@@ -66,6 +67,13 @@ public class FinalizePaymentConfirmationService {
                     savedPayment.amount().amountMinor(),
                     savedPayment.amount().currency().getCurrencyCode(),
                     completedAt
+            ));
+        } else if (providerResult.outcome() == ProviderOutcome.DECLINED
+                || providerResult.outcome() == ProviderOutcome.TECHNICAL_FAILURE) {
+            eventPublisher.publish(new PaymentFailedEventV1(
+                    savedPayment.merchantId(), savedPayment.publicId(),
+                    savedPayment.amount().amountMinor(), savedPayment.amount().currency().getCurrencyCode(),
+                    savedTransaction.failureCode(), savedTransaction.failureMessage(), completedAt
             ));
         }
 

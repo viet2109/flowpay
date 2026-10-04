@@ -2,6 +2,8 @@ package com.flowpay.backend.payment.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
+import com.flowpay.backend.payment.application.event.PaymentIntegrationEventPublisher;
+import com.flowpay.backend.payment.application.event.PaymentProcessingEventV1;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +30,7 @@ public class PreparePaymentConfirmationService {
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final PaymentTransactionPublicIdGenerator transactionPublicIdGenerator;
     private final PaymentProviderSelection providerSelection;
+    private final PaymentIntegrationEventPublisher eventPublisher;
     private final Clock clock;
 
     @Transactional
@@ -35,7 +39,7 @@ public class PreparePaymentConfirmationService {
                 command.merchantContext(),
                 command.paymentPublicId()
         );
-        Instant startedAt = clock.instant();
+        Instant startedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
         transitionToProcessing(payment, startedAt);
 
         PaymentTransaction transaction = PaymentTransaction.createProcessing(
@@ -46,13 +50,20 @@ public class PreparePaymentConfirmationService {
                 startedAt
         );
 
+        PaymentIntent savedPayment;
+        PaymentTransaction savedTransaction;
         try {
-            PaymentIntent savedPayment = paymentIntentRepository.save(payment);
-            PaymentTransaction savedTransaction = paymentTransactionRepository.save(transaction);
-            return toResult(savedPayment, savedTransaction);
+            savedPayment = paymentIntentRepository.save(payment);
+            savedTransaction = paymentTransactionRepository.save(transaction);
         } catch (OptimisticLockingFailureException | DataIntegrityViolationException exception) {
             throw invalidState();
         }
+        eventPublisher.publish(new PaymentProcessingEventV1(
+                savedPayment.merchantId(), savedPayment.publicId(),
+                savedPayment.amount().amountMinor(), savedPayment.amount().currency().getCurrencyCode(),
+                startedAt
+        ));
+        return toResult(savedPayment, savedTransaction);
     }
 
     private static void transitionToProcessing(PaymentIntent payment, Instant startedAt) {

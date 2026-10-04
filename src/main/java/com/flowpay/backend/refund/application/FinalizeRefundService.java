@@ -5,6 +5,7 @@ import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.payment.application.PaymentRefundApi;
 import com.flowpay.backend.refund.application.event.RefundIntegrationEventPublisher;
 import com.flowpay.backend.refund.application.event.RefundSucceededEventV1;
+import com.flowpay.backend.refund.application.event.RefundFailedEventV1;
 import com.flowpay.backend.refund.domain.Refund;
 import com.flowpay.backend.refund.domain.RefundFailure;
 import com.flowpay.backend.refund.domain.RefundProviderOutcome;
@@ -40,26 +41,27 @@ public class FinalizeRefundService {
         Instant finalizedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
         applyOutcome(refund, command, finalizedAt);
         Refund saved = refundRepository.save(refund);
-        publishSuccessfulRefund(saved, command.paymentPublicId(), finalizedAt);
+        publishTerminalRefund(saved, command.paymentPublicId(), finalizedAt);
         return toResult(saved, command.paymentPublicId());
     }
 
-    private void publishSuccessfulRefund(
+    private void publishTerminalRefund(
             Refund refund,
             String paymentPublicId,
             Instant finalizedAt
     ) {
-        if (refund.status() != RefundStatus.SUCCEEDED) {
-            return;
+        if (refund.status() == RefundStatus.FAILED) {
+            eventPublisher.publish(new RefundFailedEventV1(
+                    refund.merchantId(), refund.publicId(), paymentPublicId,
+                    refund.amount().amountMinor(), refund.amount().currency().getCurrencyCode(),
+                    refund.failureCode(), refund.failureMessage(), finalizedAt
+            ));
+        } else if (refund.status() == RefundStatus.SUCCEEDED) {
+            eventPublisher.publish(new RefundSucceededEventV1(
+                    refund.merchantId(), refund.publicId(), paymentPublicId,
+                    refund.amount().amountMinor(), refund.amount().currency().getCurrencyCode(), finalizedAt
+            ));
         }
-        eventPublisher.publish(new RefundSucceededEventV1(
-                refund.merchantId(),
-                refund.publicId(),
-                paymentPublicId,
-                refund.amount().amountMinor(),
-                refund.amount().currency().getCurrencyCode(),
-                finalizedAt
-        ));
     }
 
     private void applyOutcome(

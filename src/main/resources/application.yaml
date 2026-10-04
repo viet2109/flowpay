@@ -48,6 +48,16 @@ flowpay:
       dead-letter-exchange: ${RABBITMQ_DEAD_LETTER_EXCHANGE:flowpay.events.dlx}
       ledger-dead-letter-queue: ${RABBITMQ_LEDGER_DLQ:flowpay.ledger.events.dlq}
       dead-letter-routing-key: ${RABBITMQ_LEDGER_DEAD_ROUTING_KEY:ledger.dead}
+      webhook-queue: ${RABBITMQ_WEBHOOK_QUEUE:flowpay.webhook.events}
+      webhook-dead-letter-queue: ${RABBITMQ_WEBHOOK_DLQ:flowpay.webhook.events.dlq}
+      webhook-dead-letter-routing-key: ${RABBITMQ_WEBHOOK_DEAD_ROUTING_KEY:webhook.dead}
+    webhook-consumer:
+      enabled: ${WEBHOOK_EVENT_CONSUMER_ENABLED:true}
+      retry:
+        max-attempts: ${WEBHOOK_EVENT_CONSUMER_RETRY_MAX_ATTEMPTS:3}
+        initial-interval: ${WEBHOOK_EVENT_CONSUMER_RETRY_INITIAL_INTERVAL:500ms}
+        multiplier: ${WEBHOOK_EVENT_CONSUMER_RETRY_MULTIPLIER:2.0}
+        max-interval: ${WEBHOOK_EVENT_CONSUMER_RETRY_MAX_INTERVAL:5s}
     ledger-consumer:
       enabled: ${LEDGER_EVENT_CONSUMER_ENABLED:true}
       retry:
@@ -79,6 +89,22 @@ flowpay:
     provider: ${REFUND_PROVIDER:simulator}
     simulator:
       default-outcome: ${REFUND_SIMULATOR_DEFAULT_OUTCOME:SUCCESS}
+  webhook:
+    delivery-worker:
+      enabled: ${WEBHOOK_DELIVERY_WORKER_ENABLED:true}
+      fixed-delay: ${WEBHOOK_DELIVERY_WORKER_FIXED_DELAY:1s}
+      batch-size: ${WEBHOOK_DELIVERY_WORKER_BATCH_SIZE:100}
+      lease-timeout: ${WEBHOOK_DELIVERY_WORKER_LEASE_TIMEOUT:30s}
+    delivery:
+      retry-delays: ${WEBHOOK_DELIVERY_RETRY_DELAYS:10s,30s,2m,10m,1h}
+      retry-jitter-max: ${WEBHOOK_DELIVERY_RETRY_JITTER_MAX:0.20}
+    http:
+      connect-timeout: ${WEBHOOK_HTTP_CONNECT_TIMEOUT:2s}
+      request-timeout: ${WEBHOOK_HTTP_REQUEST_TIMEOUT:5s}
+    secret:
+      encryption-key: ${WEBHOOK_SECRET_ENCRYPTION_KEY}
+    url-policy:
+      allow-insecure-localhost: ${WEBHOOK_ALLOW_INSECURE_LOCALHOST:false}
   security:
     prometheus-public: false
     jwt:

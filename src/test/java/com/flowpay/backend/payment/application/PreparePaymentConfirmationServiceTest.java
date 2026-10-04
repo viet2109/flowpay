@@ -2,6 +2,8 @@ package com.flowpay.backend.payment.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
+import com.flowpay.backend.payment.application.event.PaymentIntegrationEventPublisher;
+import com.flowpay.backend.payment.application.event.PaymentProcessingEventV1;
 import com.flowpay.backend.common.money.Money;
 import com.flowpay.backend.common.security.MerchantApiPrincipal;
 import com.flowpay.backend.payment.domain.PaymentIntent;
@@ -57,6 +59,9 @@ class PreparePaymentConfirmationServiceTest {
     @Mock
     private PaymentProviderSelection providerSelection;
 
+    @Mock
+    private PaymentIntegrationEventPublisher eventPublisher;
+
     private PreparePaymentConfirmationService service;
 
     @BeforeEach
@@ -67,7 +72,8 @@ class PreparePaymentConfirmationServiceTest {
                 paymentTransactionRepository,
                 transactionPublicIdGenerator,
                 providerSelection,
-                Clock.fixed(STARTED_AT, ZoneOffset.UTC)
+                eventPublisher,
+                Clock.fixed(STARTED_AT.plusNanos(789), ZoneOffset.UTC)
         );
     }
 
@@ -100,6 +106,9 @@ class PreparePaymentConfirmationServiceTest {
         assertThat(transaction.status()).isEqualTo(PaymentTransactionStatus.PROCESSING);
         assertThat(transaction.startedAt()).isEqualTo(STARTED_AT);
         assertThat(transaction.completedAt()).isNull();
+        verify(eventPublisher).publish(new PaymentProcessingEventV1(
+                payment.merchantId(), payment.publicId(), payment.amount().amountMinor(),
+                payment.amount().currency().getCurrencyCode(), STARTED_AT));
 
         assertThat(result).isEqualTo(new PreparedPaymentConfirmation(
                 "pi_prepare",

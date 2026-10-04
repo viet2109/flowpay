@@ -36,6 +36,7 @@ Examples:
 | LedgerTransaction | `ltxn_` |
 | WebhookEndpoint | `wep_` |
 | WebhookEvent | `evt_` |
+| WebhookDelivery | `wdl_` |
 
 ### Money
 
@@ -525,13 +526,21 @@ INDEX(status, available_at)
 
 ## 8. Webhooks
 
+V010 implements endpoint configuration/subscriptions; V011 implements the
+event, delivery, and attempt schema below. V011 preserves V001–V010 and existing
+endpoint data. Materialization uses source-ID uniqueness and locked ACTIVE
+subscription snapshots. The delivery worker implements transactional claim,
+fenced finalization, lease recovery, and retained attempt history. These are
+application use cases, not behavior performed by migrations. V010/V011 remain
+unchanged; later shared-schema defects require reviewed forward migrations.
+
 ### `webhook_endpoints`
 
 ```text
 id                     BIGINT PK
 public_id              VARCHAR NOT NULL UNIQUE
 merchant_id            BIGINT NOT NULL FK -> merchants.id
-url                    VARCHAR NOT NULL
+url                    VARCHAR(2048) NOT NULL
 secret_ciphertext      TEXT NOT NULL
 status                 VARCHAR NOT NULL
 created_at             TIMESTAMPTZ NOT NULL
@@ -544,6 +553,15 @@ Status:
 - `ACTIVE`
 - `DISABLED`
 
+Constraints/indexes:
+
+```text
+CHECK(status IN ('ACTIVE', 'DISABLED'))
+INDEX(merchant_id, status, created_at DESC)
+```
+
+Endpoint URLs are intentionally not globally or merchant unique.
+
 ### `webhook_endpoint_events`
 
 ```text
@@ -551,6 +569,7 @@ endpoint_id          BIGINT NOT NULL FK -> webhook_endpoints.id
 event_type           VARCHAR NOT NULL
 
 PRIMARY KEY(endpoint_id, event_type)
+CHECK(event_type IN the six supported public Webhook event names)
 ```
 
 ### `webhook_events`
@@ -558,6 +577,8 @@ PRIMARY KEY(endpoint_id, event_type)
 ```text
 id                  BIGINT PK
 public_id           VARCHAR NOT NULL UNIQUE
+source_event_id     VARCHAR NOT NULL UNIQUE
+merchant_id         BIGINT NOT NULL FK -> merchants.id
 event_type          VARCHAR NOT NULL
 resource_type       VARCHAR NOT NULL
 resource_id         VARCHAR NOT NULL
@@ -568,15 +589,22 @@ created_at          TIMESTAMPTZ NOT NULL
 
 Webhook events are immutable.
 
+`event_type` is restricted to the six public Webhook event names and
+`resource_type` to `PAYMENT_INTENT` or `REFUND`. Source-event identity provides
+Rabbit redelivery deduplication; merchant ownership makes delivery history
+tenant-safe without querying source-module persistence.
+
 ### `webhook_deliveries`
 
 ```text
 id                     BIGINT PK
+public_id              VARCHAR NOT NULL UNIQUE
 webhook_event_id       BIGINT NOT NULL FK -> webhook_events.id
 webhook_endpoint_id    BIGINT NOT NULL FK -> webhook_endpoints.id
 status                 VARCHAR NOT NULL
 attempt_count          INTEGER NOT NULL DEFAULT 0
 next_attempt_at        TIMESTAMPTZ NULL
+lease_expires_at       TIMESTAMPTZ NULL
 delivered_at           TIMESTAMPTZ NULL
 last_http_status       INTEGER NULL
 last_error             TEXT NULL
@@ -589,13 +617,56 @@ Constraint:
 
 ```sql
 UNIQUE(webhook_event_id, webhook_endpoint_id)
+CHECK(status IN ('PENDING', 'DELIVERING', 'DELIVERED', 'RETRYING', 'DEAD'))
+CHECK(attempt_count >= 0)
+CHECK(last_http_status IS NULL OR last_http_status BETWEEN 100 AND 599)
 ```
 
 Worker index:
 
 ```sql
 INDEX(status, next_attempt_at)
+INDEX(status, lease_expires_at)
+INDEX(webhook_endpoint_id, created_at DESC)
 ```
+
+V011 enforces all scheduling timestamp combinations with a CHECK constraint:
+
+| Status | `next_attempt_at` | `lease_expires_at` | `delivered_at` |
+|---|---|---|---|
+| PENDING / RETRYING | NOT NULL | NULL | NULL |
+| DELIVERING | NULL | NOT NULL | NULL |
+| DELIVERED | NULL | NULL | NOT NULL |
+| DEAD | NULL | NULL | NULL |
+
+Among V011 tables, only mutable deliveries carry a version; immutable events
+and retained attempt history have no version column. Public delivery identities
+use `wdl_...`.
+
+P7-T10 adds no migration. Worker candidate selection joins ACTIVE endpoints and
+uses `FOR UPDATE OF delivery SKIP LOCKED` / `FOR SHARE OF endpoint SKIP LOCKED`
+in a short transaction. Each actual claim then takes the endpoint shared lock
+before the delivery write lock, rechecks due status, and commits DELIVERING,
+incremented attempt count, lease, and an OPEN attempt atomically. HTTP runs after
+commit. Finalization locks in the same order and fences by status/attempt count;
+delivery and conditional attempt completion commit or roll back together.
+
+P7-T11 also requires no migration. Expired-lease candidate selection includes
+disabled endpoints and skips contended rows. Recovery rechecks status, attempt
+number, and expiry under endpoint-before-delivery locks, then atomically closes
+the abandoned OPEN attempt and retries/stops the delivery. Unknown HTTP status
+and duration remain NULL. Endpoint disable locks the endpoint exclusively and
+cancels all PENDING/RETRYING rows using bounded write-locked pages in that same
+transaction; it never skips scheduled rows or changes retained attempt history.
+
+P7-T12 needs no migration. Delivery history reads join only Webhook-owned
+delivery/event/endpoint tables and require matching merchant ownership on both
+the event and endpoint. List filters are bound SQL parameters; count and bounded
+page queries use the same ownership predicate, with created_at DESC/id DESC
+ordering. Detail history is ordered by attempt_no ASC. Manual scheduling locks
+the endpoint for share before the delivery for update, rechecks DEAD/ACTIVE and
+the observed attempt count, and updates only delivery state/version. No attempt
+row is inserted or changed until the worker later claims that scheduled retry.
 
 ### `webhook_delivery_attempts`
 
@@ -615,7 +686,12 @@ Constraint:
 
 ```sql
 UNIQUE(delivery_id, attempt_no)
+CHECK(attempt_no > 0)
+CHECK(duration_ms IS NULL OR duration_ms >= 0)
+CHECK(http_status IS NULL OR http_status BETWEEN 100 AND 599)
 ```
+
+Webhook foreign keys do not cascade physical deletes.
 
 ## 9. Optimistic locking
 

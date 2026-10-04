@@ -1,0 +1,60 @@
+package com.flowpay.backend.webhook.infrastructure.persistence;
+
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+interface WebhookDeliveryJpaRepository extends JpaRepository<WebhookDeliveryEntity, Long> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from WebhookDeliveryEntity d where d.id = :id")
+    Optional<WebhookDeliveryEntity> findByIdForUpdate(@Param("id") long id);
+
+    @Query(value = "SELECT * FROM webhook_deliveries WHERE id = :id FOR UPDATE SKIP LOCKED", nativeQuery = true)
+    Optional<WebhookDeliveryEntity> findByIdForUpdateSkipLocked(@Param("id") long id);
+
+    @Query(value = """
+            SELECT d.* FROM webhook_deliveries d JOIN webhook_endpoints p ON p.id = d.webhook_endpoint_id
+            WHERE d.status IN ('PENDING', 'RETRYING') AND d.next_attempt_at <= :now AND p.status = 'ACTIVE'
+            ORDER BY d.next_attempt_at, d.id LIMIT :limit
+            FOR UPDATE OF d SKIP LOCKED FOR SHARE OF p SKIP LOCKED
+            """, nativeQuery = true)
+    List<WebhookDeliveryEntity> findClaimCandidates(@Param("now") Instant now, @Param("limit") int limit);
+
+    @Query("""
+            select d from WebhookDeliveryEntity d, WebhookEventEntity e, WebhookEndpointEntity p
+            where d.webhookEventId = e.id and d.webhookEndpointId = p.id
+                and d.publicId = :publicId and e.merchantId = :merchantId and p.merchantId = :merchantId
+            """)
+    Optional<WebhookDeliveryEntity> findOwned(@Param("publicId") String publicId, @Param("merchantId") long merchantId);
+
+    @Query(value = """
+            SELECT * FROM webhook_deliveries WHERE status IN ('PENDING', 'RETRYING') AND next_attempt_at <= :now
+            ORDER BY next_attempt_at, id LIMIT :limit
+            """, nativeQuery = true)
+    List<WebhookDeliveryEntity> findDue(@Param("now") Instant now, @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT * FROM webhook_deliveries WHERE status = 'DELIVERING' AND lease_expires_at <= :now
+            ORDER BY lease_expires_at, id LIMIT :limit
+            """, nativeQuery = true)
+    List<WebhookDeliveryEntity> findExpiredLeases(@Param("now") Instant now, @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT d.* FROM webhook_deliveries d JOIN webhook_endpoints p ON p.id = d.webhook_endpoint_id
+            WHERE d.status = 'DELIVERING' AND d.lease_expires_at <= :now
+            ORDER BY d.lease_expires_at, d.id LIMIT :limit
+            FOR UPDATE OF d SKIP LOCKED FOR SHARE OF p SKIP LOCKED
+            """, nativeQuery = true)
+    List<WebhookDeliveryEntity> findRecoveryCandidates(@Param("now") Instant now, @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT * FROM webhook_deliveries WHERE webhook_endpoint_id = :endpointId
+                AND status IN ('PENDING', 'RETRYING') ORDER BY id LIMIT :limit FOR UPDATE
+            """, nativeQuery = true)
+    List<WebhookDeliveryEntity> findScheduledByEndpointForUpdate(@Param("endpointId") long endpointId, @Param("limit") int limit);
+}

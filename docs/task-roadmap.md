@@ -259,22 +259,41 @@ acceptance criteria, and the mandatory implementation order.
 
 ## Phase 7 — Webhooks
 
-Planned tasks:
+Status: `DONE/FROZEN` as of 2026-10-04.
 
-- endpoint/subscription schema.
-- endpoint CRUD.
-- secret generation/encryption.
-- webhook event materialization.
-- delivery queue/state.
-- HMAC signing.
-- HTTP delivery adapter.
-- retry/backoff.
-- delivery-attempt history.
-- dead state/manual retry.
-- dashboard delivery APIs.
-- integration tests.
+Completed tasks:
+
+- P7-T01 Phase 6 exit gate and Webhook architecture freeze.
+- P7-T02 Webhook configuration migration.
+- P7-T03 WebhookEndpoint domain, URL policy, and secret cryptography.
+- P7-T04 Webhook endpoint persistence and dashboard APIs.
+- P7-T05 Complete Webhook source event catalog.
+- P7-T06 Webhook delivery migration.
+- P7-T07 WebhookEvent, Delivery, and Attempt domain/persistence.
+- P7-T08 RabbitMQ Webhook topology and event materialization.
+- P7-T09 HMAC signing and outbound HTTP adapter.
+- P7-T10 Delivery claim, lease, and attempt execution.
+- P7-T11 Retry, DEAD state, and stale-delivery recovery.
+- P7-T12 Manual retry and delivery dashboard APIs.
+- P7-T13 End-to-end event-to-Webhook verification.
+- P7-T14 Concurrency, failure, and security hardening.
+- P7-T15 Architecture and regression tests.
+- P7-T16 Quality gate and documentation freeze.
+
+P7-T16 passed 59 focused Webhook migration tests and the complete 1,173-test
+`clean verify` gate on Java 21 / Maven 3.9.16, with zero failures, errors, or skips.
+Clean PostgreSQL/RabbitMQ Compose health checks used a separate disposable
+project; Testcontainers independently supplied fresh test infrastructure.
+Existing development volumes were preserved. V001–V011, source-event contracts,
+Webhook/financial regressions, and architecture boundaries remain verified.
+The functional simulator MVP is complete; Phase 6 remains DONE/FROZEN.
+
+See the local `phase-7-webhooks.md` plan for frozen decisions, dependencies,
+acceptance criteria, and the mandatory implementation order.
 
 ## Phase 8 — Production Engineering
+
+Status: `NOT STARTED`. Begin only on an explicit follow-up assignment.
 
 Post-functional-MVP hardening:
 
