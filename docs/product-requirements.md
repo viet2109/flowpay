@@ -178,33 +178,42 @@ idempotent eventual Ledger posting for versioned Payment/Refund success events.
 
 ### Phase 7 — Webhooks
 
-Status: `IN PROGRESS` as of 2026-09-13.
+Status: `DONE/FROZEN` as of 2026-10-04 after P7-T16's clean quality gate.
+The functional simulator MVP is complete; production readiness is not implied.
 
-Endpoint configuration, subscriptions, immutable event materialization, signed
-at-least-once HTTP delivery, leased multi-instance claiming, retry/backoff,
-delivery history, and dead delivery handling. Architecture/contracts are frozen,
-the V010 endpoint/subscription schema is complete, and endpoint lifecycle, URL
-policy, and secret cryptography are implemented. Merchant-scoped dashboard APIs
-now persist, list, retrieve, update, soft-disable, and rotate endpoint secrets
-with optimistic concurrency protection. Automatic HTTP delivery remains pending. The
-complete six-event Payment/Refund source catalog now writes
-processing and known failure events atomically through Outbox, preserving
-UNKNOWN semantics and the existing success-only Ledger consumer.
-V011 now supplies the event/delivery/attempt schema with source-event dedupe,
-merchant ownership, public delivery identity, state/timestamp checks, lease
-indexes, and retained attempt history. Event/delivery/attempt domain and
-persistence are implemented with immutable event snapshots, attempt fencing,
-optimistic delivery locking, and one-time attempt completion. Rabbit materialization
-now consumes all six types, creates immutable public snapshots and PENDING
-deliveries for matching ACTIVE subscriptions atomically, and deduplicates source
-events without recomputing subscriptions. Contradictory/malformed events follow
-bounded retry to the independent Webhook DLQ; Ledger remains success-only.
-HMAC signing and the bounded no-redirect HTTP adapter are implemented with exact
-body-byte signing, safe diagnostics, URL revalidation, and no response-body
-retention. Worker orchestration, automatic HTTP delivery, and dashboard delivery
-APIs remain pending.
+The complete six-event Payment/Refund catalog writes processing, success, and
+known failure facts atomically through Outbox, preserving UNKNOWN semantics and
+the existing success-only Ledger consumer. V010/V011 implement endpoint,
+subscription, immutable event, leased delivery, and retained attempt schemas.
+Dashboard JWT APIs create/list/get/update/soft-disable endpoints and rotate
+AES-256-GCM-protected signing secrets, with tenant ownership and concurrency
+protection. Secrets are returned once on create/rotate, never on reads.
+
+RabbitMQ materialization handles all six types, snapshots ACTIVE subscriptions
+only once per source event, and commits event/delivery rows before ACK. Equivalent
+redelivery does not recompute subscriptions; malformed/contradictory messages
+follow bounded consumer retry to the independent Webhook DLQ.
+
+The enabled worker claims each due delivery and OPEN attempt transactionally,
+sends exact-body HMAC-signed HTTP outside a DB transaction with URL revalidation,
+bounded timeouts and no redirects, then fences finalization by attempt number.
+Five jittered retry delays give six normal attempts; exhausted deliveries become
+DEAD. Expired leases recover abandoned attempts without fabricating HTTP results.
+Disabling an endpoint atomically cancels scheduled work; an in-flight request may
+finish with its claimed URL/secret snapshot. Later attempts use current secrets.
+
+Dashboard delivery list/detail APIs expose filters, pagination, safe diagnostics
+and ordered attempt history. Manual retry returns 202, requires an owned DEAD
+delivery and ACTIVE endpoint, and retains counts/history without synchronous
+HTTP. External delivery is at-least-once with stable event ID/body and merchant
+dedupe, not guaranteed ordering or exactly-once processing. Delivery failures
+do not mutate Payment, Refund, Ledger, or published Outbox records. Clean
+migration, E2E, crash/concurrency, security and architecture regressions cover
+these boundaries. Phase 6 remains DONE/FROZEN; Phase 8 hardening is not included.
 
 ### Phase 8 — Production engineering
+
+Status: `NOT STARTED`.
 
 Hardening after the functional MVP: richer tracing/metrics, load testing, security hardening, deployment improvements, and operational tooling.
 

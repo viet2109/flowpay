@@ -716,6 +716,11 @@ Dashboard JWT required.
 All endpoint identifiers are public `wep_...` IDs. Unknown and cross-merchant
 resources both return `404`.
 
+Production URLs require HTTPS, a valid host, and no user-info or fragment.
+Obvious private/local/metadata/non-routable literal targets are rejected. The
+explicit development/test localhost switch is not production egress protection;
+DNS-rebinding and network-egress hardening remain Phase 8 work.
+
 ### Create endpoint
 
 ```http
@@ -804,6 +809,9 @@ POST /api/v1/merchant/webhook-endpoints/{endpointId}/rotate-secret
 
 Returns the new raw secret once.
 
+Rotation affects later claims only: an in-flight request retains the secret
+captured for that attempt. There is no dual-secret grace period or re-enable API.
+
 ```json
 {
   "data": {
@@ -853,7 +861,7 @@ Algorithm:
 
 `HMAC-SHA256`
 
-Default timestamp tolerance:
+Merchant-side verification timestamp tolerance:
 
 `5 minutes`
 
@@ -904,6 +912,21 @@ Processing/failed Refund variants use the corresponding type and status, just
 like Payment. An event is materialized once even with no ACTIVE subscribers.
 Delivery subscriptions are snapshotted on its first materialization; redelivery
 does not include endpoints configured afterward.
+
+External delivery is at-least-once, not exactly-once. Deliveries progress through
+PENDING/DELIVERING to DELIVERED, RETRYING, or DEAD. The initial attempt is immediate;
+five base retry delays (10s, 30s, 2m, 10m, 1h) have deterministic additive 0–20%
+jitter and give six normal attempts. HTTP 429/410, other non-2xx statuses, and
+transport failures use the same policy; no automatic Retry-After or endpoint
+disable behavior is implemented.
+
+Expired leases can cause another HTTP request with the same event ID/body. The
+abandoned attempt is retained with `DELIVERY_LEASE_EXPIRED` and unknown HTTP
+status/duration as null; late results cannot overwrite it or a newer attempt.
+DEAD deliveries are not automatically claimed. Their manual retry path below
+allows an additional attempt without resetting the automatic budget/history.
+Delivery DEAD is not the materializer RabbitMQ DLQ, and delivery failure never
+changes Payment/Refund/Ledger or a published Outbox record.
 
 ### Delivery history
 

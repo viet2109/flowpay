@@ -259,7 +259,7 @@ acceptance criteria, and the mandatory implementation order.
 
 ## Phase 7 — Webhooks
 
-Status: `IN PROGRESS`.
+Status: `DONE/FROZEN` as of 2026-10-04.
 
 Completed tasks:
 
@@ -278,15 +278,22 @@ Completed tasks:
 - P7-T13 End-to-end event-to-Webhook verification.
 - P7-T14 Concurrency, failure, and security hardening.
 - P7-T15 Architecture and regression tests.
-
-Remaining tasks:
-
 - P7-T16 Quality gate and documentation freeze.
+
+P7-T16 passed 59 focused Webhook migration tests and the complete 1,173-test
+`clean verify` gate on Java 21 / Maven 3.9.16, with zero failures, errors, or skips.
+Clean PostgreSQL/RabbitMQ Compose health checks used a separate disposable
+project; Testcontainers independently supplied fresh test infrastructure.
+Existing development volumes were preserved. V001–V011, source-event contracts,
+Webhook/financial regressions, and architecture boundaries remain verified.
+The functional simulator MVP is complete; Phase 6 remains DONE/FROZEN.
 
 See the local `phase-7-webhooks.md` plan for frozen decisions, dependencies,
 acceptance criteria, and the mandatory implementation order.
 
 ## Phase 8 — Production Engineering
+
+Status: `NOT STARTED`. Begin only on an explicit follow-up assignment.
 
 Post-functional-MVP hardening:
 

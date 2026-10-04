@@ -864,6 +864,42 @@ another provider call or financial mutation. Prior UNKNOWN, refund-capacity,
 success-only Ledger routing, tenant/security, and public API regressions remain
 part of the full verification gate.
 
+### Phase 7 quality gate
+
+P7-T16 completed on 2026-10-04. Phase 7 is DONE/FROZEN and the functional
+simulator MVP is complete; Phase 6 remains DONE/FROZEN. No new API, schema,
+event contract, dependency, transaction boundary, or locking strategy was needed.
+Applied V010/V011 migrations remain unchanged; later shared-schema corrections
+require reviewed forward migrations.
+
+Verification used JDK 21 and Maven 3.9.16: 59 focused Webhook migration tests,
+then `clean verify` with 1,173 tests, zero failures/errors/skips. Optional OTLP
+metrics export was disabled for this local run; no business worker, consumer,
+or infrastructure test was excluded by run-specific overrides. No test-skip
+flag was supplied.
+
+| Acceptance area | Existing verification evidence |
+|---|---|
+| V001–V011, upgrade preservation, constraints/indexes | `WebhookConfigurationMigrationTest`, `WebhookDeliveryMigrationTest`, earlier migration suites |
+| Endpoint lifecycle, JWT/tenant isolation, encrypted secret, URL policy | `WebhookEndpointApiTest`, cryptography and URL-policy suites |
+| Six source events, unchanged success V1, snapshot/dedupe, independent DLQ | `SourceEventLifecycleIntegrationTest`, `WebhookIntegrationEventConsumerIntegrationTest`, `WebhookEventMaterializationIntegrationTest` |
+| Exact-body HMAC, bounded no-redirect HTTP | `HmacSha256WebhookSignerTest`, `WebhookHttpClientIntegrationTest` |
+| Claim/attempt/lease, stale fencing, jitter/DEAD, disable/rotation, manual retry/history | `WebhookDeliveryExecutionIntegrationTest`, `WebhookDeliveryRecoveryIntegrationTest`, `WebhookDeliveryHardeningIntegrationTest`, `WebhookDeliveryApiTest` |
+| DB + Rabbit + HTTP, financial isolation and earlier phase regressions | `PhaseSevenWebhookEndToEndIntegrationTest`, `PhaseSixEndToEndIntegrationTest`, Payment/Refund/Idempotency/Ledger suites |
+| Module boundaries and no external call inside DB transactions | `ArchitectureTest`, `TransactionBoundaryRegressionTest` |
+
+The clean infrastructure smoke check used a disposable Compose project with
+fresh isolated PostgreSQL 16.15/RabbitMQ 4.3 volumes and healthy services. The
+checked-in Compose definition pins development container names; merely changing
+`-p` would not isolate that definition. Development volumes were not reset.
+Testcontainers separately provided fresh test databases/brokers, including
+migration verification; Compose health alone does not verify schema/application
+behavior. Only the disposable gate project's resources are eligible for cleanup.
+
+The gate does not claim exactly-once HTTP, ordered delivery, real-money
+processing, or production readiness. Phase 8 network/operations/security/load
+hardening remains unstarted and requires a separate assignment.
+
 ## 17. Logging and observability
 
 Every HTTP request receives/propagates `X-Request-Id`.

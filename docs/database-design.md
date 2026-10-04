@@ -36,6 +36,7 @@ Examples:
 | LedgerTransaction | `ltxn_` |
 | WebhookEndpoint | `wep_` |
 | WebhookEvent | `evt_` |
+| WebhookDelivery | `wdl_` |
 
 ### Money
 
@@ -527,9 +528,11 @@ INDEX(status, available_at)
 
 V010 implements endpoint configuration/subscriptions; V011 implements the
 event, delivery, and attempt schema below. V011 preserves V001–V010 and existing
-endpoint data. P7-T08 now materializes event/delivery rows transactionally using
-source-ID uniqueness and locked ACTIVE subscription snapshots. Delivery execution
-remains a subsequent Phase 7 task; neither behavior is performed by migrations.
+endpoint data. Materialization uses source-ID uniqueness and locked ACTIVE
+subscription snapshots. The delivery worker implements transactional claim,
+fenced finalization, lease recovery, and retained attempt history. These are
+application use cases, not behavior performed by migrations. V010/V011 remain
+unchanged; later shared-schema defects require reviewed forward migrations.
 
 ### `webhook_endpoints`
 
