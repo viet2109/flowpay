@@ -8,8 +8,9 @@ data.
 
 Phases 0–7 are complete; Phase 7 Webhooks is DONE/FROZEN as of 2026-10-04 after
 its clean quality gate. The functional simulator MVP is complete. Phase 8
-production engineering has started with P8-T01's verified baseline/design;
-runtime hardening tasks remain pending.
+production engineering has completed P8-T01's baseline/design and P8-T02's
+production configuration, management isolation and probes. Remaining hardening
+and staging tasks are pending.
 
 ## Implemented flow
 
@@ -81,8 +82,8 @@ development defaults, also supply the matching `DB_URL`, `DB_USERNAME`,
 configured JWT public/private key locations; no production secrets have
 defaults in the production profile.
 
-Health is available at `/actuator/health`. OTLP export is optional for local
-development; without an OTLP collector, it can be disabled with
+Development health is available at `/actuator/health`. OTLP export is optional
+for local development; without an OTLP collector, it can be disabled with
 `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=false`.
 
 Production Webhook URL policy requires HTTPS and rejects obvious private,
@@ -91,6 +92,36 @@ never followed; connect/request timeouts default to 2s/5s. Only controlled local
 receiver testing should opt into `WEBHOOK_ALLOW_INSECURE_LOCALHOST=true`; this
 does not allow arbitrary HTTP/private-network destinations. Application URL
 checks do not replace DNS-rebinding or network-egress controls.
+
+## Production configuration and probes
+
+Activate only `prod`, not `prod,dev` or `prod,test`. Startup rejects missing or
+invalid mandatory DB/broker settings, ephemeral JWT keys, insecure-localhost
+Webhooks, public Prometheus and non-Secure refresh cookies. Supply external
+matching RSA PEM keys (X.509 public / PKCS#8 private, at least 2048 bits) and the
+stable Webhook master key. Keep database credentials separate from the single-host
+PostgreSQL JDBC URL; prod uses Rabbit `host`/`port`, not `addresses` overrides.
+Configuration failures are sanitized without echoing secret values/parser causes.
+
+Prod management defaults to `127.0.0.1:9091`. GET/HEAD
+`/actuator/prometheus`, `/actuator/info` and minimal `/actuator/health/**` are
+available only on that dedicated listener. All business-port `/actuator/**`
+requests are denied, including authenticated scrapes. The business listener
+instead serves `/livez` and `/readyz`: liveness checks process state; readiness
+checks accepting-traffic state and DB SQL connectivity, not RabbitMQ/OTLP.
+DB outage returns readiness 503; broker outage makes aggregate internal health
+503 without blocking otherwise durable source + Outbox acceptance.
+
+`MANAGEMENT_SERVER_PORT` must differ from the business port. Override
+`MANAGEMENT_SERVER_ADDRESS` only for an explicitly private interface/container
+network; never publish or proxy the management port to public ingress. There
+is no management credential flow: loopback/private network is its trust boundary.
+Actual Linux staging network enforcement is still P8-T13 work.
+
+Graceful HTTP shutdown is enabled with a prod limit of 30s **per lifecycle phase**,
+not a whole-process deadline. Container signal/grace periods, worker shutdown
+and CPU/memory/JVM limits remain packaging/staging tasks. See the
+[configuration, listener and lifecycle contract](docs/production-engineering.md#6-production-configuration-and-management-t02).
 
 ## Verification
 
@@ -109,6 +140,11 @@ The P7-T16 gate passed on Java 21 / Maven 3.9.16: 59 focused Webhook migration
 tests and 1,173 full-suite tests, with zero failures, errors, or skipped tests.
 See the [architecture verification record](docs/architecture.md#phase-7-quality-gate)
 for scope and infrastructure isolation.
+
+P8-T02 passed focused configuration/security regressions and full `clean verify`:
+1,227 tests in 173 suites, zero failures/errors/skips. The new prod-profile tests
+use real separate listeners, disposable DB/broker resources and synthetic
+temporary keys; deployment-network and image lifecycle proof remain later gates.
 
 For a clean infrastructure smoke check, use a dedicated disposable Compose
 project with separate container names, volumes, and ports. The checked-in
@@ -133,8 +169,9 @@ the repository's shared entry points.
 
 Phase 8 targets reproducible Linux/container staging; no provider, cloud account
 or external deployment has been selected. P8-T01 verifies the merged Phase 7
-baseline and records the task/design gates. Stronger egress/DNS-rebinding
-controls, operational metrics/tracing, load testing, security/dependency review,
+baseline; P8-T02 implements production startup and management/probe controls.
+Stronger egress/DNS-rebinding controls, operational metrics/tracing, load testing,
+security/dependency review,
 packaging/staging, backup/recovery, and runbooks are still pending implementation.
 The functional simulator MVP is not a claim of
 production readiness, real payment processing, guaranteed cross-event ordering,

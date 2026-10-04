@@ -213,17 +213,22 @@ these boundaries. Phase 6 remains DONE/FROZEN; Phase 8 hardening is not included
 
 ### Phase 8 — Production engineering
 
-Status: `IN PROGRESS` as of 2026-10-04; P8-T01 baseline/design complete.
+Status: `IN PROGRESS` as of 2026-10-04; P8-T01 baseline/design and P8-T02
+production configuration/management complete.
 
 Target selected by the user: reproducible staging on Linux/container, without
 a chosen provider or external deployment. The Phase 7 release is merged into
 remote main, the phase branch is isolated, and the fresh 1,173-test baseline
 gate passes with zero failures/errors/skips. P8-T01 introduces documentation
-only, not runtime hardening or a new business feature.
+only. P8-T02 adds fail-closed production startup, a dedicated loopback-by-default
+management scrape listener, public Actuator denial, DB/availability readiness,
+process liveness and bounded HTTP graceful shutdown. Broker/telemetry outages
+do not block durable source + Outbox acceptance; no business contract changed.
+Staging network and container/worker lifecycle proof remain separate gates.
 
-The remaining 17 tasks cover committed-outcome and asynchronous metrics,
-synchronous/durable tracing, monitoring/alerts, production configuration and
-management security, Webhook DNS/egress enforcement, auth/security review,
+The remaining 16 tasks cover committed-outcome and asynchronous metrics,
+synchronous/durable tracing, monitoring/alerts, Webhook DNS/egress enforcement,
+auth/security review,
 CI/supply-chain gates, a constrained image, staged deployment, declared load and
 multi-instance failure drills, actual DB/broker/key restore and runbooks.
 Specific tool versions, trace DDL/security contract changes and measured

@@ -1,7 +1,8 @@
 # Production Engineering — Phase 8 Design Record
 
-Status: P8-T01 design/exit baseline complete on 2026-10-04; Phase 8 IN PROGRESS.
-Runtime hardening is not implemented by this document. Phase 7 remains
+Status: P8-T01 design/exit baseline and P8-T02 configuration/management implemented
+on 2026-10-04; Phase 8 IN PROGRESS. Remaining runtime/operational controls are
+owned by subsequent tasks. Phase 7 remains
 DONE/FROZEN; the simulator functional MVP remains complete.
 
 This tracked document records shared scope and decision gates. The detailed
@@ -44,9 +45,9 @@ documentation-only preparation does not require repeating an unchanged suite.
 | Source events | Six processing/success/known-failure facts; success V1 preserved; UNKNOWN non-terminal | T06-T07 add technical trace correlation, not business fields |
 | Webhook delivery | Immutable event/subscription snapshot; claim/OPEN/lease; exact-body signed no-TX HTTP; fenced finalize; jitter/DEAD/manual retry | T04/T07/T09/T14-T16 operational evidence |
 | Observability foundation | Actuator, Micrometer Prometheus registry, OpenTelemetry starter, X-Request-Id MDC | T03-T08 add and verify business/async observations |
-| Management security | Prod does not permit Prometheus; current catch-all denies access | T02 supplies a tested internal scrape route, never a public workaround |
+| Management security | T02: dedicated loopback-by-default listener; internal scrape allowed, public Actuator denied | T13 must prove private staging network/ingress enforcement |
 | URL/network safety | HTTPS/literal target checks, no redirects, bounded JDK HTTP; arbitrary DNS hostnames are not resolved by URL policy | T09 proves effective-destination and egress non-bypassability |
-| Health/shutdown | Probes and graceful shutdown configured; workload-specific readiness not yet verified | T02/T12-T15 prove semantics and lifecycle |
+| Health/shutdown | T02: DB + availability readiness, process liveness, bounded HTTP drain verified | T12-T15 prove image signals, workers and staged lifecycle |
 | CI | A workflow exists locally in untracked `.github/`; it is not the repository's committed CI | T11 reviews ownership and introduces approved tracked gates |
 | Packaging/operations | No production image/staging/monitoring/load/restore gate demonstrated | T08/T12-T18 own implementation and evidence |
 
@@ -134,29 +135,102 @@ Importing those specifications does not upgrade Java dependencies automatically.
 
 ## 6. Production configuration and management (T02)
 
-Fail startup safely for missing/invalid mandatory DB/broker configuration,
-persistent JWT key material or the externally supplied 32-byte Webhook
-encryption key. Do not expose values in diagnostics. Development ephemeral JWT
-and insecure-localhost conveniences must not silently activate in prod.
+### Startup and secret ownership
+
+P8-T02 registers an EnvironmentPostProcessor immediately after Boot ConfigData,
+before bean binding/DB initialization. In `prod` it rejects missing/blank or
+malformed mandatory settings with property names and fixed safe messages, not
+values/parser causes. It requires a single-host PostgreSQL JDBC URL with a
+database, separate username/password, and a RabbitMQ hostname/IP, valid port
+and credentials. Credentials in the JDBC URL and Rabbit `addresses` overrides
+are rejected; this baseline uses `host`/`port`, not a second connection path.
+
+Prod cannot be combined with `dev`/`test` profiles. Ephemeral JWT generation,
+insecure-localhost Webhooks and public Prometheus must be false; refresh cookies
+must remain Secure. JWT resources must be readable X.509 public / PKCS#8 private
+PEM containing a matching RSA pair of at least 2048 bits. Loading errors discard
+sensitive resource/parser causes; persisted keys are reused, not regenerated.
+The external Webhook encryption key must decode from standard Base64 to exactly
+32 bytes. Do not use synthetic test keys outside tests.
+
+Boot does not automatically read the root `.env`. Compose's `.env` substitution
+does not export values into an IDE/application process; provide process env or
+external ConfigData/secret mounts. Required environment names are `DB_URL`,
+`DB_USERNAME`, `DB_PASSWORD`, `RABBITMQ_HOST`, `RABBITMQ_USERNAME`,
+`RABBITMQ_PASSWORD`, `JWT_PUBLIC_KEY_LOCATION`, `JWT_PRIVATE_KEY_LOCATION` and
+`WEBHOOK_SECRET_ENCRYPTION_KEY`; `RABBITMQ_PORT` defaults to 5672. Use external
+read-only mounts for persistent key files; never put secret values on a real
+production command line, in an image, a Git commit or a diagnostics artifact.
+Deployment operators own these secrets and continuity across replicas/restores.
 Replacing the encryption key is not a supported rotation procedure and can
 make existing endpoint records unreadable.
 
-Provide a dedicated management listener reachable only on the lab's internal
-management path, not through public/business ingress. Prove internal scraping
-works and public scraping does not. Do not simply enable
-`prometheus-public=true` or treat exposure configuration as authorization.
-T02 documents the exact listener/access enforcement and tests the real routes;
-T13 proves the staged network/reverse-proxy boundary.
+### Listener and authorization boundary
 
-Liveness represents process viability. Readiness represents the declared
-request workload. DB inability to accept source transactions matters; broker or
-collector failure must not automatically block otherwise valid durable source
-requests merely to make a global health endpoint green. The exact health-group
-behavior is reviewed/tested in T02 and remains distinct from dependency alerts.
+Prod management defaults to `127.0.0.1:9091`, independently of the business
+listener (default 8080). `MANAGEMENT_SERVER_PORT` must be a different port;
+port 0 is supported for isolated tests. `MANAGEMENT_SERVER_ADDRESS` defaults to
+loopback. An explicit private interface/container bind is an operator decision:
+do not publish that port, route it through public ingress, or attach untrusted
+containers to its network. T13 must prove those actual deployment boundaries;
+T02 does not claim that a staging network already exists.
 
-Document application versus Compose environment loading, configured resource
-limits, graceful shutdown and required secret continuity. Never commit `.env`,
-JWT/private key material or Webhook master keys.
+A prod-only first security chain identifies the management connector by the
+request's **local** port, not Host/Forwarded headers. It allows unauthenticated
+GET/HEAD only for `/actuator/health/**`, `/actuator/info` and
+`/actuator/prometheus`. The private listener/network is the scrape trust boundary;
+this is not a management-user credential API. All other management routes,
+including business APIs, discovery, env/configprops/loggers/shutdown, are denied.
+On the business listener **all** `/actuator/**` routes are denied, even with a
+valid dashboard JWT. Existing business authentication is unchanged. Dev retains
+its existing single-listener local Prometheus behavior; test defaults stay closed.
+Health details/components remain `never`; component navigation is hidden (404).
+
+### Probes and lifecycle
+
+| Prod route | Listener | Meaning |
+|---|---|---|
+| `/livez` | Business | `livenessState` only; process viability |
+| `/readyz` | Business | `readinessState,db`; accepting traffic plus DB SQL connectivity |
+| `/actuator/health/liveness`, `/actuator/health/readiness` | Management | Same groups, minimal status only |
+| `/actuator/health` | Management | Aggregate dependency status, not routing readiness |
+| `/actuator/prometheus` | Management | Prometheus scrape, no business authentication change |
+
+DB outage makes readiness DOWN/503, not liveness. Broker outage makes aggregate
+health DOWN/503 but leaves readiness/liveness UP/200 if PostgreSQL is usable;
+durable source + Outbox acceptance remains available while publication/consumers
+recover separately. Telemetry exporters are not readiness dependencies. The DB
+SQL probe is not proof of write capacity, performance or successful asynchronous
+delivery; schema validation/migrations remain startup checks. An explicit
+REFUSING_TRAFFIC availability state makes readiness OUT_OF_SERVICE/503.
+
+`server.shutdown=graceful` is retained and prod explicitly sets
+`spring.lifecycle.timeout-per-shutdown-phase=30s`. Context closure drains an
+in-flight HTTP request and stops new acceptance through Boot's server lifecycle.
+This is a timeout **per lifecycle phase**, not a guaranteed whole-process 30s
+deadline. T12/T13 must choose the container termination grace period accordingly;
+image SIGTERM propagation and worker/lease/multi-instance recovery belong to
+T12-T15, not this HTTP-context test. CPU/memory/JVM limits are not yet configured
+in a runtime image; T12-T14 own declared resource limits and measured tuning.
+
+The implementation follows Boot's [separate management listener](https://docs.spring.io/spring-boot/reference/actuator/monitoring.html),
+[health groups and additional probe paths](https://docs.spring.io/spring-boot/reference/actuator/endpoints.html),
+and [graceful shutdown lifecycle](https://docs.spring.io/spring-boot/reference/web/graceful-shutdown.html).
+FlowPay chooses DB-only dependency readiness to preserve its Outbox semantics.
+
+T02 verification (2026-10-04, Java21/Maven3.9.16): the final focused regression
+command passed 127 tests, followed by 45 expanded validator tests (41 overlap;
+131 distinct cases). Full `clean verify` passed 1,227 tests across 173 suites in
+5m16s, zero failures/errors/skips. Optional local OTLP metrics export was disabled;
+DB/broker tests were not skipped. Real prod-profile listeners use owned disposable
+PostgreSQL/RabbitMQ plus temporary synthetic key files. Tests cover sanitized
+startup errors, persistent/weak/mismatched/malformed/unreadable RSA keys, public
+denial with valid JWT and forwarded headers, minimal probes, dependency outages,
+explicit REFUSING_TRAFFIC and in-flight HTTP drain. Existing source/Outbox
+broker-outage recovery, authentication and architecture/transaction gates pass.
+An executable-JAR smoke check verifies the packaged guard rejects prod/dev
+profiles before context initialization (exit 1, expected sanitized message);
+it does not access development infrastructure or claim deployment readiness.
 
 ## 7. Staging topology and monitoring (T08/T12-T13)
 

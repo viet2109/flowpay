@@ -947,8 +947,20 @@ reviewed T06/T07 forward migrations, not a change to success V1, source facts or
 public signed Webhook bodies. Tracing preserves source/materialization/claim/
 HTTP/finalize boundaries and uses separate bounded consumer/attempt spans.
 
-T02 owns internal-only management access and workload-specific probes. T09 owns
-effective-destination/egress protection, initially using a reviewed proxy/network
+T02 implements a prod-only dedicated management listener (loopback:9091 by
+default) with local-connector-port authorization. Only internal GET/HEAD health,
+info and Prometheus are permitted; all business-listener Actuator routes are
+denied, including for dashboard JWTs. Main-listener `/livez` checks process state;
+`/readyz` checks readinessState plus DB, not RabbitMQ or telemetry. Broker outage
+does not remove durable source + Outbox acceptance; aggregate health still
+reflects dependency failure. Startup validates required production configuration
+before bean binding, rejects dev/test conveniences, and loads matching persistent
+RSA keys with sanitized failures. Bounded HTTP graceful shutdown is tested on
+real listeners; image/worker lifecycle and private staging network enforcement
+remain T12-T15 work. See section 6 of `production-engineering.md` for the exact
+configuration and probe contract. No schema or business contract changed.
+
+T09 owns effective-destination/egress protection, initially using a reviewed proxy/network
 path with the existing JDK client. Actual DNS/IPv4/IPv6/TLS/bypass evidence is
 required; a preliminary lookup alone is not network-hardening acceptance.
 Security/API defects, new Java dependencies and concrete trace DDL require their

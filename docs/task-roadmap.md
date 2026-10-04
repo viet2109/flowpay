@@ -295,7 +295,8 @@ acceptance criteria, and the mandatory implementation order.
 
 Status: `IN PROGRESS` as of 2026-10-04.
 
-Completed: P8-T01 Phase 7 exit gate and production-engineering design freeze.
+Completed: P8-T01 baseline/design and P8-T02 production configuration, health
+and management security. Next: P8-T03 (not started).
 
 The user selected staging Linux/container with no provider/external deployment.
 Phase 7 source `d348b10` was pushed and merged into remote main at `0b96400`;
@@ -312,7 +313,7 @@ phase branch before completion unless explicitly requested. Existing untracked
 | Task | Name | Depends on | Status |
 |---|---|---|---|
 | P8-T01 | Phase 7 Exit Gate and Production Engineering Freeze | Phase 7 DONE/FROZEN and merged | DONE |
-| P8-T02 | Production Configuration, Health and Management Security | P8-T01 | PLANNED |
+| P8-T02 | Production Configuration, Health and Management Security | P8-T01 | DONE |
 | P8-T03 | Payment, Refund and Idempotency Metrics | P8-T01, P8-T02 | PLANNED |
 | P8-T04 | Outbox, Ledger and Webhook Operational Metrics | P8-T03 | PLANNED |
 | P8-T05 | HTTP Tracing and Safe Log Correlation | P8-T02 | PLANNED |
@@ -337,6 +338,29 @@ Runtime controls, concrete proxy/tool versions, technical trace migrations and
 numeric performance/recovery acceptance are owned by their tasks; preparation
 does not claim they are already implemented or measured. No financial/API/event
 schema/locking change or external provisioning is introduced by P8-T01.
+
+P8-T02 verifies fail-closed prod startup with safe diagnostics, persistent
+matching RSA keys, dev/test separation, dedicated loopback-by-default management
+scraping and business-port Actuator denial (including valid JWT/forwarded-header
+attempts). Main `/livez` and `/readyz` separate process health from DB/availability
+readiness; real broker outage leaves readiness UP, DB outage makes it DOWN.
+An in-flight HTTP request drains during bounded graceful context shutdown.
+No business API/event/schema/dependency/transaction/locking changes. Actual
+staging networks, image signals, resource limits and worker lifecycle remain
+their later gates; private management-network access is the trust boundary.
+
+Verification on JDK21/Maven3.9.16: final eight-class focused regression command
+passed 127 tests, then the expanded startup validator passed 45 tests (41 overlap,
+131 distinct focused cases). Full `clean verify` passed 1,227 tests in 173 suites,
+zero failures/errors/skips, 5m16s. Only optional OTLP metrics export was disabled;
+required DB/broker tests ran. Compilation/ArchUnit/transaction checks and
+`git diff --check` pass; no formatting plugin is configured. Management tests
+use owned disposable PostgreSQL/RabbitMQ and temporary synthetic RSA keys, not
+development resources. Local phase/index corrections stay unstaged; pre-existing
+`.env`/`.github/` remain untouched. Task commit stays local on the phase branch.
+The packaged executable JAR also rejects mixed prod/dev profiles before context
+initialization (exit 1 with the expected sanitized guard message); no deployment
+or database connection was used for that smoke check.
 
 ## Agent task template
 

@@ -2,6 +2,8 @@ spring:
   config:
     activate:
       on-profile: prod
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -13,6 +15,20 @@ spring:
     password: ${RABBITMQ_PASSWORD}
 
 management:
+  server:
+    port: ${MANAGEMENT_SERVER_PORT:9091}
+    address: ${MANAGEMENT_SERVER_ADDRESS:127.0.0.1}
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+      probes:
+        add-additional-paths: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
   tracing:
     sampling:
       probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
