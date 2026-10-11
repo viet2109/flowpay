@@ -96,6 +96,10 @@ public final class ProductionEnvironmentPostProcessor implements EnvironmentPost
         require("never".equals(value(environment, "management.endpoint.health.show-details"))
                         && "never".equals(value(environment, "management.endpoint.health.show-components")),
                 "prod health details and components must remain hidden");
+        require(com.flowpay.backend.webhook.infrastructure.http.WebhookEgressProperties.validHost(
+                        required(environment, "flowpay.webhook.egress.proxy-host")),
+                "flowpay.webhook.egress.proxy-host must be a hostname or IP without credentials or port");
+        port(environment, "flowpay.webhook.egress.proxy-port", false);
     }
 
     private static int port(ConfigurableEnvironment environment, String key, boolean randomAllowed) {

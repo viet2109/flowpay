@@ -1000,7 +1000,7 @@ Incoming propagation reads W3C traceparent only, never baggage or B3. Root
 sampling/export configuration and console MDC fields are explicit. Request IDs
 remain independent of trace IDs and the public contract is unchanged.
 
-Provider application calls and the existing Webhook JDK transport have scoped
+Provider application calls and the dedicated Webhook HTTP transport have scoped
 CLIENT spans outside DB transactions, with normalized outcomes only. Scope
 cleanup restores context; telemetry failure preserves results/exceptions and
 interruption. No context headers are added to signed Webhook HTTP. Domain code
@@ -1060,9 +1060,32 @@ real listeners; image/worker lifecycle and private staging network enforcement
 remain T12-T15 work. See section 6 of `production-engineering.md` for the exact
 configuration and probe contract. No schema or business contract changed.
 
-T09 owns effective-destination/egress protection, initially using a reviewed proxy/network
-path with the existing JDK client. Actual DNS/IPv4/IPv6/TLS/bypass evidence is
-required; a preliminary lookup alone is not network-hardening acceptance.
+T09 implements effective-destination protection with a fixed enforcing CONNECT
+proxy and an application container on an internal-only network. Only the proxy
+joins its outbound network; trusted DB/broker/telemetry paths remain separate.
+The proxy evaluates every cached IPv4/IPv6 destination and denies private,
+special-use and mixed answers. A preliminary application DNS lookup alone is
+not network-hardening acceptance. See [egress design and evidence](webhook-egress.md).
+
+After reproduced proxied IPv6-literal SNI failures on Java 21/25, the user approved
+Apache HttpClient 5 solely for the Webhook infrastructure adapter. Java 21 and
+the public port/API/event/financial/transaction contracts remain unchanged.
+Client 5.6.4/Core 5.4.4 are explicitly selected over Boot's managed pair for
+documented stable async TLS/Core fixes. The dedicated asynchronous HTTP/1 client
+uses a fixed proxy route with no system proxy or direct fallback, trusted TLS
+chains and explicit hostname/IP-SAN verification. Only the operator's proxy DNS
+is snapshotted at bounded startup; refresh it by restarting the client after
+proxy address changes. Merchant DNS and effective-destination checks stay in
+the proxy. Redirects, transport retries, cookies, auth and compression are off.
+
+A monotonic delivery deadline covers signing, pool/CONNECT/TLS/header waits;
+an independent headers future permits hard cancellation of unread bodies.
+Plaintext CONNECT refusals are not merchant acknowledgements. No outgoing trace
+headers, raw HTTP logs or active DB transaction are allowed. Final clean verify,
+TLS/IP-SAN/DNS/rebinding/bypass fixtures and affected monitoring acceptance pass
+on the same final JAR/Java 21 runtime. Artifact and separate focused/full/native
+gate evidence are recorded in `webhook-egress.md`; this is T09 acceptance, not
+release-image, staged-host-firewall or production-readiness evidence.
 Security/API defects, new Java dependencies and concrete trace DDL require their
 recorded reviews before implementation, not incidental changes during telemetry.
 

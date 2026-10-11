@@ -7,17 +7,10 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.Locale;
-import java.util.Set;
 
 final class DefaultWebhookUrlPolicy implements WebhookUrlPolicy {
 
     private static final int URL_MAX_LENGTH = 2048;
-    private static final Set<String> KNOWN_METADATA_ADDRESSES = Set.of(
-            "169.254.169.254",
-            "169.254.170.2",
-            "100.100.100.200"
-    );
-
     private final boolean allowInsecureLocalhost;
 
     DefaultWebhookUrlPolicy(boolean allowInsecureLocalhost) {
@@ -73,7 +66,7 @@ final class DefaultWebhookUrlPolicy implements WebhookUrlPolicy {
             throw invalid("localhost and loopback webhook targets are not allowed", null);
         }
         if (literalAddress != null
-                && isBlockedLiteralAddress(literalAddress, normalizedHost)
+                && WebhookDestinationAddressPolicy.blocked(literalAddress)
                 && !allowedLocalTarget) {
             throw invalid("private or non-routable webhook targets are not allowed", null);
         }
@@ -150,21 +143,6 @@ final class DefaultWebhookUrlPolicy implements WebhookUrlPolicy {
             }
         }
         return true;
-    }
-
-    private static boolean isBlockedLiteralAddress(InetAddress address, String host) {
-        return address.isAnyLocalAddress()
-                || address.isLoopbackAddress()
-                || address.isLinkLocalAddress()
-                || address.isSiteLocalAddress()
-                || address.isMulticastAddress()
-                || isUniqueLocalIpv6(address)
-                || KNOWN_METADATA_ADDRESSES.contains(host);
-    }
-
-    private static boolean isUniqueLocalIpv6(InetAddress address) {
-        byte[] bytes = address.getAddress();
-        return bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;
     }
 
     private static IllegalArgumentException invalid(String message, Throwable cause) {

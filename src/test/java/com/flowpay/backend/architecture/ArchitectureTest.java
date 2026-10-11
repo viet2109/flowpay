@@ -193,7 +193,7 @@ class ArchitectureTest {
             .that().resideInAPackage("com.flowpay.backend.webhook.domain..")
             .should().dependOnClassesThat().resideInAnyPackage(
                     "org.springframework..", "jakarta.persistence..", "org.hibernate..",
-                    "tools.jackson..", "com.fasterxml.jackson..", "java.net.http..");
+                    "tools.jackson..", "com.fasterxml.jackson..", "java.net.http..", "org.apache.hc..");
 
     @ArchTest
     static final ArchRule webhookDomainMustNotImportSourceBusinessModules = noClasses()
@@ -217,7 +217,7 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule webhookBusinessCoreMustNotUseHttpClientTechnology = noClasses()
             .that().resideInAnyPackage("com.flowpay.backend.webhook.application..", "com.flowpay.backend.webhook.domain..")
-            .should().dependOnClassesThat().resideInAnyPackage("java.net.http..", "org.springframework.web.client..");
+            .should().dependOnClassesThat().resideInAnyPackage("java.net.http..", "org.springframework.web.client..", "org.apache.hc..");
 
     @ArchTest
     static final ArchRule merchantMustNotDependOnIdentityInfrastructure = noClasses()

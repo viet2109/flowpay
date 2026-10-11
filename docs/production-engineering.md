@@ -4,7 +4,8 @@ Status: P8-T01 design/exit baseline, P8-T02 configuration/management, P8-T03
 business metrics, P8-T04 asynchronous operational metrics, P8-T05 synchronous
 HTTP/provider/Webhook tracing, P8-T06 durable Outbox trace metadata and P8-T07
 consumer/delayed-worker tracing and P8-T08 monitoring lab/dashboards/alerts
-implemented through 2026-10-11; Phase 8 IN PROGRESS. Remaining
+implemented through 2026-10-11; P8-T09 effective-destination/egress protection
+and approved Apache transport on Java 21 are verified. Phase 8 IN PROGRESS. Remaining
 runtime/operational controls are owned by subsequent tasks. Phase 7 remains
 DONE/FROZEN; the simulator functional MVP remains complete.
 
@@ -49,7 +50,7 @@ documentation-only preparation does not require repeating an unchanged suite.
 | Webhook delivery | Immutable event/subscription snapshot; claim/OPEN/lease; exact-body signed no-TX HTTP; fenced finalize; jitter/DEAD/manual retry | T04/T07/T09/T14-T16 operational evidence |
 | Observability foundation | Actuator/Prometheus/OpenTelemetry, request MDC; T03/T04 bounded metrics, T05-T07 privacy-safe durable tracing, T08 isolated provisioned monitoring lab | T13 stages the released artifact; T14/T15 measure operational overhead |
 | Management security | T02: dedicated loopback-by-default listener; internal scrape allowed, public Actuator denied | T13 must prove private staging network/ingress enforcement |
-| URL/network safety | HTTPS/literal target checks, no redirects, bounded JDK HTTP; arbitrary DNS hostnames are not resolved by URL policy | T09 proves effective-destination and egress non-bypassability |
+| URL/network safety | HTTPS/literal target checks; T09 adds fixed CONNECT/proxy network enforcement and approved Apache transport on Java 21; registration does not resolve merchant DNS | T09 verifies actual DNS/TLS/IP-SAN/rebinding/bypass; T13 proves staging isolation |
 | Health/shutdown | T02: DB + availability readiness, process liveness, bounded HTTP drain verified | T12-T15 prove image signals, workers and staged lifecycle |
 | CI | A workflow exists locally in untracked `.github/`; it is not the repository's committed CI | T11 reviews ownership and introduces approved tracked gates |
 | Packaging/operations | T08 monitoring lab demonstrated on stock JRE/mounted verified JAR; no production image/staging/load/restore acceptance | T12-T18 own remaining implementation and evidence |
@@ -344,7 +345,7 @@ beside requestId. Instrumentation never records/logs throwable messages or bodie
 
 Provider and Webhook calls use scoped CLIENT spans outside DB transactions,
 preserve results/exceptions/interruption and restore context in finally. Webhook
-HTTP uses the existing JDK transport: no tracing/baggage/request-ID headers are
+HTTP uses the dedicated Webhook transport: no tracing/baggage/request-ID headers are
 injected, and signed headers/body/timeouts/redirect rules remain unchanged.
 This is synchronous tracing only; delayed jobs have no durable causality yet.
 
@@ -718,7 +719,8 @@ temporary synthetic secret files remain for manual deletion (no values logged).
 Tracked source-of-truth docs synchronized; phase/index corrected locally and
 never staged. Branch feature/phase-8-production-engineering, local task commit
 only, no push/merge. External paging/HA, security scanning, production image/TLS
-staging and performance/recovery evidence remain later gates. T09 is unstarted.
+staging and performance/recovery evidence remain later gates. At that T08
+checkpoint, T09 was unstarted; its acceptance is recorded in section 8 below.
 
 T12 must provide a non-root runtime image with a correct signal/entrypoint path, no embedded
 secrets and declared writable temp/read-only/resource requirements. Source,
@@ -751,6 +753,41 @@ pins its image and proves rebinding/non-bypassability with isolated fixtures.
 If the JDK/proxy approach cannot pass, stop and review the required alternative
 or dependency. Do not silently ship lookup-only protection or disable TLS.
 This defense-in-depth requirement is informed by [OWASP's SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html).
+
+P8-T09 transport review (2026-10-11): the proxied JDK client failed accepted
+public IPv6-literal TLS/SNI on Temurin 21.0.10+7, 21.0.12.1+1 and the authorized
+25.0.4.1+1 spike. Those rejected spikes are historical evidence, not acceptance.
+The user then approved Apache HttpClient 5 for Webhook only; Java 21 and all
+public financial/event/signing/transaction contracts stay unchanged.
+
+The replacement uses Client 5.6.4/Core 5.4.4, with documented async TLS/Core
+fixes motivating the BOM override. It remains behind `WebhookHttpClientPort`;
+application/domain code cannot import Apache HTTP APIs. The fixed CONNECT route
+has no system-proxy/direct fallback. Explicit trusted TLS and hostname/IP-SAN
+verification, HTTP/1, finite pool/I/O bounds, no cookies/auth/compression,
+redirects or transport retries preserve the existing delivery semantics.
+Signing and pool/CONNECT/TLS/header waits share a monotonic deadline; unread
+bodies are hard-cancelled at headers, not buffered. Plaintext CONNECT refusals
+are normalized transport failures, not merchant acknowledgements.
+
+Only trusted operator proxy DNS is resolved at bounded initialization, then
+snapshotted. Restart the client/application after proxy address changes. Slow
+startup DNS fails closed; merchant destination resolution/enforcement remains
+in the reviewed Squid 6.13 proxy. Its pinned image, all-answer ACLs, warning-free
+startup, non-root/read-only limits and internal-app/outbound-proxy topology are
+recorded in [Webhook egress design and evidence](webhook-egress.md).
+
+P8-T09 completion: final focused **205 tests/nine classes** (44.165s), full
+**1,388 tests/193 suites** (8m37s), zero failures/errors/skips, real PostgreSQL/
+Rabbit. Expanded final-JAR Linux DNS/TLS/IP-SAN/HMAC/bypass fixture passes all
+**34** independent assertions, including required public IPv6-literal delivery;
+no assertion or TLS check was removed. Affected monitoring smoke passes native
+prod/proxy startup, ingestion/provisioning, telemetry outage/recovery and intact
+financial/replay/conflict/balanced Ledger checks on that same JAR/Java 21 runtime.
+The egress record contains its digest/resources and owned-resource cleanup proof.
+Repository-wide scanner/image/staging acceptance remains T11-T13 work, not a
+claim made by source review or this isolated compatibility spike. T10 is next
+and unstarted; no push/merge or external deployment is claimed.
 
 T10 reviews auth/refresh-cookie origin/CSRF, CORS, tenant isolation, management,
 trusted-proxy headers, abuse controls and log/error redaction. Rate limits,

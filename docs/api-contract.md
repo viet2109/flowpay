@@ -719,7 +719,12 @@ resources both return `404`.
 Production URLs require HTTPS, a valid host, and no user-info or fragment.
 Obvious private/local/metadata/non-routable literal targets are rejected. The
 explicit development/test localhost switch is not production egress protection;
-DNS-rebinding and network-egress hardening remain Phase 8 work.
+P8-T09 adds an enforcing fixed CONNECT proxy and an isolated application network
+for delivery-time DNS/effective-destination checks. Registration does not resolve
+merchant DNS. Public IPv4/IPv6 literal HTTPS remains supported with IP-SAN
+verification; redirects and direct-path fallback remain disabled. See
+[Webhook egress design and acceptance](webhook-egress.md) for deployment controls
+and verification status. This does not change endpoint response contracts.
 
 ### Create endpoint
 

@@ -654,11 +654,17 @@ opens the next numbered attempt. Manual retry does not reset automatic limits.
 
 Production endpoint URLs require HTTPS, a valid host, and no user-info or
 fragment. Literal localhost, loopback, link-local, private, unspecified,
-multicast, and known metadata-service targets are rejected. The explicit
+multicast, shared/special-use/reserved and known metadata-service targets are
+rejected. The explicit
 `allow-insecure-localhost` development/test switch permits HTTP only for
 localhost or loopback targets; it does not permit general HTTP or private-network
-destinations. This application check does not replace Phase 8 DNS-rebinding and
-network-egress controls.
+destinations. This application check does not replace delivery-time enforcement.
+P8-T09 requires a fixed enforcing CONNECT proxy, denial of all private/special-use
+addresses in a destination's DNS answers, and no direct merchant network path.
+Rebinding/new tunnels, IPv4/IPv6 and real TLS/IP-SAN are verified separately from
+URL registration. Trusted private DB/broker/telemetry paths remain allowed. See
+[Webhook egress design and acceptance](webhook-egress.md); no financial state,
+event, API or retry semantics change.
 
 ## 12. Security and logging
 

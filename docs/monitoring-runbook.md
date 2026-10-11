@@ -4,6 +4,16 @@ This is an isolated **simulator lab**, not a deployment/release gate or financia
 source of truth. Use the built and verified JAR; no new application image is built
 here. Never reuse the development Compose file, its container names or volumes.
 
+P8-T09 adds a non-root enforcing egress proxy and required prod proxy settings.
+Only that proxy joins a separate outbound bridge; app/DB/broker/telemetry remain
+on the internal network. The user approved dedicated Apache Webhook transport
+after rejected JDK IPv6-literal SNI spikes; the lab app remains on Java 21.
+Proxy DNS is snapshotted at bounded startup: restart the application after
+changing proxy addresses, never configure a merchant-derived proxy. See
+[egress design and evidence](webhook-egress.md). Final T09 monitoring smoke passes
+on the same verified JAR as the separate expanded network fixture. The original
+T08 evidence remains historical; see the T09 rerun record below.
+
 ## Recreate and verify
 
 Requirements: Linux containers, Docker Engine/Compose, a POSIX shell, curl, and the
@@ -55,11 +65,12 @@ login `lab-admin` with the **external** `GRAFANA_ADMIN_PASSWORD` file. Anonymous
 access/sign-up/plugin/update/reporting checks are disabled. All other ports,
 including business HTTP, management 9091, DB, broker and collector, are unpublished.
 All private services use a project-private internal Docker network without
-external egress. Grafana alone also uses an isolated UI bridge to make its
+external egress. Grafana also uses an isolated UI bridge to make its
 loopback-published port reachable; that bridge is not a general egress firewall.
 Do not attach
 untrusted containers: its unauthenticated scrape/OTLP listeners trust that network.
-This is not TLS/authenticated public ingress; T09/T13 own actual egress/staging.
+This is not TLS/authenticated public ingress. T09's isolated DNS/TLS/network
+fixture is separate from this telemetry smoke; T13 owns staging deployment.
 
 Use dashboard `FlowPay / FlowPay — simulator operations` and Explore datasource
 `FlowPay Tempo` for trace-ID lookup. IDs remain diagnostic identities, never meter
@@ -183,6 +194,25 @@ low-traffic noise; this alert does not replace per-request error handling.
 Check Tempo readiness/retention/disk and Collector queue/memory limits. Restore
 monitoring without altering financial state. Export retries may drop old spans;
 recovery means a **new** controlled trace is visible, not all outage spans restored.
+
+## P8-T09 affected-topology rerun (2026-10-11)
+
+Project `flowpay-monitoring-1791716846-865` exits 0 using the final T09 JAR and
+unchanged pinned Temurin 21.0.10+7 JRE. SHA-256:
+`3bab47c2f277023151cf0db951391fb4a0dcc3e6353c32bc116c8ca25db76e67`.
+Native config/rule/Collector checks, prod startup with fixed proxy settings,
+Grafana provisioning/dashboard targets, live metrics and stored traces pass.
+All four monitoring services stop without breaking financial/replay/conflict
+checks; recovery ingests a fresh trace and metrics. Final SQL verifies three
+partially refunded payments, three successful refunds, six unique Ledger
+transactions, twelve entries and zero imbalance. This does not exercise actual
+merchant TLS; the separate T09 dual-stack fixture does that.
+
+Invocation-owned containers/networks/data volumes are removed and ownership-label
+checks find zero residual resources. The external synthetic secrets directory
+is retained for manual deletion, as documented by the script; no dev/shared
+resource, `.env`, `.github/` or production credential was touched. Dependency/
+image scanning, real staging ingress/firewall and capacity remain T11-T15 gates.
 
 ## Verification sources
 

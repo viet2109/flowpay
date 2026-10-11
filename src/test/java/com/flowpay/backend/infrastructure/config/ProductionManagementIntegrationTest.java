@@ -87,6 +87,7 @@ class ProductionManagementIntegrationTest {
         ).entrySet().stream().map(entry -> "--" + entry.getKey() + "=" + entry.getValue()).toList());
         arguments.addAll(List.of("--spring.profiles.active=prod", "--server.port=0", "--management.server.port=0",
                 "--management.server.address=127.0.0.1",
+                "--flowpay.webhook.egress.proxy-host=127.0.0.1", "--flowpay.webhook.egress.proxy-port=3128",
                 "--server.forward-headers-strategy=framework",
                 "--spring.config.location=classpath:/application.yaml,classpath:/application-prod.yaml",
                 "--spring.main.banner-mode=off", "--management.otlp.metrics.export.enabled=false",

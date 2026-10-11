@@ -72,7 +72,7 @@ class TransactionBoundaryRegressionTest {
 
     @Test
     void webhookHttpAdapterMustNotOwnADatabaseTransaction() throws Exception {
-        assertNotTransactional(com.flowpay.backend.webhook.infrastructure.http.JdkWebhookHttpClientAdapter.class,
+        assertNotTransactional(com.flowpay.backend.webhook.infrastructure.http.ApacheWebhookHttpClientAdapter.class,
                 "send", com.flowpay.backend.webhook.application.WebhookHttpDeliveryRequest.class);
     }
 

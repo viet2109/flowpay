@@ -34,6 +34,10 @@ management:
       probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
 
 flowpay:
+  webhook:
+    egress:
+      proxy-host: ${WEBHOOK_EGRESS_PROXY_HOST}
+      proxy-port: ${WEBHOOK_EGRESS_PROXY_PORT}
   security:
     prometheus-public: false
     jwt:

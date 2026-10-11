@@ -216,8 +216,8 @@ these boundaries. Phase 6 remains DONE/FROZEN; Phase 8 hardening is not included
 Status: `IN PROGRESS` as of 2026-10-11; P8-T01 baseline/design, P8-T02
 production configuration/management, P8-T03 business metrics, P8-T04
 asynchronous operational metrics, P8-T05 synchronous tracing and P8-T06 durable
-Outbox trace context, P8-T07 consumer/delayed-worker tracing and P8-T08 monitoring
-lab/dashboards/alerts complete.
+Outbox trace context, P8-T07 consumer/delayed-worker tracing, P8-T08 monitoring
+lab/dashboards/alerts and P8-T09 Webhook egress protection complete.
 
 Target selected by the user: reproducible staging on Linux/container, without
 a chosen provider or external deployment. The Phase 7 release is merged into
@@ -270,8 +270,13 @@ refund, Idempotency and balanced duplicate-safe Ledger outcomes. This is not
 external paging, a production image, TLS staging or measured performance evidence.
 No application defaults, API/event/schema or financial semantics change.
 
-The remaining 10 tasks cover Webhook DNS/egress enforcement,
-auth/security review,
+P8-T09 implements and verifies Webhook effective-destination/egress enforcement
+with a fixed CONNECT proxy and dedicated user-approved Apache transport on Java
+21. Real isolated DNS/TLS/IP-SAN/HMAC and IPv4/IPv6 bypass fixtures pass; affected
+monitoring/financial wiring is reverified on the final artifact. This is not
+external-provider deployment or actual staging-firewall acceptance.
+
+The remaining nine tasks cover auth/security review,
 CI/supply-chain gates, a constrained image, staged deployment, declared load and
 multi-instance failure drills, actual DB/broker/key restore and runbooks.
 Specific tool versions, trace DDL/security contract changes and measured

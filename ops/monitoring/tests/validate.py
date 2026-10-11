@@ -6,12 +6,13 @@ import sys
 
 config = json.load(sys.stdin)
 services = config["services"]
-assert set(services) == {"app", "postgres", "rabbitmq", "prometheus", "grafana", "collector", "tempo", "probe"}
+assert set(services) == {"app", "postgres", "rabbitmq", "prometheus", "grafana", "collector", "tempo", "probe", "egress"}
 for name, service in services.items():
     assert re.fullmatch(r"[^@]+:[^@:]+@sha256:[0-9a-f]{64}", service["image"]), "Exact version and digest required"
     assert "container_name" not in service, "Fixed names break project isolation"
     assert int(service.get("mem_limit", 0)) > 0 and float(service.get("cpus", 0)) > 0, "Finite lab budgets required"
-    assert set(service["networks"]) == ({"lab", "ui"} if name == "grafana" else {"lab"}), "Do not join development/shared networks"
+    expected = {"lab", "ui"} if name == "grafana" else {"lab", "webhook-egress"} if name == "egress" else {"lab"}
+    assert set(service["networks"]) == expected, "Do not join development/shared networks"
     if name != "grafana":
         assert not service.get("ports"), "Private service must not publish ports"
     else:
@@ -21,6 +22,8 @@ assert services["app"]["environment"]["SPRING_PROFILES_ACTIVE"] == "prod"
 assert services["app"]["environment"]["MANAGEMENT_SERVER_ADDRESS"] == "0.0.0.0"
 assert services["app"]["environment"]["MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED"] == "false"
 assert services["app"]["read_only"] and services["app"]["user"] != "0"
+assert services["app"]["environment"]["WEBHOOK_EGRESS_PROXY_HOST"] == "egress"
+assert services["egress"]["cap_drop"] == ["ALL"] and services["egress"]["read_only"]
 assert "GF_SECURITY_ADMIN_PASSWORD" not in services["grafana"]["environment"]
 assert services["grafana"]["environment"]["GF_AUTH_ANONYMOUS_ENABLED"] == "false"
 assert all("file" in secret for secret in config["secrets"].values())

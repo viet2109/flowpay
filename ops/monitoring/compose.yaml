@@ -59,6 +59,8 @@ services:
       TRACING_SAMPLING_PROBABILITY: '1.0'
       OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://collector:4318/v1/traces
       MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: 'false'
+      WEBHOOK_EGRESS_PROXY_HOST: egress
+      WEBHOOK_EGRESS_PROXY_PORT: '3128'
     secrets: [DB_PASSWORD, RABBITMQ_PASSWORD, WEBHOOK_SECRET_ENCRYPTION_KEY, jwt-public.pem, jwt-private.pem]
     volumes:
       - type: bind
@@ -83,6 +85,23 @@ services:
     networks: [lab]
     mem_limit: 512m
     cpus: 1
+
+  egress:
+    image: ubuntu/squid:6.6-24.04_beta@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029
+    # Actual binary at this digest is Ubuntu-maintained Squid 6.13, despite the channel tag.
+    user: '13:13'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    entrypoint: [/bin/sh, /egress/start-proxy.sh]
+    command: [/etc/squid/flowpay.conf]
+    volumes:
+      - ../egress/squid.conf:/etc/squid/flowpay.conf:ro
+      - ../egress/start-proxy.sh:/egress/start-proxy.sh:ro
+    networks: [lab, webhook-egress]
+    mem_limit: 128m
+    cpus: 0.5
 
   grafana:
     image: grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572
@@ -148,7 +167,8 @@ secrets:
   jwt-private.pem: {file: '${LAB_SECRETS_DIR}/jwt-private.pem'}
 
 networks:
-  lab: {internal: true}
+  webhook-egress: {enable_ipv6: true}
+  lab: {internal: true, enable_ipv6: true}
   # Only the loopback UI attaches here: Docker does not publish internal-network-only ports.
   ui: {}
 volumes:

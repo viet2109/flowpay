@@ -69,6 +69,8 @@ logging:
     org.springframework.jdbc.core: INFO
     org.hibernate.SQL: 'OFF'
     org.hibernate.orm.jdbc.bind: 'OFF'
+    org.apache.hc.client5: 'OFF'
+    org.apache.hc.core5: 'OFF'
     io.opentelemetry.exporter: 'OFF'
     io.opentelemetry.sdk.trace.export: 'OFF'
 

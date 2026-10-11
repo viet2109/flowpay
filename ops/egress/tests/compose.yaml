@@ -1,0 +1,101 @@
+# Owned effective-destination fixture, not the T13 staging deployment.
+services:
+  certificates:
+    image: eclipse-temurin:21.0.10_7-jre-jammy@sha256:fa4854e6057665066cb79953616671c20f32b96a85d6dd8b78db0762203924c4
+    entrypoint: [/bin/sh, /checks/init-tls.sh]
+    volumes: [./init-tls.sh:/checks/init-tls.sh:ro, certificates:/cert]
+    network_mode: none
+    mem_limit: 128m
+    cpus: 0.5
+  fixtures:
+    image: python:3.13.12-slim@sha256:f1927c75e81efd1e091dbd64b6c0ecaa5630b38635a3d1c04034ac636e1f94c8
+    command: [python, -B, /checks/fixture.py]
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    volumes: [./fixture.py:/checks/fixture.py:ro, certificates:/cert:ro]
+    depends_on:
+      certificates: {condition: service_completed_successfully}
+    networks:
+      backend: {ipv4_address: 172.30.231.9, ipv6_address: 'fd00:231::9'}
+      destinations: {ipv4_address: 11.203.0.10, ipv6_address: '2606:4700:ffff::10'}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/count/private-requests', timeout=1)"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+    mem_limit: 128m
+    cpus: 0.5
+  proxy:
+    image: ubuntu/squid:6.6-24.04_beta@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029
+    user: '13:13'
+    entrypoint: [/bin/sh, /egress/start-proxy.sh]
+    command: [/etc/squid/fixture.conf]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    volumes:
+      - ../squid.conf:/etc/squid/flowpay.conf:ro
+      - ../start-proxy.sh:/egress/start-proxy.sh:ro
+      - ./squid-fixture.conf:/etc/squid/fixture.conf:ro
+      - ./squid-invalid.conf:/etc/squid/invalid.conf:ro
+    networks:
+      backend: {ipv4_address: 172.30.231.3, ipv6_address: 'fd00:231::3'}
+      destinations: {ipv4_address: 11.203.0.3, ipv6_address: '2606:4700:ffff::3'}
+    depends_on:
+      fixtures: {condition: service_healthy}
+    healthcheck:
+      test: [CMD-SHELL, 'test -s /tmp/squid.pid && kill -0 $$(cat /tmp/squid.pid)']
+      interval: 1s
+      timeout: 2s
+      retries: 20
+    mem_limit: 128m
+    cpus: 0.5
+  probe:
+    image: eclipse-temurin:21.0.10_7-jre-jammy@sha256:fa4854e6057665066cb79953616671c20f32b96a85d6dd8b78db0762203924c4
+    user: '10001:10001'
+    entrypoint: [java]
+    command:
+      - -Xmx128m
+      - -Djavax.net.ssl.trustStore=/cert/trust.p12
+      - -Djavax.net.ssl.trustStorePassword=fixture-only
+      - -Dloader.path=/probe
+      - -Dloader.main=com.flowpay.backend.webhook.infrastructure.http.WebhookEgressNetworkProbe
+      - -cp
+      - /app/backend.jar
+      - org.springframework.boot.loader.launch.PropertiesLauncher
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    volumes:
+      - type: bind
+        source: ${FLOWPAY_JAR:?Set verified executable JAR absolute path}
+        target: /app/backend.jar
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${FLOWPAY_TEST_CLASSES:?Set matching target/test-classes absolute path}
+        target: /probe
+        read_only: true
+        bind: {create_host_path: false}
+      - certificates:/cert:ro
+    networks: [backend]
+    mem_limit: 256m
+    cpus: 1
+networks:
+  backend:
+    internal: true
+    enable_ipv6: true
+    ipam:
+      config: [{subnet: 172.30.231.0/24}, {subnet: 'fd00:231::/64'}]
+  destinations:
+    # Global-looking IPs exist only in this internal fixture, never Internet routes/targets.
+    internal: true
+    enable_ipv6: true
+    ipam:
+      config: [{subnet: 11.203.0.0/24}, {subnet: '2606:4700:ffff::/64'}]
+volumes:
+  certificates:

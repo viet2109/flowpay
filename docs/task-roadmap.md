@@ -299,8 +299,17 @@ Completed: P8-T01 baseline/design, P8-T02 production configuration, health and
 management security, P8-T03 Payment/Refund/Idempotency metrics, P8-T04
 Outbox/Ledger/Webhook operational metrics, P8-T05 synchronous tracing and
 P8-T06 durable Outbox trace context, P8-T07 consumer/delayed-worker tracing and
-P8-T08 monitoring lab/dashboards/alerts.
-Next: P8-T09 (not started).
+P8-T08 monitoring lab/dashboards/alerts and P8-T09 effective-destination/egress
+protection. The user approved Apache HttpClient 5 specifically
+for Webhook after reproduced JDK Java 21/25 IPv6-literal SNI failures. Java 21,
+strict TLS/IP-SAN, proxy/network enforcement, signing and all financial/API
+contracts remain unchanged. Client 5.6.4/Core 5.4.4 selection and historical
+rejected-spike evidence are recorded in [egress design and review](webhook-egress.md).
+Final verification passes: 205 focused tests, full 1,388 tests/193 suites, all
+34 network/transport/startup assertions and affected native monitoring smoke on
+the same JAR. No failures/errors/skips. Next: P8-T10, PLANNED and unstarted.
+No push/merge or T10 implementation; local-only phase/index corrections remain
+unstaged. Phase 8 is still IN PROGRESS, not production/staging accepted.
 
 The user selected staging Linux/container with no provider/external deployment.
 Phase 7 source `d348b10` was pushed and merged into remote main at `0b96400`;
@@ -324,7 +333,7 @@ phase branch before completion unless explicitly requested. Existing untracked
 | P8-T06 | Durable Outbox Trace Context | P8-T01, P8-T05 | DONE |
 | P8-T07 | Consumer and Webhook Worker Tracing | P8-T06 | DONE |
 | P8-T08 | Monitoring Stack, Dashboards and Alerts | P8-T02, P8-T03, P8-T04, P8-T05, P8-T06, P8-T07 | DONE |
-| P8-T09 | Webhook SSRF, DNS-Rebinding and Egress Protection | P8-T01, P8-T02 | PLANNED |
+| P8-T09 | Webhook SSRF, DNS-Rebinding and Egress Protection | P8-T01, P8-T02 | DONE |
 | P8-T10 | API and Authentication Security Review | P8-T01, P8-T02 | PLANNED |
 | P8-T11 | CI Verification and Supply-Chain Gates | P8-T01, P8-T10 | PLANNED |
 | P8-T12 | Production Container Image | P8-T02, P8-T11 | PLANNED |
@@ -499,7 +508,35 @@ No external paging/HA, TLS staging, production image/security scan, performance
 SLO or T09 implementation is claimed. Only owned disposable lab resources are
 removed; dev data and pre-existing .env/.github are untouched. Tracked docs synced;
 phase/index corrected locally and remain unstaged. Task commit stays local on
-feature/phase-8-production-engineering, no push/merge. Next: P8-T09, unstarted.
+feature/phase-8-production-engineering, no push/merge. At that T08 checkpoint,
+next: P8-T09, unstarted.
+
+P8-T09 completed (2026-10-11): fixed CONNECT route and operator proxy DNS
+snapshot, required prod proxy configuration, strict all-answer public-unicast
+Squid ACLs and isolated internal-app/outbound-proxy networking. Reproduced JDK
+Java 21/25 IPv6-literal SNI failures led to explicit user approval of dedicated
+Apache Client 5.6.4/Core 5.4.4 Webhook transport, not a runtime/API restriction.
+Trusted TLS/IP-SAN, exact UTF-8/HMAC/four headers, no redirects/retries/cookies/auth,
+header-only completion/hard cancellation, monotonic deadlines and no-TX remain.
+Privacy-safe logging/spans and finite resources are preserved; proxy DNS changes
+require client/application restart. No schema, business, financial or event
+contract changed; Apache imports are confined to infrastructure.
+
+Final focused: 205 tests/nine classes (44.165s); full clean verify: 1,388 tests/193
+suites (8m37s), zero failures/errors/skips, real PostgreSQL/Rabbit. A test-only
+reactor startup race was corrected with a bounded assertion before rerunning
+both gates. Final Java 21 network fixture passes all 34 independent assertions,
+including native IPv6 literal, missing IP-SAN, mixed/delayed/rebound DNS, timeout,
+HMAC and denied direct IPv4/IPv6 paths. Affected monitoring smoke passes prod
+startup, native provisioning/ingestion, telemetry outage/recovery and unchanged
+replay/conflict/balanced duplicate-safe Ledger checks on the same final JAR.
+Artifact digest, environment, owned cleanup and retained external synthetic
+secrets are recorded in [egress acceptance](webhook-egress.md).
+No production image scan, provider deployment, staged firewall, load/SLO or
+recovery acceptance is claimed; T10-T18 retain their gates. Commit only T09
+tracked files on the phase branch; no push/merge, no T10 work. Ignored phase/index
+corrections are verified locally and never staged; user `.env`/`.github/` remain
+untouched.
 
 ## Agent task template
 

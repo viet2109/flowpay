@@ -262,6 +262,7 @@ external paging and measured performance thresholds remain later gates.
 - [API contract](docs/api-contract.md)
 - [Task roadmap](docs/task-roadmap.md)
 - [Production engineering design and decision gates](docs/production-engineering.md)
+- [Webhook egress protection and verification](docs/webhook-egress.md)
 
 Phase documents and `docs/README.md` are local-only planning/reference files,
 not published documentation. The root README and linked tracked documents are
@@ -274,11 +275,22 @@ P8-T03 adds Payment/Refund/Idempotency metrics; P8-T04 adds asynchronous operati
 metrics; P8-T05 adds synchronous HTTP/provider/Webhook tracing and P8-T06
 adds durable Outbox source context. P8-T07 adds asynchronous spans and restart-
 stable worker context. P8-T08 provisions and verifies the isolated monitoring lab,
-dashboards and operational alerts. Stronger egress/DNS-rebinding controls, load testing,
-security/dependency review,
+dashboards and operational alerts. P8-T09 verifies enforced CONNECT/proxy egress,
+DNS-rebinding/bypass protection and dedicated Apache Webhook transport on Java 21,
+retaining trusted TLS/IP-SAN, signing and deadlines. Load testing, auth/security
+review, repository-wide dependency/image scanning,
 packaging/staging, backup/recovery, and runbooks are still pending implementation.
 The functional simulator MVP is not a claim of
 production readiness, real payment processing, guaranteed cross-event ordering,
 or exactly-once external HTTP delivery. Endpoint re-enable, dual-secret grace,
 custom headers/templates/retry schedules, and automatic DLQ replay are not
 implemented.
+
+P8-T09 passed 205 focused tests and full `clean verify` with 1,388 tests/193 suites,
+zero failures/errors/skips. Its isolated Linux DNS/TLS/HMAC/proxy fixture passed
+all 34 independent assertions, including public IPv6 literal and rejected
+missing IP-SAN certificates. The affected monitoring smoke passed on the same
+final JAR, including production proxy startup and financial integrity during
+telemetry outage/recovery. See the egress record for artifact/runtime evidence,
+proxy-DNS restart requirements and deployment limitations. These fixtures do not
+replace T11-T13 supply-chain, image or actual staging-network acceptance.

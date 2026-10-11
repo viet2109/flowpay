@@ -54,7 +54,8 @@ class ProductionEnvironmentPostProcessorTest {
     @ValueSource(strings = {"spring.datasource.url", "spring.datasource.username", "spring.datasource.password",
             "spring.rabbitmq.host", "spring.rabbitmq.username", "spring.rabbitmq.password",
             "flowpay.security.jwt.public-key-location", "flowpay.security.jwt.private-key-location",
-            "flowpay.webhook.secret.encryption-key", "management.server.address"})
+            "flowpay.webhook.secret.encryption-key", "management.server.address",
+            "flowpay.webhook.egress.proxy-host", "flowpay.webhook.egress.proxy-port"})
     void shouldRejectMissingMandatorySettingsWithoutEchoingValues(String key) {
         MockEnvironment environment = productionEnvironment();
         environment.setProperty(key, " ");
@@ -84,6 +85,11 @@ class ProductionEnvironmentPostProcessorTest {
             "management.server.port,8080",
             "flowpay.security.jwt.generate-ephemeral-key-pair,true",
             "flowpay.webhook.url-policy.allow-insecure-localhost,true",
+            "flowpay.webhook.egress.proxy-host,http://sentinel-password@proxy",
+            "flowpay.webhook.egress.proxy-host,proxy:3128",
+            "flowpay.webhook.egress.proxy-port,0",
+            "flowpay.webhook.egress.proxy-port,65536",
+            "flowpay.webhook.egress.proxy-port,sentinel-password",
             "flowpay.security.prometheus-public,true",
             "flowpay.security.refresh-cookie.cookie-secure,false",
             "management.endpoint.health.show-details,always",
@@ -162,6 +168,8 @@ class ProductionEnvironmentPostProcessorTest {
                 "management.endpoint.health.show-details", "never",
                 "management.endpoint.health.show-components", "never"
         ));
+        properties.put("flowpay.webhook.egress.proxy-host", "egress");
+        properties.put("flowpay.webhook.egress.proxy-port", "3128");
         environment.getPropertySources().addLast(new MapPropertySource("production-test", properties));
         return environment;
     }
