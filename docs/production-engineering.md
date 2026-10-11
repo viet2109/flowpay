@@ -3,7 +3,8 @@
 Status: P8-T01 design/exit baseline, P8-T02 configuration/management, P8-T03
 business metrics, P8-T04 asynchronous operational metrics, P8-T05 synchronous
 HTTP/provider/Webhook tracing, P8-T06 durable Outbox trace metadata and P8-T07
-consumer/delayed-worker tracing implemented through 2026-10-11; Phase 8 IN PROGRESS. Remaining
+consumer/delayed-worker tracing and P8-T08 monitoring lab/dashboards/alerts
+implemented through 2026-10-11; Phase 8 IN PROGRESS. Remaining
 runtime/operational controls are owned by subsequent tasks. Phase 7 remains
 DONE/FROZEN; the simulator functional MVP remains complete.
 
@@ -46,12 +47,12 @@ documentation-only preparation does not require repeating an unchanged suite.
 | Financial consistency | Source TX + Outbox, Idempotency, reserved refund capacity, append-only balanced unique Ledger | All tasks preserve it; T14-T16/T18 recheck invariants |
 | Source events | Six processing/success/known-failure facts; success V1 preserved; UNKNOWN non-terminal; T06 durable source traceparent; T07 bounded asynchronous span relations | T14-T16/T18 verify operational behavior without new business fields |
 | Webhook delivery | Immutable event/subscription snapshot; claim/OPEN/lease; exact-body signed no-TX HTTP; fenced finalize; jitter/DEAD/manual retry | T04/T07/T09/T14-T16 operational evidence |
-| Observability foundation | Actuator/Prometheus/OpenTelemetry foundation, request MDC; T03 business metrics; T04 cached shared DB backlogs/ages and Outbox/Ledger/Webhook attempt/commit observations | T05-T08 own tracing and monitoring deployment; T14/T15 measure operational overhead |
+| Observability foundation | Actuator/Prometheus/OpenTelemetry, request MDC; T03/T04 bounded metrics, T05-T07 privacy-safe durable tracing, T08 isolated provisioned monitoring lab | T13 stages the released artifact; T14/T15 measure operational overhead |
 | Management security | T02: dedicated loopback-by-default listener; internal scrape allowed, public Actuator denied | T13 must prove private staging network/ingress enforcement |
 | URL/network safety | HTTPS/literal target checks, no redirects, bounded JDK HTTP; arbitrary DNS hostnames are not resolved by URL policy | T09 proves effective-destination and egress non-bypassability |
 | Health/shutdown | T02: DB + availability readiness, process liveness, bounded HTTP drain verified | T12-T15 prove image signals, workers and staged lifecycle |
 | CI | A workflow exists locally in untracked `.github/`; it is not the repository's committed CI | T11 reviews ownership and introduces approved tracked gates |
-| Packaging/operations | No production image/staging/monitoring/load/restore gate demonstrated | T08/T12-T18 own implementation and evidence |
+| Packaging/operations | T08 monitoring lab demonstrated on stock JRE/mounted verified JAR; no production image/staging/load/restore acceptance | T12-T18 own remaining implementation and evidence |
 
 This table is an inventory, not a claim that the future controls are already
 available. Never document a passing Java suite as proof of load capacity, DNS
@@ -622,13 +623,104 @@ management and collectors remain private. Choose and pin compatible image
 versions/digests at implementation, not floating `latest` images in a release.
 The lab must support at least two backend instances without naming conflicts.
 
-The monitoring baseline is local Prometheus/Grafana with an OTLP collector and
-local trace backend; T08 chooses the exact trace backend and compatible images
-after a focused compatibility check. This adds no business runtime Java library
-or vendor account in T01. Provision dashboards/alerts from files and supply
-credentials externally. Telemetry is off the financial critical path.
+P8-T08 implements the independent simulator lab in `ops/monitoring/compose.yaml`,
+not the T12 production image or T13 staging deployment. Its four monitoring
+images are Prometheus 3.15.0, Grafana 13.2.3, core OTLP Collector 0.162.0 and
+Tempo 2.10.4; all eight lab/check images pin an exact version **and manifest
+digest**. The latter is a maintained Tempo 2.x branch. Actual configuration
+validation/startup and OTLP/Prometheus/Grafana compatibility are tested; this is
+not a vulnerability scan or approval to deploy those images. T11/T12 own review,
+SBOM and image security/upgrade evidence.
 
-The non-root runtime image has a correct signal/entrypoint path, no embedded
+The existing verified executable JAR is mounted read-only in a non-root stock
+JRE21 container with `prod`, dedicated management and external ConfigTree/secrets.
+No Java/library, application-default configuration, API/event/schema, financial
+state, transaction/locking/retry change. Disposable simulator secret files are
+generated outside the repo with a protected host directory; each service receives
+only its required files. Root `.env` and user-owned `.github/` are not consumed or
+adopted. Do not promote synthetic fixture keys to a retained staging deployment.
+
+No fixed container names, external volumes/networks or public DB/broker/collector/
+management/business ports. Only authenticated Grafana is published on loopback
+3300 (overridable); it alone also joins the project-local UI bridge, since Docker
+does not publish internal-network-only ports. Other services use one internal
+network without external egress. That network is the unauthenticated telemetry
+trust boundary, not TLS/public-ingress or effective destination enforcement.
+The UI bridge is not an egress firewall; T09/T13 retain their explicit gates.
+
+Versioned provisioning creates the two datasources and 21 operational panels:
+API mean latency/rates (no existing server histogram), fixed-bucket provider p95,
+committed outcomes/Idempotency decisions, fresh shared-DB backlog/ages, required
+queue consumers/DLQ, Webhook attempt/recovery, JVM/pool/CPU/GC and telemetry health.
+Process-local counter rates are summed; shared DB gauges use max only over
+snapshots <=120s old with the default 30s sampler, never sum or substitute zeros
+for stale/NaN/missing samples. Native RabbitMQ detailed metrics are restricted to
+the two event queues/two DLQs. A reviewed cadence change requires freshness
+threshold review, not an automatic claim of healthy cached data.
+
+Prometheus scrape/evaluation 15s, timeout 5s; metrics retention 48h/256MB blocks
+(WAL/head add space). Tempo local-block retention 24h and per-trace limit 256KiB;
+time retention is not a hard disk quota. Collector: 160MiB limiter/32MiB spike,
+256 queued batches, maximum batch 512 spans, 2s export timeout/30s retry budget,
+no payload/debug/log exporter. Finite per-container memory/CPU budgets are lab
+guardrails, not measured production capacity or universal performance SLOs.
+
+Twelve evaluated alerts have a condition, hold/window, severity, explicit recovery
+evidence and tested runbook anchor. Provisional operational thresholds and rate
+floors are recorded in [the monitoring runbook](monitoring-runbook.md); T14 owns
+performance-derived recalibration. The lab has no external paging receiver/HA
+monitor; Prometheus cannot alert on its own complete outage. Disappearance alone
+is not recovery when telemetry is missing. Collector/scrape loss may discard
+spans/observations but cannot change financial outcomes or durable source history.
+
+Recreate/config/fixtures/controlled E2E/outage commands, topology/retention limits,
+operational recovery guidance and official compatibility sources are in the
+runbook. T08 does not provision a vendor account, build the production image,
+deploy TLS staging, implement egress enforcement or start T09.
+
+### T08 verification checkpoint (2026-10-11)
+
+Final independent clean Compose acceptance passed config/static/image/secret/
+private-topology/runbook coverage, Collector validation, promtool 16 rules and
+14 scenarios/28 assertions (every alert fires/resolves; NaN and shared-replica
+max/stale exclusion are covered). Actual provisioned Grafana JSON/datasources,
+all dashboard targets, native business/queue/cache metrics and stored controlled
+HTTP/provider/Outbox/Ledger/Webhook-materialization trace/proxy lookup pass.
+Trace storage excludes the synthetic credential/PII/body markers. Loopback UI
+access is tested on the host. All four monitoring services are stopped, financial
+operations/replay/conflict still pass, monitoring restarts and a new trace is
+retrievable. The read-only SQL audit verifies three partially refunded payments,
+three successful refunds, six unique Ledger postings/twelve balanced entries.
+
+Focused application regressions passed 15 tests/four classes (1m56s), zero
+failures/errors/skips: business/operational metric catalogs, real prod management
+and HTTP tracing/export outage tests with owned PostgreSQL/RabbitMQ. Shell syntax,
+Compose/provisioning checks and `git diff --check` pass; no formatter configured.
+Added scoped LF Git attributes keep the Linux shell fixtures runnable after
+Windows checkout. Earlier disposable iterations corrected tmpfs YAML quoting,
+the pinned Tempo override field, Payment confirmation meter name and Grafana
+read-only provisioning/proxy startup waits; no financial code was changed.
+
+No full application `clean verify` rerun for T08: Java/application-default/shared
+Spring wiring/security/schema/transaction/messaging behavior are unchanged. The
+mounted JAR is the unchanged T07 full-gate artifact, not a new full-suite claim:
+`backend-0.0.1-SNAPSHOT.jar`, 77,206,176 bytes, SHA256
+`69866b637f5dd9305f7378df59efb45f7b218299436059d46c41d91d151650b9`.
+Host: Windows + Git Bash/Compose 5.3.1, Docker Engine 29.6.2 Linux x86_64,
+4 CPUs/3,920,216,064 bytes engine memory. Lab: Temurin JRE21.0.10_7,
+PostgreSQL16.15/RabbitMQ4.3.0 and the four pinned monitoring versions above;
+Java focused gate: JDK21.0.12/Maven3.9.16/Boot4.1.0. This is not a native Linux
+host/orchestrator, two-instance, sustained-load or staging acceptance run.
+
+Only this task's disposable project/network/volumes were removed; fixture DB/
+telemetry contents are irrecoverable, development resources untouched. External
+temporary synthetic secret files remain for manual deletion (no values logged).
+Tracked source-of-truth docs synchronized; phase/index corrected locally and
+never staged. Branch feature/phase-8-production-engineering, local task commit
+only, no push/merge. External paging/HA, security scanning, production image/TLS
+staging and performance/recovery evidence remain later gates. T09 is unstarted.
+
+T12 must provide a non-root runtime image with a correct signal/entrypoint path, no embedded
 secrets and declared writable temp/read-only/resource requirements. Source,
 dependency and image checks/SBOM are separate evidence from functional tests.
 Provision all six queue bindings and separate consumer DLQs before enabling the

@@ -1011,8 +1011,14 @@ production-engineering.md. No second SDK, Java dependency, schema, payload,
 state, financial locking/transaction or authentication change is introduced.
 
 P8-T06 implements durable Outbox source-context propagation and P8-T07 adds
-bounded publication/consumer/worker spans as described above. Monitoring,
-dashboards and staging/performance evidence remain later separate gates.
+bounded publication/consumer/worker spans as described above. P8-T08 adds the
+isolated monitoring lab, versioned dashboards and operational alert/runbook
+fixtures without changing application defaults, Java wiring or financial
+semantics. Exact image digests, external-secret/private-listener boundaries,
+cached-gauge freshness/max aggregation and retention limits are recorded in
+production-engineering.md and monitoring-runbook.md. Monitoring outage is outside
+the financial critical path; no external paging/HA, production image, TLS staging
+or performance/recovery acceptance is implied by this lab.
 
 ## 18. Dependency policy
 

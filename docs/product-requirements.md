@@ -216,7 +216,8 @@ these boundaries. Phase 6 remains DONE/FROZEN; Phase 8 hardening is not included
 Status: `IN PROGRESS` as of 2026-10-11; P8-T01 baseline/design, P8-T02
 production configuration/management, P8-T03 business metrics, P8-T04
 asynchronous operational metrics, P8-T05 synchronous tracing and P8-T06 durable
-Outbox trace context and P8-T07 consumer/delayed-worker tracing complete.
+Outbox trace context, P8-T07 consumer/delayed-worker tracing and P8-T08 monitoring
+lab/dashboards/alerts complete.
 
 Target selected by the user: reproducible staging on Linux/container, without
 a chosen provider or external deployment. The Phase 7 release is merged into
@@ -260,7 +261,16 @@ policy is explicit; public IDs/JSON/HMAC/headers, financial/dedupe/ACK/retry/lea
 semantics are preserved. Full clean verify passes 1,351 tests/191 suites with
 no failures/errors/skips. This is not deployed collector/staging evidence.
 
-The remaining 11 tasks cover monitoring/alerts, Webhook DNS/egress enforcement,
+P8-T08 provides an independent Linux-container simulator monitoring lab with
+digest-pinned Prometheus/Grafana/Collector/Tempo, versioned dashboard/datasource
+provisioning, 12 alert rules with tested firing/resolution and runbook references.
+Management/broker/DB/collector remain private; Grafana is loopback/authenticated.
+Real metric/trace ingestion and all-monitoring outage/recovery preserve payment,
+refund, Idempotency and balanced duplicate-safe Ledger outcomes. This is not
+external paging, a production image, TLS staging or measured performance evidence.
+No application defaults, API/event/schema or financial semantics change.
+
+The remaining 10 tasks cover Webhook DNS/egress enforcement,
 auth/security review,
 CI/supply-chain gates, a constrained image, staged deployment, declared load and
 multi-instance failure drills, actual DB/broker/key restore and runbooks.

@@ -244,6 +244,16 @@ explicit approval: it irreversibly deletes that project's persistent data.
 
 ## Documentation and scope
 
+### Isolated monitoring lab (P8-T08)
+
+Prometheus/Grafana and OTLP Collector/Tempo are provisioned from digest-pinned
+images/configuration in `ops/monitoring`. The disposable simulator lab mounts the
+verified JAR, keeps DB/broker/management/collector private, and publishes only the
+authenticated Grafana UI on loopback. See [monitoring commands and alert runbook](docs/monitoring-runbook.md)
+for external secret setup, dashboard semantics, all 12 alerts, acceptance/outage
+checks and safe cleanup. This is not the production image or staging deployment;
+external paging and measured performance thresholds remain later gates.
+
 - [Product requirements](docs/product-requirements.md)
 - [Business rules](docs/business-rules.md)
 - [Domain model](docs/domain-model.md)
@@ -263,8 +273,8 @@ baseline; P8-T02 implements production startup and management/probe controls;
 P8-T03 adds Payment/Refund/Idempotency metrics; P8-T04 adds asynchronous operational
 metrics; P8-T05 adds synchronous HTTP/provider/Webhook tracing and P8-T06
 adds durable Outbox source context. P8-T07 adds asynchronous spans and restart-
-stable worker context. Monitoring/alerts,
-stronger egress/DNS-rebinding controls, load testing,
+stable worker context. P8-T08 provisions and verifies the isolated monitoring lab,
+dashboards and operational alerts. Stronger egress/DNS-rebinding controls, load testing,
 security/dependency review,
 packaging/staging, backup/recovery, and runbooks are still pending implementation.
 The functional simulator MVP is not a claim of

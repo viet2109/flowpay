@@ -1,0 +1,199 @@
+# Monitoring lab and alert runbook (P8-T08)
+
+This is an isolated **simulator lab**, not a deployment/release gate or financial
+source of truth. Use the built and verified JAR; no new application image is built
+here. Never reuse the development Compose file, its container names or volumes.
+
+## Recreate and verify
+
+Requirements: Linux containers, Docker Engine/Compose, a POSIX shell, curl, and the
+verified executable JAR. On Windows, Git Bash plus Docker Desktop is supported;
+use an absolute `C:/...` JAR path. Secrets are generated with the pinned JRE
+image's OpenSSL, not stored in the repository or passed in command arguments.
+
+```sh
+export FLOWPAY_JAR="$(pwd)/target/backend-0.0.1-SNAPSHOT.jar"
+sh ops/monitoring/tests/smoke.sh
+```
+
+The script creates a fresh `flowpay-monitoring-<timestamp>-<pid>` project and
+external temporary secrets directory. It rejects an existing project, validates
+the configuration/provisioning contract, runs promtool/config/alert fixtures,
+starts owned PostgreSQL/RabbitMQ and the prod-profile JAR, and checks the actual
+Grafana provisioned dashboard, every PromQL target, metric ingestion, rules and
+stored HTTP/provider/Outbox/Ledger/Webhook-materialization trace. It then stops
+**all four** monitoring services, repeats Payment/Refund/replay/conflict checks,
+restarts monitoring, and verifies fresh telemetry and six balanced Ledger posts
+for the three payments/refunds. It does not retry non-idempotent fixture writes.
+
+The EXIT trap removes **only this invocation's disposable containers/network/
+volumes**. Those fixture database/trace/metric records are irrecoverably removed.
+The printed external synthetic secrets directory remains for manual deletion;
+protect it with host ACLs (0700 on Linux). Never use these keys outside this lab.
+The script does not touch dev resources, `.env` or user-owned `.github/`.
+
+To keep a lab for inspection, use a new `flowpay-monitoring-...` project, set
+`LAB_SECRETS_DIR` to a fresh protected directory outside the repo, initialize it
+with `tests/init-secrets.sh` (requires OpenSSL), and run:
+
+```sh
+docker compose --env-file /dev/null -p flowpay-monitoring-review -f ops/monitoring/compose.yaml config --quiet
+docker compose --env-file /dev/null -p flowpay-monitoring-review -f ops/monitoring/compose.yaml up -d
+docker compose --env-file /dev/null -p flowpay-monitoring-review -f ops/monitoring/compose.yaml run --rm --no-deps probe live
+```
+
+Do not run the destructive smoke script against that retained project. Check its
+exact project label and ownership before explicit cleanup. Scale the `app` service
+without fixed container names if needed; update the scrape target list for every
+replica, and retain `job="flowpay"`. Two-replica resource/failure acceptance is T15,
+not claimed by this one-instance smoke.
+
+## Access, data and limits
+
+Grafana is bound only to `127.0.0.1:3300` (override `GRAFANA_LAB_PORT` on collision),
+login `lab-admin` with the **external** `GRAFANA_ADMIN_PASSWORD` file. Anonymous
+access/sign-up/plugin/update/reporting checks are disabled. All other ports,
+including business HTTP, management 9091, DB, broker and collector, are unpublished.
+All private services use a project-private internal Docker network without
+external egress. Grafana alone also uses an isolated UI bridge to make its
+loopback-published port reachable; that bridge is not a general egress firewall.
+Do not attach
+untrusted containers: its unauthenticated scrape/OTLP listeners trust that network.
+This is not TLS/authenticated public ingress; T09/T13 own actual egress/staging.
+
+Use dashboard `FlowPay / FlowPay — simulator operations` and Explore datasource
+`FlowPay Tempo` for trace-ID lookup. IDs remain diagnostic identities, never meter
+labels. API latency is a mean (no server histogram is currently configured);
+provider p95 uses the existing fixed buckets, not precise raw percentiles. Empty
+rate charts at idle/first scrape are not errors. Queries show normalized outcomes,
+Idempotency replay/conflict, queue consumers/DLQ, overdue work, JVM/pool/CPU and
+telemetry health. The collector has no debug/log payload exporter.
+
+Prometheus scrapes/evaluates every 15s (5s scrape timeout), retains at most 48h or
+256MB of TSDB blocks (whichever limit applies; WAL/head add space). Tempo retains
+local blocks for 24h, with 256KiB per-trace limit; this is time retention, **not** a
+hard disk quota. Host disk monitoring/storage sizing remains T13/T14. Collector
+memory limiter is 160MiB + 32MiB spike; queue 256 batches, max batch 512 spans,
+2s send timeout and 30s retry budget. Telemetry may be dropped. Container memory/
+CPU budgets are finite lab guardrails, not measured production tuning.
+
+Shared DB gauges use **max over fresh replicas**, never sum. Sample age <=120s
+is considered fresh with this lab's default 30s sampler. Stale/NaN/missing data
+are not zero; stale gauges are excluded, and the metrics alert reports degraded
+visibility. Revisit this policy if changing the sampler cadence (valid up to 5m).
+Counters sum rates across instances but are best-effort and restart/crash sensitive.
+No metric proves financial amounts, exactly-once processing or completed delivery.
+
+## Alert policy and resolution
+
+Rules are evaluated in Prometheus and visible in the dashboard/Prometheus API via
+the private network. There is **no external notification/paging route**, HA monitor
+or vendor account in this lab. Prometheus cannot report its own total outage;
+operator checks/an independent monitor are required. Adding a receiver/paging
+policy needs separately approved operator credentials/destination. Never interpret
+silent monitoring as a healthy service.
+
+All thresholds below are provisional operational guardrails, not throughput/
+latency SLOs. T14 must review workload-derived thresholds before acceptance.
+Every alert has no `keep_firing_for`: it resolves on the first successful 15s
+evaluation where the predicate clears. Rate-window conditions can take up to 5m
+to decay. Missing telemetry can also make an alert disappear: recovery requires
+fresh scrapes and durable/business evidence, not disappearance alone.
+
+| Alert | Predicate / hold | Severity | Recovery evidence |
+|---|---|---|---|
+| FlowPayTargetUnavailable | Required scrape `up=0` / 1m | critical | Successful fresh scrape and readiness checks |
+| FlowPayMetricsStale | Sample age >120s, missing or NaN / 1m | warning | Both owners sampled successfully; age <=120s |
+| FlowPayOutboxDelayed | Fresh oldest unpublished age >120s / 2m | warning | Outbox drains; fresh age <=120s |
+| FlowPayWebhookDelayed | Fresh overdue age >120s / 2m | warning | Due work drains or consciously reviewed disabled endpoints |
+| FlowPayWebhookDead | Fresh DEAD count >0 / 1m | warning | Reviewed deliveries leave DEAD through supported retry flow |
+| FlowPayConsumerDlq | Either dedicated DLQ messages >0 / 1m | critical | Reviewed remediation/replay completed; DLQ empty |
+| FlowPayConsumerUnavailable | Either required queue has <1 consumer or series absent / 2m | critical | Both queues present with active consumers |
+| FlowPayHeapPressure | Used/max positive heap >85% / 5m | warning | Sustained lower heap and GC progress |
+| FlowPayPoolPressure | Active/max DB pool >80% / 2m | warning | Pool lower and no accumulating waiters |
+| FlowPayCpuPressure | Process CPU >90% / 5m | warning | Sustained lower CPU with completed work |
+| FlowPayApiErrors | 5xx fraction >10% over 5m and >=20 requests / 5m | warning | Fresh low error rate and successful logical operations |
+| FlowPayCollectorExportFailure | Failed span-send rate over 5m >0 / 2m | warning | Backend available, failures decay, new trace retrievable |
+
+### Target unavailable
+
+Check the exact project's container states, listener/network and scrape target.
+Use `/livez` and `/readyz` inside the lab. Broker/telemetry outage is not DB
+readiness failure; do not remove durable business acceptance solely for collector
+outage. Restore the failed target/configuration; verify a new scrape/operation.
+
+### Metrics stale
+
+Check sampling is enabled, its cadence, pool saturation and successful sampling
+counter for both OUTBOX/WEBHOOK. Query timeout is 2s but pool acquisition can take
+longer. Do not enable scrape-time DB reads or sum cached replicas. Missing gauge
+registration may require a reviewed restart; retain financial records unchanged.
+
+### Outbox delayed
+
+Check broker reachability, relay enabled, confirm/return outcomes and next retry.
+Keep exponential backoff/jitter. Confirm PENDING/FAILED work drains and Ledger/
+Webhook consumption follows; PUBLISHED alone is not proof of consumer completion.
+Never manually mark records published or delete source events to clear an alert.
+
+### Webhook delayed
+
+Check worker enabled, leases, due times, disabled endpoints, HTTP outcome groups
+and pool pressure. Overdue disabled endpoints are intentionally counted. Fix the
+root cause within existing URL/security controls; do not shorten production
+retry/jitter/lease budgets or bypass fencing. Verify retained attempt history.
+
+### Webhook dead
+
+Review endpoint ownership/configuration and safe failure classification. Use
+the existing authenticated asynchronous DEAD-retry API after remediation, not
+direct SQL mutation. Retry may deliver a duplicate externally. Disabled endpoints
+cannot simply be re-enabled in this MVP; communicate the supported limitation.
+
+### Consumer DLQ
+
+Inspect only bounded event metadata on the owned queue; never dump signed bodies,
+credentials or raw exception content. Distinguish malformed/contradictory events
+from transient infrastructure failure. Preserve DLQ/history and Ledger invariants.
+Do not automatically purge/replay. A reviewed repair/replay requires operator
+authorization, then verify duplicate-safe Ledger/materialization outcomes.
+
+### Consumer unavailable
+
+Check topology declaration, queue names, enabled flags, listener connection and
+broker status. Zero DLQ consumers is normal; only the two event queues are tested.
+Recover listener/configuration and verify both consumer gauges plus actual work.
+
+### Resource pressure
+
+Compare JVM heap/GC, process CPU, pool active/max/pending and workload. Check slow
+DB/network operations without logging secrets or making transaction boundaries
+span HTTP. Do not blindly increase replicas/pool size (shared DB load multiplies).
+Capture sanitized durations/resources for T14 calibration before changing budgets.
+
+### API errors
+
+Inspect bounded error codes/request correlation and compare source state with
+Idempotency replay. Never automatically retry a financial mutation with a new
+key. UNKNOWN is ambiguous, not a terminal decline. The 20-request floor suppresses
+low-traffic noise; this alert does not replace per-request error handling.
+
+### Collector export failure
+
+Check Tempo readiness/retention/disk and Collector queue/memory limits. Restore
+monitoring without altering financial state. Export retries may drop old spans;
+recovery means a **new** controlled trace is visible, not all outage spans restored.
+
+## Verification sources
+
+Pinned images/configuration follow the official [Prometheus release](https://github.com/prometheus/prometheus/releases/tag/v3.15.0),
+[Grafana release](https://grafana.com/grafana/download/13.2.3?edition=oss),
+[Collector release/configuration](https://github.com/open-telemetry/opentelemetry-collector-releases/releases/tag/v0.162.0),
+and [Tempo 2.10.4 configuration source](https://github.com/grafana/tempo/tree/v2.10.4/example/docker-compose/local).
+Tempo 2.10 is a maintained branch under its [published version policy](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/recommended-versions/).
+Compatibility is verified by actual image startup, not inferred from tags.
+Use [promtool rule fixtures](https://prometheus.io/docs/prometheus/latest/configuration/unit_testing_rules/)
+for deterministic firing/resolution; [RabbitMQ detailed metrics](https://www.rabbitmq.com/docs/prometheus#prometheus-endpoints-metricsdetailed)
+are restricted to two required queues/two DLQs. Exact digests are in Compose.
+These checks are not a vulnerability scan/SBOM or upgrade approval; T11/T12 own
+those gates before deployment. No floating `latest` or paid service is used.

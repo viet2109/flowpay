@@ -298,8 +298,9 @@ Status: `IN PROGRESS` as of 2026-10-11.
 Completed: P8-T01 baseline/design, P8-T02 production configuration, health and
 management security, P8-T03 Payment/Refund/Idempotency metrics, P8-T04
 Outbox/Ledger/Webhook operational metrics, P8-T05 synchronous tracing and
-P8-T06 durable Outbox trace context and P8-T07 consumer/delayed-worker tracing.
-Next: P8-T08 (not started).
+P8-T06 durable Outbox trace context, P8-T07 consumer/delayed-worker tracing and
+P8-T08 monitoring lab/dashboards/alerts.
+Next: P8-T09 (not started).
 
 The user selected staging Linux/container with no provider/external deployment.
 Phase 7 source `d348b10` was pushed and merged into remote main at `0b96400`;
@@ -322,7 +323,7 @@ phase branch before completion unless explicitly requested. Existing untracked
 | P8-T05 | HTTP Tracing and Safe Log Correlation | P8-T02 | DONE |
 | P8-T06 | Durable Outbox Trace Context | P8-T01, P8-T05 | DONE |
 | P8-T07 | Consumer and Webhook Worker Tracing | P8-T06 | DONE |
-| P8-T08 | Monitoring Stack, Dashboards and Alerts | P8-T02, P8-T03, P8-T04, P8-T05, P8-T06, P8-T07 | PLANNED |
+| P8-T08 | Monitoring Stack, Dashboards and Alerts | P8-T02, P8-T03, P8-T04, P8-T05, P8-T06, P8-T07 | DONE |
 | P8-T09 | Webhook SSRF, DNS-Rebinding and Egress Protection | P8-T01, P8-T02 | PLANNED |
 | P8-T10 | API and Authentication Security Review | P8-T01, P8-T02 | PLANNED |
 | P8-T11 | CI Verification and Supply-Chain Gates | P8-T01, P8-T10 | PLANNED |
@@ -474,6 +475,31 @@ an advisory SKIP LOCKED candidate-discovery fixture. Full clean verify passes
 Scope/SQL lookup limits and full evidence are recorded in production-engineering.md.
 No deployed collector/staging claim or T08 work. Commit remains local; phase/index/
 agent/env/user-owned .github paths are excluded. Next: P8-T08, not started.
+
+### P8-T08 completion checkpoint (2026-10-11)
+
+Independent digest-pinned Prometheus/Grafana/OTLP Collector/Tempo lab with
+versioned two-datasource/21-panel provisioning and 12 operational alerts/runbooks.
+External fixture secrets, private infrastructure ports, loopback/authenticated
+Grafana, finite budgets/retention and fresh shared-DB max (not sum) are explicit.
+Promtool validates 16 rules and 14 scenarios/28 firing-resolution/aggregation
+assertions; Compose/static/runbook coverage and Collector config checks pass.
+Final clean owned Linux-container acceptance passes real metrics, every dashboard
+query, E2E stored trace/proxy/privacy, all-four-monitor outage/recovery, financial
+replay/conflict and six balanced unique Ledger posts/twelve entries. Focused Java
+regressions pass 15 tests/four classes, zero failures/errors/skips (1m56s).
+
+No full application suite rerun: no Java/application-default configuration,
+security wiring, schema, transaction, financial or messaging behavior changed.
+The tested JAR remains the T07 full-gate artifact; that prior 1,351-test run is
+provenance, not a new T08 gate. Environment/artifact/limitations are in
+production-engineering.md and monitoring-runbook.md. Startup fixture/config issues
+were corrected, including finite read-only Grafana provisioning readiness waits.
+No external paging/HA, TLS staging, production image/security scan, performance
+SLO or T09 implementation is claimed. Only owned disposable lab resources are
+removed; dev data and pre-existing .env/.github are untouched. Tracked docs synced;
+phase/index corrected locally and remain unstaged. Task commit stays local on
+feature/phase-8-production-engineering, no push/merge. Next: P8-T09, unstarted.
 
 ## Agent task template
 

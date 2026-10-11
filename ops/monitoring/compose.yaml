@@ -1,0 +1,159 @@
+# Disposable simulator observability lab, NOT the T12 image or T13 staging deployment.
+# Always supply an explicit new project name and an external secrets directory.
+services:
+  postgres:
+    image: postgres:16.15-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    environment:
+      POSTGRES_DB: flowpay_lab
+      POSTGRES_USER: flowpay_lab
+      POSTGRES_PASSWORD_FILE: /run/secrets/DB_PASSWORD
+    secrets: [DB_PASSWORD]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U flowpay_lab -d flowpay_lab']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [lab]
+    mem_limit: 512m
+    cpus: 1
+
+  rabbitmq:
+    image: rabbitmq:4.3.0-management-alpine@sha256:1a43764bdcf116542e7c8c794adc67c79461727da16d474e9e21483fe7f716d3
+    environment:
+      RABBITMQ_DEFAULT_USER: flowpay_lab
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - 'export RABBITMQ_DEFAULT_PASS="$$(cat /run/secrets/RABBITMQ_PASSWORD)"; exec docker-entrypoint.sh rabbitmq-server'
+    secrets: [RABBITMQ_PASSWORD]
+    volumes:
+      - rabbit-data:/var/lib/rabbitmq
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [lab]
+    mem_limit: 512m
+    cpus: 1
+
+  app:
+    image: eclipse-temurin:21.0.10_7-jre-jammy@sha256:fa4854e6057665066cb79953616671c20f32b96a85d6dd8b78db0762203924c4
+    user: '10001:10001'
+    read_only: true
+    tmpfs: ['/tmp:size=128m,mode=1777']
+    entrypoint: [java, '-Xmx768m', -jar, /opt/flowpay/app.jar]
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
+      DB_URL: jdbc:postgresql://postgres:5432/flowpay_lab
+      DB_USERNAME: flowpay_lab
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: flowpay_lab
+      JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
+      JWT_PRIVATE_KEY_LOCATION: file:/run/secrets/jwt-private.pem
+      MANAGEMENT_SERVER_ADDRESS: 0.0.0.0
+      TRACING_EXPORT_ENABLED: 'true'
+      TRACING_SAMPLER: parent-based-always-on
+      TRACING_SAMPLING_PROBABILITY: '1.0'
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://collector:4318/v1/traces
+      MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: 'false'
+    secrets: [DB_PASSWORD, RABBITMQ_PASSWORD, WEBHOOK_SECRET_ENCRYPTION_KEY, jwt-public.pem, jwt-private.pem]
+    volumes:
+      - type: bind
+        source: ${FLOWPAY_JAR:?Set FLOWPAY_JAR to the verified executable JAR absolute path}
+        target: /opt/flowpay/app.jar
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      postgres: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+    networks: [lab]
+    mem_limit: 1536m
+    cpus: 2
+
+  prometheus:
+    image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
+    command: [--config.file=/etc/prometheus/prometheus.yaml, --storage.tsdb.path=/prometheus, --storage.tsdb.retention.time=48h, --storage.tsdb.retention.size=256MB]
+    volumes:
+      - ./prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    networks: [lab]
+    mem_limit: 512m
+    cpus: 1
+
+  grafana:
+    image: grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572
+    environment:
+      GF_SECURITY_ADMIN_USER: lab-admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/GRAFANA_ADMIN_PASSWORD
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: 'false'
+      GF_LOG_LEVEL: warn
+    secrets: [GRAFANA_ADMIN_PASSWORD]
+    ports: ['127.0.0.1:${GRAFANA_LAB_PORT:-3300}:3000']
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks: [lab, ui]
+    mem_limit: 256m
+    cpus: 1
+
+  collector:
+    image: otel/opentelemetry-collector:0.162.0@sha256:310a800ad69ee430e7c541796852a242c9c7db97aaad4daa5ccf843c525fbdb2
+    command: [--config=/etc/otel/config.yaml]
+    volumes: [./collector.yaml:/etc/otel/config.yaml:ro]
+    networks: [lab]
+    mem_limit: 256m
+    cpus: 1
+
+  tempo:
+    image: grafana/tempo:2.10.4@sha256:a6616c9d224770c883a67b50e4941e99c5df81b076ef05f516bb7cce5a96cec0
+    command: [-config.file=/etc/tempo/config.yaml]
+    volumes:
+      - ./tempo.yaml:/etc/tempo/config.yaml:ro
+      - tempo-data:/var/tempo
+    networks: [lab]
+    mem_limit: 512m
+    cpus: 1
+
+  probe:
+    image: python:3.13.12-slim@sha256:f1927c75e81efd1e091dbd64b6c0ecaa5630b38635a3d1c04034ac636e1f94c8
+    profiles: [checks]
+    read_only: true
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    volumes:
+      - ./tests:/checks:ro
+      - ./grafana/dashboards:/dashboards:ro
+      - ./prometheus:/rules:ro
+      - ../../docs/monitoring-runbook.md:/runbook.md:ro
+    secrets: [GRAFANA_ADMIN_PASSWORD]
+    entrypoint: [python, -B, /checks/smoke.py]
+    networks: [lab]
+    mem_limit: 128m
+    cpus: 1
+
+secrets:
+  DB_PASSWORD: {file: '${LAB_SECRETS_DIR:?Set external LAB_SECRETS_DIR}/DB_PASSWORD'}
+  RABBITMQ_PASSWORD: {file: '${LAB_SECRETS_DIR}/RABBITMQ_PASSWORD'}
+  WEBHOOK_SECRET_ENCRYPTION_KEY: {file: '${LAB_SECRETS_DIR}/WEBHOOK_SECRET_ENCRYPTION_KEY'}
+  GRAFANA_ADMIN_PASSWORD: {file: '${LAB_SECRETS_DIR}/GRAFANA_ADMIN_PASSWORD'}
+  jwt-public.pem: {file: '${LAB_SECRETS_DIR}/jwt-public.pem'}
+  jwt-private.pem: {file: '${LAB_SECRETS_DIR}/jwt-private.pem'}
+
+networks:
+  lab: {internal: true}
+  # Only the loopback UI attaches here: Docker does not publish internal-network-only ports.
+  ui: {}
+volumes:
+  postgres-data:
+  rabbit-data:
+  prometheus-data:
+  grafana-data:
+  tempo-data:

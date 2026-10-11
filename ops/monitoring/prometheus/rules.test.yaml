@@ -1,0 +1,543 @@
+# JSON is a YAML subset; generated cases are reviewed and versioned, not regenerated at runtime.
+{
+  "rule_files": [
+    "rules.yaml"
+  ],
+  "evaluation_interval": "1m",
+  "group_eval_order": [
+    "flowpay-shared-database",
+    "flowpay-operational-alerts"
+  ],
+  "tests": [
+    {
+      "name": "FlowPayTargetUnavailable fires then resolves",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"flowpay\",instance=\"app:9091\"}",
+          "values": "0x9 1x11"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "8m",
+          "alertname": "FlowPayTargetUnavailable",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "flowpay",
+                "instance": "app:9091",
+                "severity": "critical"
+              },
+              "exp_annotations": {
+                "summary": "Required lab scrape target is unavailable",
+                "runbook": "docs/monitoring-runbook.md#target-unavailable"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "20m",
+          "alertname": "FlowPayTargetUnavailable",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "FlowPayMetricsStale fires then resolves",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "flowpay_metrics_sample_age_seconds{job=\"flowpay\",instance=\"app:9091\",component=\"OUTBOX\"}",
+          "values": "180x9 0x11"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "8m",
+          "alertname": "FlowPayMetricsStale",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "flowpay",
+                "instance": "app:9091",
+                "component": "OUTBOX",
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "Durable metrics are stale, missing or never sampled",
+                "runbook": "docs/monitoring-runbook.md#metrics-stale"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "20m",
+          "alertname": "FlowPayMetricsStale",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "FlowPayOutboxDelayed fires then resolves",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "flowpay_outbox_oldest_unpublished_age_seconds{job=\"flowpay\",instance=\"app:9091\"}",
+          "values": "180x9 0x11"
+        },
+        {
+          "series": "flowpay_metrics_sample_age_seconds{job=\"flowpay\",instance=\"app:9091\",component=\"OUTBOX\"}",
+          "values": "0x21"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "8m",
+          "alertname": "FlowPayOutboxDelayed",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "Unpublished source facts are delayed",
+                "runbook": "docs/monitoring-runbook.md#outbox-delayed"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "20m",
+          "alertname": "FlowPayOutboxDelayed",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "FlowPayWebhookDelayed fires then resolves",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "flowpay_webhook_oldest_due_age_seconds{job=\"flowpay\",instance=\"app:9091\"}",
+          "values": "180x9 0x11"
+        },
+        {
+          "series": "flowpay_metrics_sample_age_seconds{job=\"flowpay\",instance=\"app:9091\",component=\"WEBHOOK\"}",
+          "values": "0x21"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "8m",
+          "alertname": "FlowPayWebhookDelayed",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "Webhook work is overdue",
+                "runbook": "docs/monitoring-runbook.md#webhook-delayed"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "20m",
+          "alertname": "FlowPayWebhookDelayed",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "FlowPayWebhookDead fires then resolves",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "flowpay_webhook_backlog_rows{job=\"flowpay\",instance=\"app:9091\",status=\"DEAD\"}",
+          "values": "7x9 0x11"
+        },
+        {
+          "series": "flowpay_metrics_sample_age_seconds{job=\"flowpay\",instance=\"app:9091\",component=\"WEBHOOK\"}",
+          "values": "0x21"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "8m",
+          "alertname": "FlowPayWebhookDead",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "status": "DEAD",
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "Webhook deliveries require manual review",
+                "runbook": "docs/monitoring-runbook.md#webhook-dead"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "20m",
+          "alertname": "FlowPayWebhookDead",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "FlowPayConsumerDlq fires then resolves",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "rabbitmq_detailed_queue_messages{job=\"rabbitmq-queues\",instance=\"rabbitmq:15692\",queue=\"flowpay.ledger.events.dlq\",vhost=\"/\"}",
+          "values": "7x9 0x11"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "8m",
+          "alertname": "FlowPayConsumerDlq",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "rabbitmq-queues",
+                "instance": "rabbitmq:15692",
+                "queue": "flowpay.ledger.events.dlq",
+                "vhost": "/",
+                "severity": "critical"
+              },
+              "exp_annotations": {
+                "summary": "Consumer dead-letter queue is nonempty",
+                "runbook": "docs/monitoring-runbook.md#consumer-dlq"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "20m",
+          "alertname": "FlowPayConsumerDlq",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "FlowPayConsumerUnavailable fires then resolves",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "rabbitmq_detailed_queue_consumers{job=\"rabbitmq-queues\",instance=\"rabbitmq:15692\",queue=\"flowpay.ledger.events\",vhost=\"/\"}",
+          "values": "0x9 1x11"
+        },
+        {
+          "series": "rabbitmq_detailed_queue_consumers{job=\"rabbitmq-queues\",instance=\"rabbitmq:15692\",queue=\"flowpay.webhook.events\",vhost=\"/\"}",
+          "values": "1x21"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "8m",
+          "alertname": "FlowPayConsumerUnavailable",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "rabbitmq-queues",
+                "instance": "rabbitmq:15692",
+                "queue": "flowpay.ledger.events",
+                "vhost": "/",
+                "severity": "critical"
+              },
+              "exp_annotations": {
+                "summary": "Required event queue has no consumer or its series is absent",
+                "runbook": "docs/monitoring-runbook.md#consumer-unavailable"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "20m",
+          "alertname": "FlowPayConsumerUnavailable",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "FlowPayHeapPressure fires then resolves",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "jvm_memory_used_bytes{job=\"flowpay\",instance=\"app:9091\",area=\"heap\"}",
+          "values": "90x9 10x11"
+        },
+        {
+          "series": "jvm_memory_max_bytes{job=\"flowpay\",instance=\"app:9091\",area=\"heap\"}",
+          "values": "100x21"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "8m",
+          "alertname": "FlowPayHeapPressure",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "flowpay",
+                "instance": "app:9091",
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "JVM heap pressure is sustained",
+                "runbook": "docs/monitoring-runbook.md#resource-pressure"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "20m",
+          "alertname": "FlowPayHeapPressure",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "FlowPayPoolPressure fires then resolves",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "hikaricp_connections_active{job=\"flowpay\",instance=\"app:9091\",pool=\"main\"}",
+          "values": "9x9 1x11"
+        },
+        {
+          "series": "hikaricp_connections_max{job=\"flowpay\",instance=\"app:9091\",pool=\"main\"}",
+          "values": "10x21"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "8m",
+          "alertname": "FlowPayPoolPressure",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "flowpay",
+                "instance": "app:9091",
+                "pool": "main",
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "Database connection pool pressure is sustained",
+                "runbook": "docs/monitoring-runbook.md#resource-pressure"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "20m",
+          "alertname": "FlowPayPoolPressure",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "FlowPayCpuPressure fires then resolves",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "process_cpu_usage{job=\"flowpay\",instance=\"app:9091\"}",
+          "values": "0.95x9 0.1x11"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "8m",
+          "alertname": "FlowPayCpuPressure",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "flowpay",
+                "instance": "app:9091",
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "Process CPU pressure is sustained",
+                "runbook": "docs/monitoring-runbook.md#resource-pressure"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "20m",
+          "alertname": "FlowPayCpuPressure",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "FlowPayApiErrors fires then resolves",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "http_server_requests_seconds_count{job=\"flowpay\",uri=\"/api/v1/payment-intents\",status=\"500\"}",
+          "values": "0+9x9 81+0x11"
+        },
+        {
+          "series": "http_server_requests_seconds_count{job=\"flowpay\",uri=\"/api/v1/payment-intents\",status=\"200\"}",
+          "values": "0+1x9 9+10x11"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "8m",
+          "alertname": "FlowPayApiErrors",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "API server errors exceed the provisional operational threshold",
+                "runbook": "docs/monitoring-runbook.md#api-errors"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "20m",
+          "alertname": "FlowPayApiErrors",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "FlowPayCollectorExportFailure fires then resolves",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "otelcol_exporter_send_failed_spans_total{job=\"collector\"}",
+          "values": "0+1x9 9+0x11"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "8m",
+          "alertname": "FlowPayCollectorExportFailure",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "Collector trace export is failing",
+                "runbook": "docs/monitoring-runbook.md#collector-export-failure"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "20m",
+          "alertname": "FlowPayCollectorExportFailure",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "never sampled NaN is unavailable, not zero",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"flowpay\",instance=\"app:9091\"}",
+          "values": "1x21"
+        },
+        {
+          "series": "flowpay_metrics_sample_age_seconds{job=\"flowpay\",instance=\"app:9091\",component=\"OUTBOX\"}",
+          "values": "NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 0x11"
+        },
+        {
+          "series": "flowpay_metrics_sample_age_seconds{job=\"flowpay\",instance=\"app:9091\",component=\"WEBHOOK\"}",
+          "values": "NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 0x11"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "8m",
+          "alertname": "FlowPayMetricsStale",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "flowpay",
+                "instance": "app:9091",
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "Durable metrics are stale, missing or never sampled",
+                "runbook": "docs/monitoring-runbook.md#metrics-stale"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "20m",
+          "alertname": "FlowPayMetricsStale",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "fresh shared DB replicas use max; stale and NaN excluded",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "flowpay_outbox_backlog_rows{job=\"flowpay\",instance=\"one\",status=\"PENDING\"}",
+          "values": "7x21"
+        },
+        {
+          "series": "flowpay_outbox_backlog_rows{job=\"flowpay\",instance=\"two\",status=\"PENDING\"}",
+          "values": "7x21"
+        },
+        {
+          "series": "flowpay_outbox_backlog_rows{job=\"flowpay\",instance=\"stale\",status=\"PENDING\"}",
+          "values": "99x21"
+        },
+        {
+          "series": "flowpay_outbox_backlog_rows{job=\"flowpay\",instance=\"never\",status=\"PENDING\"}",
+          "values": "NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN"
+        },
+        {
+          "series": "flowpay_metrics_sample_age_seconds{job=\"flowpay\",instance=\"one\",component=\"OUTBOX\"}",
+          "values": "0x9 180x11"
+        },
+        {
+          "series": "flowpay_metrics_sample_age_seconds{job=\"flowpay\",instance=\"two\",component=\"OUTBOX\"}",
+          "values": "0x9 180x11"
+        },
+        {
+          "series": "flowpay_metrics_sample_age_seconds{job=\"flowpay\",instance=\"stale\",component=\"OUTBOX\"}",
+          "values": "180x21"
+        },
+        {
+          "series": "flowpay_metrics_sample_age_seconds{job=\"flowpay\",instance=\"never\",component=\"OUTBOX\"}",
+          "values": "NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN"
+        }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "flowpay:outbox_backlog_rows",
+          "eval_time": "8m",
+          "exp_samples": [
+            {
+              "labels": "flowpay:outbox_backlog_rows{status=\"PENDING\"}",
+              "value": 7
+            }
+          ]
+        },
+        {
+          "expr": "flowpay:outbox_backlog_rows",
+          "eval_time": "20m",
+          "exp_samples": []
+        }
+      ]
+    }
+  ]
+}
