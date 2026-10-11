@@ -1,6 +1,6 @@
 package com.flowpay.backend.infrastructure.messaging.outbox;
 
-import com.flowpay.backend.infrastructure.messaging.trace.DurableTraceContext;
+import com.flowpay.backend.common.observability.DurableTraceContext;
 
 import java.time.Instant;
 import java.util.Objects;

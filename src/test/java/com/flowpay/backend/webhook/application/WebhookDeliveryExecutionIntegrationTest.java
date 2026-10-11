@@ -285,7 +285,8 @@ class WebhookDeliveryExecutionIntegrationTest extends PostgresIntegrationTest {
         var delivery = delivery("disabled_worker", NOW);
         new WebhookDeliveryWorker(execution, http, cipher,
                 new WebhookDeliveryWorkerProperties(false, Duration.ofSeconds(1), 2, Duration.ofSeconds(30)), clock,
-                new WebhookMetrics(new MetricsRecorder(new SimpleMeterRegistry()))).deliverBatch();
+                new WebhookMetrics(new MetricsRecorder(new SimpleMeterRegistry())),
+                new com.flowpay.backend.testing.UnobservedWebhookWorkerTracing()).deliverBatch();
         assertThat(load(delivery).status()).isEqualTo(WebhookDeliveryStatus.PENDING);
         assertThatThrownBy(() -> tx(() -> { worker().deliverBatch(); return null; }))
                 .isInstanceOf(IllegalStateException.class);
@@ -295,7 +296,8 @@ class WebhookDeliveryExecutionIntegrationTest extends PostgresIntegrationTest {
     private WebhookDeliveryWorker worker() {
         return new WebhookDeliveryWorker(execution, http, cipher,
                 new WebhookDeliveryWorkerProperties(true, Duration.ofSeconds(1), 2, Duration.ofSeconds(30)), clock,
-                new WebhookMetrics(new MetricsRecorder(new SimpleMeterRegistry())));
+                new WebhookMetrics(new MetricsRecorder(new SimpleMeterRegistry())),
+                new com.flowpay.backend.testing.UnobservedWebhookWorkerTracing());
     }
 
     private WebhookDelivery delivery(String suffix, Instant createdAt) {

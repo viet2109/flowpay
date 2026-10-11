@@ -1,5 +1,6 @@
 package com.flowpay.backend.webhook.infrastructure.persistence;
 
+import com.flowpay.backend.common.observability.DurableTraceContext;
 import com.flowpay.backend.webhook.application.WebhookEventRepository;
 import com.flowpay.backend.webhook.domain.WebhookEvent;
 import lombok.RequiredArgsConstructor;
@@ -21,12 +22,13 @@ public class WebhookEventRepositoryAdapter implements WebhookEventRepository {
         }
         return jdbc.query("""
                 INSERT INTO webhook_events (public_id, source_event_id, merchant_id, event_type,
-                    resource_type, resource_id, payload, occurred_at, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?)
+                    resource_type, resource_id, payload, occurred_at, created_at, traceparent)
+                VALUES (?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, ?)
                 ON CONFLICT (source_event_id) DO NOTHING RETURNING id
                 """, (rs, row) -> rs.getLong("id"), event.publicId(), event.sourceEventId(), event.merchantId(),
                 event.eventType().value(), event.resourceType().name(), event.resourceId(), event.payload(),
-                event.occurredAt().atOffset(ZoneOffset.UTC), event.createdAt().atOffset(ZoneOffset.UTC))
+                event.occurredAt().atOffset(ZoneOffset.UTC), event.createdAt().atOffset(ZoneOffset.UTC),
+                DurableTraceContext.captureOrNull())
                 .stream().findFirst().flatMap(this::findByInternalId);
     }
 

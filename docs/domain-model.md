@@ -456,6 +456,11 @@ canonical JSON values and event metadata on redelivery. It creates PENDING
 deliveries only for the first ACTIVE subscription snapshot, holding shared
 endpoint row locks until commit; equivalent duplicates never repeat fan-out.
 
+P8-T07's nullable persisted traceparent is technical storage metadata, not a
+WebhookEvent field/invariant or a contradiction/dedupe fact. First materialization
+retains it across redelivery/restart; domain rehydration and immutable public
+payloads ignore it. Delivery/lease transitions remain telemetry-independent.
+
 ### WebhookDelivery — Aggregate Root
 
 Represents delivery of one webhook event to one endpoint.

@@ -1,7 +1,7 @@
 package com.flowpay.backend.infrastructure.messaging.outbox.relay;
 
 import com.flowpay.backend.infrastructure.messaging.outbox.OutboxEvent;
-import com.flowpay.backend.infrastructure.messaging.trace.DurableTraceContext;
+import com.flowpay.backend.common.observability.DurableTraceContext;
 
 import java.time.Instant;
 import java.util.Objects;

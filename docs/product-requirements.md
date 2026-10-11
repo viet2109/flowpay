@@ -213,10 +213,10 @@ these boundaries. Phase 6 remains DONE/FROZEN; Phase 8 hardening is not included
 
 ### Phase 8 — Production engineering
 
-Status: `IN PROGRESS` as of 2026-10-04; P8-T01 baseline/design, P8-T02
+Status: `IN PROGRESS` as of 2026-10-11; P8-T01 baseline/design, P8-T02
 production configuration/management, P8-T03 business metrics, P8-T04
 asynchronous operational metrics, P8-T05 synchronous tracing and P8-T06 durable
-Outbox trace context complete.
+Outbox trace context and P8-T07 consumer/delayed-worker tracing complete.
 
 Target selected by the user: reproducible staging on Linux/container, without
 a chosen provider or external deployment. The Phase 7 release is merged into
@@ -254,7 +254,13 @@ change, dependency or financial TX/locking/retry change. Full clean verify
 passes 1,331 tests/187 suites with zero failures/errors/skips. Publication,
 consumer and delayed-worker spans still belong to T07, not this task.
 
-The remaining 12 tasks cover asynchronous tracing, monitoring/alerts, Webhook DNS/egress enforcement,
+P8-T07 implements bounded publication/consumer/delivery/recovery spans and
+restart-stable Webhook-owned technical context (V013). Parent/cleanup/privacy
+policy is explicit; public IDs/JSON/HMAC/headers, financial/dedupe/ACK/retry/lease
+semantics are preserved. Full clean verify passes 1,351 tests/191 suites with
+no failures/errors/skips. This is not deployed collector/staging evidence.
+
+The remaining 11 tasks cover monitoring/alerts, Webhook DNS/egress enforcement,
 auth/security review,
 CI/supply-chain gates, a constrained image, staged deployment, declared load and
 multi-instance failure drills, actual DB/broker/key restore and runbooks.

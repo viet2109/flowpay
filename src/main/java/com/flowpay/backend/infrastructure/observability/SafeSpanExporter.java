@@ -1,6 +1,7 @@
 package com.flowpay.backend.infrastructure.observability;
 
 import com.flowpay.backend.common.observability.ExternalCallTracing;
+import com.flowpay.backend.common.observability.AsyncWorkTracing;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.SpanContext;
@@ -27,6 +28,10 @@ final class SafeSpanExporter implements SpanExporter {
 
     private static final Set<String> METHODS = Set.of("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE");
     private static final Set<String> CLIENT_NAMES = Set.of("payment.provider", "refund.provider", "webhook.http");
+    private static final Set<String> ASYNC_NAMES = java.util.Arrays.stream(AsyncWorkTracing.Operation.values())
+            .map(AsyncWorkTracing.Operation::spanName).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    private static final Set<String> ASYNC_OUTCOMES = java.util.Arrays.stream(AsyncWorkTracing.Outcome.values())
+            .map(Enum::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
     private static final Set<String> OUTCOMES = java.util.Arrays.stream(ExternalCallTracing.Outcome.values())
             .map(Enum::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
     private final SpanExporter delegate;
@@ -57,10 +62,12 @@ final class SafeSpanExporter implements SpanExporter {
             attributes.put("http.response.status_class", status.charAt(0) + "xx");
         }
         String outcome = source.getAttributes().get(AttributeKey.stringKey("flowpay.outcome"));
-        if (OUTCOMES.contains(outcome == null ? "" : outcome)) attributes.put("flowpay.outcome", outcome);
+        if ((ASYNC_NAMES.contains(source.getName()) ? ASYNC_OUTCOMES : OUTCOMES)
+                .contains(outcome == null ? "" : outcome)) attributes.put("flowpay.outcome", outcome);
         Attributes safeAttributes = attributes.build();
         String name = source.getKind() == SpanKind.SERVER ? "http.server"
-                : CLIENT_NAMES.contains(source.getName()) ? source.getName() : "internal";
+                : CLIENT_NAMES.contains(source.getName()) || ASYNC_NAMES.contains(source.getName())
+                        ? source.getName() : "internal";
         return new DelegatingSpanData(source) {
             @Override public String getName() { return name; }
             @Override public Attributes getAttributes() { return safeAttributes; }

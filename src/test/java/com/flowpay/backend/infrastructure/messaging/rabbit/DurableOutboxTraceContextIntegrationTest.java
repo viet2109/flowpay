@@ -120,6 +120,21 @@ class DurableOutboxTraceContextIntegrationTest {
                     "SELECT retry_count FROM outbox_events WHERE event_id = ?", Integer.class,
                     retried.eventId())).isEqualTo(1);
             assertThat(repository.findDueUnpublished(Instant.now(), 10)).isEmpty();
+            relay.getBean(io.opentelemetry.sdk.trace.SdkTracerProvider.class).forceFlush()
+                    .join(5, java.util.concurrent.TimeUnit.SECONDS);
+            var publicationSpans = relay.getBean(com.flowpay.backend.testing.CapturingSpanExporter.class)
+                    .spans().stream().filter(s -> s.getName().equals("outbox.publish")).toList();
+            // Unsampled source is propagated but not exported; absent/corrupt sources create independent roots.
+            assertThat(publicationSpans).hasSize(3).allSatisfy(s -> {
+                assertThat(s.getKind()).isEqualTo(io.opentelemetry.api.trace.SpanKind.PRODUCER);
+                assertThat(s.getEvents()).isEmpty();
+                assertThat(s.getTraceId()).isNotEqualTo("e".repeat(32));
+            });
+            assertThat(publicationSpans).anySatisfy(s -> {
+                assertThat(s.getTraceId()).isEqualTo("a".repeat(32));
+                assertThat(s.getParentSpanId()).isEqualTo("b".repeat(16));
+            });
+            assertThat(publicationSpans.stream().filter(s -> !s.getParentSpanContext().isValid())).hasSize(2);
         }
         assertThat(Span.current().getSpanContext().isValid()).isFalse();
         assertThat(Baggage.current().isEmpty()).isTrue();
@@ -148,7 +163,8 @@ class DurableOutboxTraceContextIntegrationTest {
     }
 
     private static ConfigurableApplicationContext start() {
-        return new SpringApplicationBuilder(FlowPayApplication.class).profiles("test")
+        return new SpringApplicationBuilder(FlowPayApplication.class,
+                com.flowpay.backend.testing.TraceCaptureConfiguration.class).profiles("test")
                 .initializers(context -> context.getEnvironment().getPropertySources().addFirst(
                         new MapPropertySource("owned-trace-restart-fixture", Map.ofEntries(
                                 Map.entry("server.port", "0"),
@@ -160,6 +176,7 @@ class DurableOutboxTraceContextIntegrationTest {
                                 Map.entry("spring.rabbitmq.username", RABBIT.getAdminUsername()),
                                 Map.entry("spring.rabbitmq.password", RABBIT.getAdminPassword()),
                                 Map.entry("management.otlp.metrics.export.enabled", false),
+                                Map.entry("management.opentelemetry.tracing.sampler", "parent-based-always-on"),
                                 Map.entry("management.tracing.export.otlp.enabled", false)
                         )))).run();
     }

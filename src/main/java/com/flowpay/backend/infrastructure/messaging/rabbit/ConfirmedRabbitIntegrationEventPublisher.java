@@ -5,7 +5,7 @@ import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationR
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationStatus;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventTransportPublisher;
 import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvelope;
-import com.flowpay.backend.infrastructure.messaging.trace.DurableTraceContext;
+import com.flowpay.backend.common.observability.DurableTraceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;

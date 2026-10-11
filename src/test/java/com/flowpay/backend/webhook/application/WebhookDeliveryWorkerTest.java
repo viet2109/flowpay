@@ -104,6 +104,7 @@ class WebhookDeliveryWorkerTest {
     private WebhookDeliveryWorker worker(boolean enabled) {
         return new WebhookDeliveryWorker(execution, http, cipher,
                 new WebhookDeliveryWorkerProperties(enabled, Duration.ofSeconds(1), 2, Duration.ofSeconds(30)), clock,
-                new WebhookMetrics(new MetricsRecorder(new SimpleMeterRegistry())));
+                new WebhookMetrics(new MetricsRecorder(new SimpleMeterRegistry())),
+                new com.flowpay.backend.testing.UnobservedWebhookWorkerTracing());
     }
 }

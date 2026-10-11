@@ -592,11 +592,22 @@ event_type          VARCHAR NOT NULL
 resource_type       VARCHAR NOT NULL
 resource_id         VARCHAR NOT NULL
 payload             JSONB NOT NULL
+traceparent         VARCHAR(55) NULL
 occurred_at         TIMESTAMPTZ NOT NULL
 created_at          TIMESTAMPTZ NOT NULL
 ```
 
 Webhook events are immutable.
+
+P8-T07 / V013 adds only nullable technical `traceparent`, with no backfill,
+default, index or business constraint. The first successful INSERT captures
+materialization context; ON CONFLICT does not replace it on equal redelivery.
+It is not a domain/public/dedupe fact, never part of signed JSON or merchant
+headers. Webhook infrastructure reads it by delivery/event IDs outside claim,
+HTTP and finalize transactions, with a two-second statement timeout. Invalid,
+absent or unavailable metadata is ignored. Delayed attempts/recovery have fresh
+spans parented to this immutable context, including after restart. Existing
+writers can omit it; existing rich domain readers ignore it. V001-V012 are unchanged.
 
 `event_type` is restricted to the six public Webhook event names and
 `resource_type` to `PAYMENT_INTENT` or `REFUND`. Source-event identity provides
@@ -785,6 +796,7 @@ Phase 8:
 
 ```text
 V012__outbox_trace_context.sql
+V013__webhook_trace_context.sql
 ```
 
 Migration numbering may be extended, but an already-applied shared migration is never edited to retrofit a later design change.

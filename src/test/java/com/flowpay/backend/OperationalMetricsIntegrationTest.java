@@ -331,7 +331,8 @@ class OperationalMetricsIntegrationTest extends PostgresIntegrationTest {
 
     private WebhookDeliveryWorker worker() {
         return new WebhookDeliveryWorker(execution, http, cipher,
-                new WebhookDeliveryWorkerProperties(true, Duration.ofSeconds(1), 100, Duration.ofSeconds(30)), Clock.systemUTC(), webhookMetrics);
+                new WebhookDeliveryWorkerProperties(true, Duration.ofSeconds(1), 100, Duration.ofSeconds(30)), Clock.systemUTC(), webhookMetrics,
+                new com.flowpay.backend.testing.UnobservedWebhookWorkerTracing());
     }
 
     private void outbox(String suffix, String status, int ageOffset) {

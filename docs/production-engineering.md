@@ -2,8 +2,8 @@
 
 Status: P8-T01 design/exit baseline, P8-T02 configuration/management, P8-T03
 business metrics, P8-T04 asynchronous operational metrics, P8-T05 synchronous
-HTTP/provider/Webhook tracing and P8-T06 durable Outbox trace metadata implemented on
-2026-10-04; Phase 8 IN PROGRESS. Remaining
+HTTP/provider/Webhook tracing, P8-T06 durable Outbox trace metadata and P8-T07
+consumer/delayed-worker tracing implemented through 2026-10-11; Phase 8 IN PROGRESS. Remaining
 runtime/operational controls are owned by subsequent tasks. Phase 7 remains
 DONE/FROZEN; the simulator functional MVP remains complete.
 
@@ -44,7 +44,7 @@ documentation-only preparation does not require repeating an unchanged suite.
 | Area | Existing implementation | Phase 8 owner and required evidence |
 |---|---|---|
 | Financial consistency | Source TX + Outbox, Idempotency, reserved refund capacity, append-only balanced unique Ledger | All tasks preserve it; T14-T16/T18 recheck invariants |
-| Source events | Six processing/success/known-failure facts; success V1 preserved; UNKNOWN non-terminal; T06 durable source traceparent | T07 adds asynchronous span relations, not business fields |
+| Source events | Six processing/success/known-failure facts; success V1 preserved; UNKNOWN non-terminal; T06 durable source traceparent; T07 bounded asynchronous span relations | T14-T16/T18 verify operational behavior without new business fields |
 | Webhook delivery | Immutable event/subscription snapshot; claim/OPEN/lease; exact-body signed no-TX HTTP; fenced finalize; jitter/DEAD/manual retry | T04/T07/T09/T14-T16 operational evidence |
 | Observability foundation | Actuator/Prometheus/OpenTelemetry foundation, request MDC; T03 business metrics; T04 cached shared DB backlogs/ages and Outbox/Ledger/Webhook attempt/commit observations | T05-T08 own tracing and monitoring deployment; T14/T15 measure operational overhead |
 | Management security | T02: dedicated loopback-by-default listener; internal scrape allowed, public Actuator denied | T13 must prove private staging network/ingress enforcement |
@@ -279,6 +279,45 @@ T05 was next and unstarted at the T04 checkpoint; task commit stays local on the
 
 ## 5. Trace correlation (T05-T07)
 
+### Asynchronous tracing policy (T07)
+
+Reviewed before applying V013: add only nullable `webhook_events.traceparent`
+VARCHAR(55), no default/backfill/index/business constraint. Capture the first
+successful materialization span at INSERT; ON CONFLICT never replaces it, even
+when equal redelivery has different/missing context. Rich domain rehydration,
+public payload, event ID, signing bytes and merchant HTTP headers ignore it.
+Webhook-owned infrastructure reads it after claim/before HTTP or before recovery,
+outside application transactions; failed/missing/corrupt lookup starts a root.
+The SQL statement has a two-second timeout (connection acquisition still follows
+the existing pool budget). Legacy writers/readers remain compatible; V001-V012
+checksums remain unchanged.
+
+Single-message parent policy: Outbox publication attempts and independent Ledger
+processing/Webhook materialization invocations are siblings under the validated
+durable source creation context. Transport retains that original traceparent,
+not a mutable last-publication span. Each retry/redelivery creates a fresh span;
+no span includes broker backoff. Delivery/recovery spans are siblings under the
+first persisted materialization context, including after application/SDK restart.
+The existing `webhook.http` CLIENT span is a child of its delivery span. No links
+are needed for this single-parent flow; max-links remains zero. This is a local
+bounded causal policy, not a claim of full messaging semantic-convention coverage.
+
+Only strict canonical version-00 sampled/unsampled nonzero lowercase W3C context
+is accepted. Non-string/oversized/malformed headers are ignored; no baggage,
+tracestate, B3 or ambient request/scheduler parent is inherited. Scopes close on
+success/failure before reused threads handle other work. Telemetry availability
+never repeats the callback or changes its result/exception, ACK, transaction,
+dedupe, lease, retry policy, or financial result.
+
+Exporter policy expands only by fixed names `outbox.publish` (PRODUCER),
+`ledger.consume`/`webhook.materialize` (CONSUMER), `webhook.delivery` and
+`webhook.recovery` (INTERNAL), and enum outcomes COMPLETED/EXCEPTION,
+CONFIRMED/NOT_CONFIRMED, APPLIED/STALE. These are technical outcomes: APPLIED
+means a guarded persistence transition, not payment/delivery success. No IDs,
+attempt numbers, payloads, URLs, exceptions or secrets become attributes/events.
+No span is open during delayed scheduling or across a held DB transaction and
+HTTP call. Tracing remains diagnostic; disabled export/sampling is supported.
+
 ### Synchronous tracing policy (T05)
 
 Reuse Boot 4.1.0's Micrometer/OpenTelemetry bridge and auto-configured SDK; do
@@ -290,7 +329,8 @@ remain present but carry no other export attributes. Span names are fixed (`http
 `payment.provider`, `refund.provider`, `webhook.http`, or `internal`). Export
 removes events, links, status descriptions, tracestate, arbitrary attributes,
 and arbitrary resource/instrumentation attributes. Resource service.name is
-`flowpay`. Expanding this policy requires review, including T06/T07 causal links.
+`flowpay`. T07's reviewed expansion is specified above; any further expansion
+requires another review.
 
 Incoming propagation accepts W3C traceparent only, not baggage, tracestate or B3.
 Malformed context starts a new trace. The parent-based ratio sampler defaults
@@ -355,16 +395,16 @@ Trace metadata is not a business contradiction/dedupe fact and never enters
 the public Webhook body/signature/headers. Delivery/confirm/backoff/TX behavior
 remains unchanged, including when metadata is missing or corrupted.
 
-T07 reviews equivalent Webhook-owned technical storage if needed
-for delayed workers. These are separate additive forward migrations using the
-next actually unused versions, not reserved version numbers. Review concrete
-DDL, compatibility, validation and test coverage before applying them; never
-edit V001-V011 or add trace fields to business payloads/public signed JSON.
+T07 reviewed Webhook-owned V013 metadata for delayed workers as described above.
+These are separate additive forward migrations using the next actually unused
+versions, not reserved version numbers. Review concrete DDL, compatibility,
+validation and test coverage before applying migrations; never edit applied
+migrations or add trace fields to business payloads/public signed JSON.
 
 Rabbit transport headers carry validated optional context. Legacy/absent/bad
 context must not poison valid business processing or alter contradiction/dedupe
-facts. T07 will add bounded producer, consumer, redelivery and worker spans and
-explicit causal links/parent relationships; do not hold a request span or DB
+facts. T07 adds bounded producer, consumer, redelivery and worker spans with
+the explicit single-parent policy above; do not hold a request span or DB
 transaction open for retry delays. Clear context on reused threads. Outbound
 merchant Webhooks do not inherit internal tracing headers without an explicit
 separate contract review.
@@ -434,6 +474,45 @@ and staging/collector/load evidence remain pending. Only documentation finalized
 after the successful gate, so the unchanged full suite is not repeated. This
 task is committed locally on the phase branch, not pushed; phase/index remain
 local-only and `.env`/`.github/` are preserved.
+
+### T07 verification checkpoint (2026-10-11)
+
+Focused iteration/checkpoints verified 125 unique tests across 13 classes.
+The broad checkpoint caught a concurrency-fixture assumption that candidate
+discovery would assign one item per worker; actual SKIP LOCKED discovery is
+advisory and can return a whole batch. The fixture was corrected without
+changing production locks; its final two-test restart/concurrency rerun passed
+with zero failures/errors/skips (59s). An earlier raw-message fixture omitted
+mandatory messageId and was corrected, retaining validation assertions.
+
+Full `clean verify` then passed 1,351 tests in 191 suites, zero failures/errors/
+skips, 7m39s, and packaged `target/backend-0.0.1-SNAPSHOT.jar`. Environment:
+Windows/JDK21.0.12/Maven3.9.16/Boot4.1.0 with owned PostgreSQL16.15/RabbitMQ4.3
+Testcontainers and local HTTP receivers. Default optional OTLP metrics export
+was disabled; explicit exporter-outage tests still ran. No required DB/broker
+test was skipped. Compilation, ArchUnit, TX boundaries and git diff --check pass;
+no formatter plugin is configured.
+
+Evidence covers producer parent/unsampled/root behavior after app restart;
+real Ledger retries, backoff-separated sibling spans, rollback and DLQ;
+Webhook equal redelivery with different parents retaining first context;
+non-string/bad/oversized Rabbit headers; fresh/upgrade/legacy/checksum compatibility;
+actual app/pool/SDK close/restart; expired-lease recovery, stale result fencing,
+real HTTP timeout and subsequent retry; exact immutable body/event ID/HMAC and
+absence of internal merchant headers; simultaneous/reused worker-thread MDC/
+context isolation and one HTTP invocation per committed claim; optional metadata/
+SDK/exporter failure isolation. Existing full-suite financial/operational/E2E
+regressions remain intact.
+
+V013 contains only reviewed nullable Webhook-owned metadata. The shared helper
+is persistence-free; domain/API/envelope/source facts, dependencies, retry/lease,
+ACK, state, locking and financial transactions are unchanged. Five bounded names/
+outcomes expand the export allow-list but events/links remain absent. Sampling,
+queue loss and statement/pool lookup latency are diagnostic limits, not durable
+accounting. No deployed monitoring/collector/Linux staging/performance evidence
+is claimed; T08 is next/unstarted. Only docs finalized after the successful full
+gate, so unchanged code is not reverified. Commit stays local on the phase branch;
+phase/index/agent/env/user-owned .github paths remain excluded.
 
 ## 6. Production configuration and management (T02)
 

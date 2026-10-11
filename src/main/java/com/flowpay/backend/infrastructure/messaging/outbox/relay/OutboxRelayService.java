@@ -1,5 +1,6 @@
 package com.flowpay.backend.infrastructure.messaging.outbox.relay;
 
+import com.flowpay.backend.common.observability.AsyncWorkTracing;
 import com.flowpay.backend.infrastructure.messaging.FlowPayMessagingProperties;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationResult;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventTransportPublisher;
@@ -28,6 +29,7 @@ public class OutboxRelayService {
     private final FlowPayMessagingProperties properties;
     private final Clock clock;
     private final OutboxMetrics metrics;
+    private final AsyncWorkTracing tracing;
 
     public OutboxRelayBatchResult relayDueEvents() {
         int batchSize = properties.outbox().relay().batchSize();
@@ -59,9 +61,10 @@ public class OutboxRelayService {
     private PublicationAttempt publish(OutboxRelaySnapshot snapshot) {
         try {
             IntegrationEventEnvelope envelope = envelopeMapper.from(snapshot);
-            IntegrationEventPublicationResult result = transportPublisher.publish(
-                    envelope, snapshot.traceparent()
-            );
+            IntegrationEventPublicationResult result = tracing.call(AsyncWorkTracing.Operation.OUTBOX_PUBLISH,
+                    snapshot.traceparent(), () -> transportPublisher.publish(envelope, snapshot.traceparent()),
+                    published -> published.confirmed() ? AsyncWorkTracing.Outcome.CONFIRMED
+                            : AsyncWorkTracing.Outcome.NOT_CONFIRMED);
             metrics.attempt(result.status());
             if (result.confirmed()) {
                 return PublicationAttempt.success();

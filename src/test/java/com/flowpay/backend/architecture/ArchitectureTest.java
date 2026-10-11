@@ -72,7 +72,7 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule commonMustNotDependOnInfrastructure = noClasses()
             .that().resideInAPackage("com.flowpay.backend.common..")
-            .should().dependOnClassesThat().resideInAPackage("com.flowpay.infrastructure..")
+            .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.infrastructure..")
             .allowEmptyShould(true);
 
     @ArchTest

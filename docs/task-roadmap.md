@@ -293,13 +293,13 @@ acceptance criteria, and the mandatory implementation order.
 
 ## Phase 8 — Production Engineering
 
-Status: `IN PROGRESS` as of 2026-10-04.
+Status: `IN PROGRESS` as of 2026-10-11.
 
 Completed: P8-T01 baseline/design, P8-T02 production configuration, health and
 management security, P8-T03 Payment/Refund/Idempotency metrics, P8-T04
 Outbox/Ledger/Webhook operational metrics, P8-T05 synchronous tracing and
-P8-T06 durable Outbox trace context.
-Next: P8-T07 (not started).
+P8-T06 durable Outbox trace context and P8-T07 consumer/delayed-worker tracing.
+Next: P8-T08 (not started).
 
 The user selected staging Linux/container with no provider/external deployment.
 Phase 7 source `d348b10` was pushed and merged into remote main at `0b96400`;
@@ -321,7 +321,7 @@ phase branch before completion unless explicitly requested. Existing untracked
 | P8-T04 | Outbox, Ledger and Webhook Operational Metrics | P8-T03 | DONE |
 | P8-T05 | HTTP Tracing and Safe Log Correlation | P8-T02 | DONE |
 | P8-T06 | Durable Outbox Trace Context | P8-T01, P8-T05 | DONE |
-| P8-T07 | Consumer and Webhook Worker Tracing | P8-T06 | PLANNED |
+| P8-T07 | Consumer and Webhook Worker Tracing | P8-T06 | DONE |
 | P8-T08 | Monitoring Stack, Dashboards and Alerts | P8-T02, P8-T03, P8-T04, P8-T05, P8-T06, P8-T07 | PLANNED |
 | P8-T09 | Webhook SSRF, DNS-Rebinding and Egress Protection | P8-T01, P8-T02 | PLANNED |
 | P8-T10 | API and Authentication Security Review | P8-T01, P8-T02 | PLANNED |
@@ -461,6 +461,19 @@ checks pass. No deployment, business state/locking or retry-budget change.
 Tracked docs synchronized; local phase/index corrected and unstaged. `.env`/
 `.github/` preserved. Commit stays local on the phase branch; no push/merge.
 P8-T07 is next, not started; Phase 8 is not complete.
+
+### P8-T07 completion checkpoint (2026-10-11)
+
+Independent bounded publication, consumer, delivery/recovery spans use strict
+source-context validation. Reviewed V013 first-materialization Webhook metadata
+preserves causality across restart without changing public bodies/HMAC, dedupe,
+ACK/retry/lease or financial transactions. Focused checkpoints verified 125
+unique cases; the final restart/concurrent-worker rerun passed after correcting
+an advisory SKIP LOCKED candidate-discovery fixture. Full clean verify passes
+1,351 tests/191 suites with no failures/errors/skips (7m39s), packaged JAR.
+Scope/SQL lookup limits and full evidence are recorded in production-engineering.md.
+No deployed collector/staging claim or T08 work. Commit remains local; phase/index/
+agent/env/user-owned .github paths are excluded. Next: P8-T08, not started.
 
 ## Agent task template
 

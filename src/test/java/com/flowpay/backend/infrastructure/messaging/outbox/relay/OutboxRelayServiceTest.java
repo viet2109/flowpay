@@ -43,7 +43,8 @@ class OutboxRelayServiceTest {
             new OutboxRelayFailureSummary(),
             properties,
             Clock.fixed(NOW, ZoneOffset.UTC),
-            new OutboxMetrics(new MetricsRecorder(new SimpleMeterRegistry()))
+            new OutboxMetrics(new MetricsRecorder(new SimpleMeterRegistry())),
+            new com.flowpay.backend.common.observability.AsyncWorkTracing(io.opentelemetry.api.OpenTelemetry.noop())
     );
 
     @Test

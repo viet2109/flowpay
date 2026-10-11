@@ -51,9 +51,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-@SpringBootTest
+@SpringBootTest(properties = {"management.opentelemetry.tracing.sampler=parent-based-always-on",
+        "management.opentelemetry.tracing.export.schedule-delay=100ms"})
 @ActiveProfiles("test")
-@Import(LedgerConsumerRetryIntegrationTest.FaultInjectionConfiguration.class)
+@Import({LedgerConsumerRetryIntegrationTest.FaultInjectionConfiguration.class,
+        com.flowpay.backend.testing.TraceCaptureConfiguration.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class LedgerConsumerRetryIntegrationTest extends PostgresIntegrationTest {
 
@@ -85,6 +87,9 @@ class LedgerConsumerRetryIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired private com.flowpay.backend.testing.CapturingSpanExporter spans;
+    @Autowired private io.opentelemetry.sdk.trace.SdkTracerProvider traceProvider;
+    private static final String TRACEPARENT = "00-" + "a".repeat(32) + "-" + "b".repeat(16) + "-01";
 
     @DynamicPropertySource
     static void messagingProperties(DynamicPropertyRegistry registry) {
@@ -124,6 +129,8 @@ class LedgerConsumerRetryIntegrationTest extends PostgresIntegrationTest {
                     ledger_accounts RESTART IDENTITY CASCADE
                 """);
         purgeQueues();
+        traceProvider.forceFlush().join(5, java.util.concurrent.TimeUnit.SECONDS);
+        spans.clear();
     }
 
     @AfterEach
@@ -152,6 +159,7 @@ class LedgerConsumerRetryIntegrationTest extends PostgresIntegrationTest {
         assertBoundedBackoff(postingApi.paymentAttemptTimes(paymentPublicId));
         assertThat(receive(properties.topology().ledgerDeadLetterQueue(), 300L)).isNull();
         assertThat(postingApi.transactionStates()).containsOnly(true);
+        assertTraceAttempts(MAX_ATTEMPTS, "EXCEPTION", "EXCEPTION", "COMPLETED");
     }
 
     @Test
@@ -191,6 +199,7 @@ class LedgerConsumerRetryIntegrationTest extends PostgresIntegrationTest {
     void malformedEventShouldBeRetriedBoundedlyThenDeadLettered() {
         MessageProperties metadata = new MessageProperties();
         metadata.setMessageId("ievt_retry_malformed");
+        metadata.setHeader("traceparent", TRACEPARENT);
         metadata.setContentType(MessageProperties.CONTENT_TYPE_JSON);
         metadata.setContentEncoding(StandardCharsets.UTF_8.name());
         metadata.setDeliveryMode(MessageDeliveryMode.PERSISTENT);
@@ -312,7 +321,7 @@ class LedgerConsumerRetryIntegrationTest extends PostgresIntegrationTest {
     }
 
     private void publish(IntegrationEventEnvelope envelope) {
-        IntegrationEventPublicationResult result = transportPublisher.publish(envelope);
+        IntegrationEventPublicationResult result = transportPublisher.publish(envelope, TRACEPARENT);
         assertThat(result.confirmed()).isTrue();
     }
 
@@ -348,7 +357,31 @@ class LedgerConsumerRetryIntegrationTest extends PostgresIntegrationTest {
                 2_000L
         );
         assertThat(deadLetter).isNotNull();
+        assertThat(deadLetter.getMessageProperties().getHeaders()).containsEntry("traceparent", TRACEPARENT);
+        assertTraceAttempts(MAX_ATTEMPTS, "EXCEPTION", "EXCEPTION", "EXCEPTION");
         return deadLetter;
+    }
+
+    private void assertTraceAttempts(int count, String... outcomes) {
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+            traceProvider.forceFlush().join(2, java.util.concurrent.TimeUnit.SECONDS);
+            var attempts = spans.spans().stream().filter(s -> s.getName().equals("ledger.consume")).toList();
+            assertThat(attempts.size()).isGreaterThanOrEqualTo(count);
+            // The contradictory-duplicate case also contains its first successful delivery.
+            var latest = attempts.subList(attempts.size() - count, attempts.size());
+            assertThat(latest).hasSize(count).allSatisfy(s -> {
+                assertThat(s.getTraceId()).isEqualTo(TRACEPARENT.substring(3, 35));
+                assertThat(s.getParentSpanId()).isEqualTo(TRACEPARENT.substring(36, 52));
+                assertThat(s.getKind()).isEqualTo(io.opentelemetry.api.trace.SpanKind.CONSUMER);
+                assertThat(s.getEvents()).isEmpty();
+            });
+            assertThat(latest.stream().map(s -> s.getSpanId()).distinct()).hasSize(count);
+            assertThat(latest).extracting(s -> s.getAttributes().get(
+                    io.opentelemetry.api.common.AttributeKey.stringKey("flowpay.outcome"))).containsExactly(outcomes);
+            for (int i = 1; i < latest.size(); i++) {
+                assertThat(latest.get(i).getStartEpochNanos()).isGreaterThan(latest.get(i - 1).getEndEpochNanos());
+            }
+        });
     }
 
     private Message receive(String queue, long timeoutMillis) {

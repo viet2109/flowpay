@@ -11,7 +11,7 @@ its clean quality gate. The functional simulator MVP is complete. Phase 8
 production engineering has completed P8-T01's baseline/design, P8-T02's
 production configuration/management/probes, P8-T03's business metrics and
 P8-T04's asynchronous operational metrics, P8-T05's synchronous tracing and
-P8-T06's durable Outbox trace context.
+P8-T06's durable Outbox trace context and P8-T07's consumer/delayed-worker tracing.
 Remaining hardening
 and staging tasks are pending.
 
@@ -173,9 +173,12 @@ P8-T06 persists validated optional source `traceparent` atomically with Outbox
 (V012, nullable VARCHAR(55)). Retry/restart retain it as a Rabbit header only,
 not JSON event fields or merchant HTTP headers. Missing/invalid metadata does
 not block valid business events; no baggage/tracestate is persisted. The relay
-never substitutes ambient scheduler context. P8-T07 still owns publication,
-consumer and delayed-worker spans; this is not yet end-to-end asynchronous
-tracing or deployed collector evidence.
+never substitutes ambient scheduler context. P8-T07 adds independent publication,
+consumer, delivery/recovery spans and V013 nullable first-materialization context.
+Retries/restarts remain causally connected without long-lived spans, business
+payload/HMAC/headers or dedupe changes. See the
+[async parent/worker/privacy policy](docs/production-engineering.md#asynchronous-tracing-policy-t07).
+No monitoring/collector or Linux staging deployment is claimed.
 
 ## Verification
 
@@ -225,6 +228,14 @@ application restart, rollback, sampled/unsampled/absent/bad context, concurrent
 isolation, byte-identical retried envelopes and old/enriched consumer duplicates.
 V001-V011 remain unchanged; V012 adds optional technical Outbox metadata only.
 
+P8-T07 focused checkpoints verified 125 unique cases, including the final
+two-test restart/concurrent-worker rerun. Full clean verify passes 1,351 tests/
+191 suites, zero failures/errors/skips, 7m39s. Includes real broker retry/DLQ,
+equal redelivery with different context, V013 upgrade compatibility, actual app/
+SDK restart, timeout/recovery/stale fencing, worker-thread context/MDC isolation
+and exact-body HMAC. V001-V012/public contracts remain unchanged; V013 adds only
+nullable technical Webhook metadata. Artifact: backend-0.0.1-SNAPSHOT.jar.
+
 For a clean infrastructure smoke check, use a dedicated disposable Compose
 project with separate container names, volumes, and ports. The checked-in
 Compose file pins development container names, so `-p` alone is not isolation.
@@ -251,7 +262,8 @@ or external deployment has been selected. P8-T01 verifies the merged Phase 7
 baseline; P8-T02 implements production startup and management/probe controls;
 P8-T03 adds Payment/Refund/Idempotency metrics; P8-T04 adds asynchronous operational
 metrics; P8-T05 adds synchronous HTTP/provider/Webhook tracing and P8-T06
-adds durable Outbox source context. P8-T07 asynchronous spans,
+adds durable Outbox source context. P8-T07 adds asynchronous spans and restart-
+stable worker context. Monitoring/alerts,
 stronger egress/DNS-rebinding controls, load testing,
 security/dependency review,
 packaging/staging, backup/recovery, and runbooks are still pending implementation.

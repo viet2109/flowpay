@@ -44,6 +44,8 @@ class WebhookEventEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, updatable = false, columnDefinition = "jsonb")
     private String payload;
+    @Column(name = "traceparent", length = 55, updatable = false)
+    private String traceparent;
     @Column(name = "occurred_at", nullable = false, updatable = false)
     private Instant occurredAt;
     @Column(name = "created_at", nullable = false, updatable = false)

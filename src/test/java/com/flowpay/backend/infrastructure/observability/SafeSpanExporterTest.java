@@ -12,6 +12,25 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SafeSpanExporterTest {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(com.flowpay.backend.common.observability.AsyncWorkTracing.Operation.class)
+    void exportsOnlyReviewedAsyncNamesAndBoundedTechnicalOutcomes(
+            com.flowpay.backend.common.observability.AsyncWorkTracing.Operation operation) {
+        var captured = new CapturingSpanExporter();
+        try (var sdk = SdkTracerProvider.builder().addSpanProcessor(SimpleSpanProcessor.create(new SafeSpanExporter(captured))).build()) {
+            var span = sdk.get("fixture").spanBuilder(operation.spanName())
+                    .setAttribute("flowpay.outcome", "APPLIED")
+                    .setAttribute("eventId", "synthetic-private").setAttribute("url.full", "synthetic-private").startSpan();
+            span.recordException(new IllegalStateException("synthetic-private"));
+            span.end();
+            var exported = captured.spans().getFirst();
+            assertThat(exported.getName()).isEqualTo(operation.spanName());
+            assertThat(exported.getAttributes()).isEqualTo(Attributes.builder().put("flowpay.outcome", "APPLIED").build());
+            assertThat(exported.getEvents()).isEmpty();
+            assertThat(exported.getLinks()).isEmpty();
+        }
+    }
+
     @Test
     void removesSensitiveNamesAttributesErrorsEventsLinksResourcesAndScopeBeforeExport() {
         String privateValue = "synthetic-private-credential-hash-ciphertext-signature-body";

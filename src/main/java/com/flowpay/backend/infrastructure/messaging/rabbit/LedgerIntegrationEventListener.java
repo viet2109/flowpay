@@ -1,5 +1,6 @@
 package com.flowpay.backend.infrastructure.messaging.rabbit;
 
+import com.flowpay.backend.common.observability.AsyncWorkTracing;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -18,6 +19,7 @@ public class LedgerIntegrationEventListener {
 
     private final IntegrationEventEnvelopeParser envelopeParser;
     private final LedgerIntegrationEventDispatcher eventDispatcher;
+    private final AsyncWorkTracing tracing;
 
     @RabbitListener(
             id = "flowpayLedgerIntegrationEventListener",
@@ -25,6 +27,10 @@ public class LedgerIntegrationEventListener {
             containerFactory = RabbitMessagingConfiguration.LEDGER_LISTENER_CONTAINER_FACTORY
     )
     public void consume(Message message) {
-        eventDispatcher.dispatch(envelopeParser.parse(message));
+        tracing.call(AsyncWorkTracing.Operation.LEDGER_CONSUME,
+                message.getMessageProperties().getHeaders().get("traceparent"), () -> {
+                    eventDispatcher.dispatch(envelopeParser.parse(message));
+                    return true;
+                }, ignored -> AsyncWorkTracing.Outcome.COMPLETED);
     }
 }

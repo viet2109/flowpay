@@ -1,4 +1,4 @@
-package com.flowpay.backend.infrastructure.messaging.trace;
+package com.flowpay.backend.common.observability;
 
 import io.opentelemetry.api.baggage.Baggage;
 import io.opentelemetry.api.trace.Span;

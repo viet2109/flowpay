@@ -524,9 +524,29 @@ Relay snapshots preserve it across retries/restarts; the publisher validates and
 adds only a Rabbit `traceparent` header. Legacy/invalid metadata is absent, never
 a business failure. No ambient relay-thread context is propagated or retained.
 No baggage/tracestate/request IDs, source-domain tracing dependencies, new
-transaction boundaries or changes to confirms/backoff/dedupe. T07 owns bounded
-publication/consumer/worker spans and parent/link policy; T06 adds no such spans
-and keeps the T05 exporter allow-list/zero-link limit unchanged.
+transaction boundaries or changes to confirms/backoff/dedupe. T06 added no spans;
+T07 adds bounded attempt spans with the explicit parent policy below.
+
+P8-T07 wraps each relay publication and listener invocation with a fresh span
+under the validated stored/transport source creation context. Publish/processing
+attempts are siblings, not a mutable last-send parent. Listeners scope parsing
+and application dispatch independently, close before broker backoff, propagate
+the original exception and preserve AUTO ACK-after-commit/retry/DLQ behavior.
+No ambient thread parent, baggage or tracestate is inherited. Missing/malformed/
+non-string metadata starts an independent root, never rejects valid facts.
+
+Webhook-owned V013 nullable `webhook_events.traceparent` stores only the first
+successful materialization context; equal redelivery cannot replace it. A small
+application tracing port is implemented in Webhook infrastructure, reading its
+own technical context outside transactions. Each claimed delivery and expired
+lease recovery has a distinct bounded span; existing HTTP CLIENT spans nest
+under delivery spans. Attempts after restart remain siblings under first
+materialization, not hours-long spans. Domain aggregates/public JSON/signatures/
+merchant headers are unchanged. Guarded APPLIED/STALE observation is diagnostic,
+not a business result. No links are exported (the zero-link limit is unchanged).
+Shared trace helpers do not query repositories/DB. SDK/exporter failure cannot
+repeat work or replace its result/failure. No new SDK, dependency, lock, financial
+transaction boundary or retry/lease budget is introduced.
 
 P7-T05 completes production source publication for all six types. Preparation
 persists processing events in the source transaction; known terminal failures
@@ -990,8 +1010,8 @@ DEBUG defaults are disabled. Policy and operational limits are documented in
 production-engineering.md. No second SDK, Java dependency, schema, payload,
 state, financial locking/transaction or authentication change is introduced.
 
-P8-T06 implements durable Outbox source-context propagation as described above;
-publication/consumer/worker spans remain P8-T07 work. Monitoring,
+P8-T06 implements durable Outbox source-context propagation and P8-T07 adds
+bounded publication/consumer/worker spans as described above. Monitoring,
 dashboards and staging/performance evidence remain later separate gates.
 
 ## 18. Dependency policy
@@ -1018,7 +1038,7 @@ collector/sampling failure cannot change financial outcomes.
 
 P8-T06 implements validated nullable Outbox W3C metadata under reviewed V012,
 not a change to success V1, source facts or public signed Webhook bodies.
-T07 still owns reviewed Webhook storage and bounded asynchronous span relations.
+P8-T07 adds reviewed V013 Webhook-only metadata and bounded asynchronous span relations.
 Source/materialization/claim/HTTP/finalize transaction boundaries are preserved.
 
 T02 implements a prod-only dedicated management listener (loopback:9091 by

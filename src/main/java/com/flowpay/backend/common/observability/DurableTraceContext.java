@@ -1,7 +1,10 @@
-package com.flowpay.backend.infrastructure.messaging.trace;
+package com.flowpay.backend.common.observability;
 
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanContext;
+import io.opentelemetry.api.trace.TraceFlags;
+import io.opentelemetry.api.trace.TraceState;
+import io.opentelemetry.context.Context;
 
 import java.util.regex.Pattern;
 
@@ -39,5 +42,15 @@ public final class DurableTraceContext {
             // Tracing availability must not reject or roll back a financial event.
             return null;
         }
+    }
+
+    /** Reject non-string transport values; never inherit ambient baggage or scheduler context. */
+    public static Context remoteParentOrRoot(Object value) {
+        String parent = value instanceof String text ? validatedOrNull(text) : null;
+        if (parent == null) return Context.root();
+        SpanContext span = SpanContext.createFromRemoteParent(parent.substring(3, 35),
+                parent.substring(36, 52), parent.endsWith("01") ? TraceFlags.getSampled()
+                        : TraceFlags.getDefault(), TraceState.getDefault());
+        return Context.root().with(Span.wrap(span));
     }
 }
