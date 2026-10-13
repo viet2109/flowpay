@@ -5,7 +5,8 @@ business metrics, P8-T04 asynchronous operational metrics, P8-T05 synchronous
 HTTP/provider/Webhook tracing, P8-T06 durable Outbox trace metadata and P8-T07
 consumer/delayed-worker tracing and P8-T08 monitoring lab/dashboards/alerts
 implemented through 2026-10-11; P8-T09 effective-destination/egress protection
-and approved Apache transport on Java 21 are verified. Phase 8 IN PROGRESS. Remaining
+and approved Apache transport on Java 21 are verified. P8-T10's approved auth/
+ingress controls are verified on 2026-10-13. Phase 8 IN PROGRESS. Remaining
 runtime/operational controls are owned by subsequent tasks. Phase 7 remains
 DONE/FROZEN; the simulator functional MVP remains complete.
 
@@ -787,13 +788,40 @@ financial/replay/conflict/balanced Ledger checks on that same JAR/Java 21 runtim
 The egress record contains its digest/resources and owned-resource cleanup proof.
 Repository-wide scanner/image/staging acceptance remains T11-T13 work, not a
 claim made by source review or this isolated compatibility spike. T10 is next
-and unstarted; no push/merge or external deployment is claimed.
+at the T09 checkpoint; no push/merge or external deployment is claimed.
 
 T10 reviews auth/refresh-cookie origin/CSRF, CORS, tenant isolation, management,
 trusted-proxy headers, abuse controls and log/error redaction. Rate limits,
 429/Problem Details/Retry-After changes or a token/auth contract correction need
 documented evidence and explicit contract review before implementation. Prefer
 the selected edge/current stack; Redis/new modules are not preapproved.
+
+T10 review started 2026-10-13 on `1e27eb8`: cookie-authenticated refresh/logout
+have no CSRF/Origin barrier. Two same-site sibling form-POST regressions reproduce
+200/204 instead of required denial; existing 11 auth cases pass. The documented
+threat/preconditions and proposals in [API security review](api-security-review.md)
+received explicit owner approval of the auth request marker and edge/rate-limit
+response contract. The chain-local decoded-path filter now requires exactly one
+`X-FlowPay-CSRF: 1` on auth POSTs and denies auth CORS preflight before credential/
+session work. Non-browser clients and legitimate tests/monitoring fixtures are
+updated explicitly, without bypassing the guard. Bearer APIs, financial state,
+schema, token TTL/cookie policy and provider/transaction behavior remain unchanged.
+
+Approved NGINX 1.30.5, pinned by digest, uses finite single-edge auth 10/minute/IP
+burst 5 and mutation 10/second/IP burst 20 budgets. Incoming forwarded/rewrite
+headers are stripped, Host/request ID overwritten, and prod app forwarding is
+`none`. Immediate safe correlated 429/Retry-After responses precede upstream work;
+no upstream mutation retry or 429 interception occurs. Native owned HTTP policy
+and real-app/DB/broker fixtures verify acceptance separately; they are not T13
+TLS staging or supply-chain/performance proof. Final 266-test focused checkpoint
+and full 1,405-test/195-suite clean verify pass, zero failures/errors/skips. Native
+policy and real-app/DB/broker ingress gates verify limits, spoofing, non-forwarding,
+replays/refill and unchanged balanced unique financial state. Affected monitoring
+outage/recovery and all 34 Webhook DNS/TLS/HMAC/bypass assertions pass on the same
+JAR; artifact/resource/owned cleanup evidence is recorded in the security review.
+No finding is silently waived and T11 remains unstarted. Reviewed contracts,
+version rationale, reproducer, artifact and limitation details are in the
+tracked security review rather than inferred from a green unit suite.
 
 Required positive and negative tests cover cross-tenant/auth failures,
 management exposure, header spoofing, DNS rebinding/redirect/bypass, invalid TLS,

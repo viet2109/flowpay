@@ -75,6 +75,8 @@ public class SecurityConfig {
     ) {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                // Chain-local instance: no duplicate servlet registration and no business/TX work.
+                .addFilterBefore(new AuthRequestMarkerFilter(securityProblemHandler), BearerTokenAuthenticationFilter.class)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .oauth2ResourceServer(oauth2 -> oauth2

@@ -216,6 +216,17 @@ image scanning, real staging ingress/firewall and capacity remain T11-T15 gates.
 
 ## Verification sources
 
+P8-T10 affected-client rerun (2026-10-13): `smoke.py` supplies the required
+`X-FlowPay-CSRF: 1` explicitly for auth POSTs; the guard is not disabled in the
+fixture. Project `flowpay-monitoring-1791865252-1494` passes native provisioning,
+metrics/stored traces, all-monitoring outage/recovery and the unchanged final
+three-payment/three-refund/six-posting/twelve-entry balanced Ledger audit.
+T10 final JAR SHA-256:
+`240a95bc61895d095d3f0becff65daa078a2a367cf9ff806efdeafa2a3878401`.
+The monitoring definition remains internal-only; it is not the new NGINX ingress
+gate or TLS staging. All owned resources are removed; external synthetic secret
+files remain for manual cleanup as recorded in `api-security-review.md`.
+
 Pinned images/configuration follow the official [Prometheus release](https://github.com/prometheus/prometheus/releases/tag/v3.15.0),
 [Grafana release](https://grafana.com/grafana/download/13.2.3?edition=oss),
 [Collector release/configuration](https://github.com/open-telemetry/opentelemetry-collector-releases/releases/tag/v0.162.0),

@@ -1089,6 +1089,41 @@ release-image, staged-host-firewall or production-readiness evidence.
 Security/API defects, new Java dependencies and concrete trace DDL require their
 recorded reviews before implementation, not incidental changes during telemetry.
 
+### P8-T10 reviewed auth and ingress protections
+
+The user approved the concrete auth marker and NGINX per-IP budget/429 proposals
+after the documented cookie CSRF and missing-ingress-limit findings. See
+[API security review](api-security-review.md) for evidence, preconditions,
+dependency/runtime selection, tests and remaining gates.
+
+`AuthRequestMarkerFilter` is a chain-local, infrastructure-only filter before
+bearer processing on the dashboard/auth chain, not a duplicate global servlet
+filter. Decoded Security/MVC path matching includes context paths and encoded
+letters. Auth POSTs need exactly one `X-FlowPay-CSRF: 1`; auth cross-origin
+preflights are denied regardless of marker. Existing normalized `403 ACCESS_DENIED`
+is used without credential/session/controller/DB work or Set-Cookie. Controllers
+remain thin, body/state/token/TTL contracts stay unchanged, and bearer financial/
+dashboard APIs are not forced into cookie CSRF semantics. No permissive CORS or
+Origin/Host/Forwarded-derived trust is added. Same-origin UI and non-browser
+auth clients must explicitly send the reviewed marker.
+
+The pinned NGINX 1.30.5 policy has finite shared zones/workers/connections and
+bounded waits, runs non-root/read-only/capability-free, and does not log request
+data or retry upstream mutations. TCP peer address selects shared auth and
+mutation buckets; inbound forwarded/rewrite headers are stripped and request IDs/
+Host overwritten. Production application forwarded-header handling is `none`.
+Excess receives a correlated safe `429 RATE_LIMIT_EXCEEDED` before reaching
+source/Idempotency/provider work; upstream 429 is passed through. Budget values
+and retry behavior are in `api-contract.md`. Replays consume ingress budget
+without changing duplicate-safe financial semantics. No Redis or new module,
+Java dependency, schema or financial locking/transaction change is introduced.
+
+Isolated HTTP policy fixtures verify real TCP IPv4/IPv6 limits, spoofing,
+non-forwarding, refill and actual prod/DB/broker/replay/Ledger behavior. They do
+not publish backend/management ports or provision TLS staging. T13 must supply
+reviewed TLS listen/ingress and prove no backend bypass on the selected host;
+T11/T12 own scanners/image acceptance and T14/T15 own load/multi-instance quotas.
+
 Staging, load, multi-instance failure and DB/broker/key restore evidence remain
 separate from Java unit/integration tests. Performance and recovery targets are
 declared before their respective acceptance runs on recorded artifacts/resources.

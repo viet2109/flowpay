@@ -43,3 +43,7 @@ flowpay:
     jwt:
       public-key-location: ${JWT_PUBLIC_KEY_LOCATION}
       private-key-location: ${JWT_PRIVATE_KEY_LOCATION}
+
+# Edge owns client identity; never let caller-controlled forwarded headers rewrite it.
+server:
+  forward-headers-strategy: none

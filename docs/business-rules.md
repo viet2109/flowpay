@@ -106,6 +106,17 @@ Required policy:
 
 The raw refresh token must not appear in JSON responses.
 
+### BR-AUTH-012 — Browser-request marker
+
+P8-T10's reviewed contract requires exactly one `X-FlowPay-CSRF: 1` header on
+every auth POST. Reject missing/invalid/repeated values with `403 ACCESS_DENIED`
+before parsing credentials or creating/rotating/revoking a session; do not issue
+or clear a cookie on rejection. The fixed marker is not an authentication secret.
+Auth cross-origin preflights are denied; no credentialed cross-origin CORS
+allowlist is enabled. SameSite/HttpOnly/Secure/path remain defense in depth.
+Non-browser auth clients supply the same header. Bearer dashboard/financial APIs
+are unchanged and do not require it. Separate-origin UI support needs review.
+
 ## 2. Merchant
 
 ### BR-MER-001 — Merchant isolation
@@ -667,6 +678,16 @@ URL registration. Trusted private DB/broker/telemetry paths remain allowed. See
 event, API or retry semantics change.
 
 ## 12. Security and logging
+
+P8-T10 approved single-edge abuse controls: auth POSTs share 10 requests/minute/IP
+plus burst 5; API mutations share 10 requests/second/IP plus burst 20. The edge
+uses the TCP peer, not incoming forwarded identity. Excess receives immediate
+`429 RATE_LIMIT_EXCEEDED` with a generated request ID and conservative Retry-After
+before upstream work. No provider retry/new financial key or source mutation is
+created by a rejection. Accepted replays preserve the stored logical result;
+clients retain the original Idempotency-Key after waiting. These are bounded
+per-IP guardrails, not per-account/global quotas or measured capacity. Shared-NAT
+and multi-edge behavior are deployment/operator concerns; see the security review.
 
 ### BR-SEC-001
 

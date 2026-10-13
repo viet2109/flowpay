@@ -213,11 +213,12 @@ these boundaries. Phase 6 remains DONE/FROZEN; Phase 8 hardening is not included
 
 ### Phase 8 — Production engineering
 
-Status: `IN PROGRESS` as of 2026-10-11; P8-T01 baseline/design, P8-T02
+Status: `IN PROGRESS` as of 2026-10-13; P8-T01 baseline/design, P8-T02
 production configuration/management, P8-T03 business metrics, P8-T04
 asynchronous operational metrics, P8-T05 synchronous tracing and P8-T06 durable
 Outbox trace context, P8-T07 consumer/delayed-worker tracing, P8-T08 monitoring
-lab/dashboards/alerts and P8-T09 Webhook egress protection complete.
+lab/dashboards/alerts, P8-T09 Webhook egress protection and P8-T10 reviewed auth/
+ingress security controls complete.
 
 Target selected by the user: reproducible staging on Linux/container, without
 a chosen provider or external deployment. The Phase 7 release is merged into
@@ -276,7 +277,15 @@ with a fixed CONNECT proxy and dedicated user-approved Apache transport on Java
 monitoring/financial wiring is reverified on the final artifact. This is not
 external-provider deployment or actual staging-firewall acceptance.
 
-The remaining nine tasks cover auth/security review,
+P8-T10's documented cookie CSRF/ingress findings and explicit user-approved
+mitigations are verified: required auth POST marker/closed preflight and bounded
+TCP-peer-IP edge limits with safe correlated 429/Retry-After. Final 266 focused
+and 1,405 full tests, native edge/real-app financial/replay gates, monitoring and
+Webhook egress regressions pass without weakening token/financial/TX semantics.
+The single-edge/per-IP, same-origin UI and pending TLS/scan/capacity limitations
+have explicit owners in `api-security-review.md`; this is not real-money readiness.
+
+The remaining eight tasks cover
 CI/supply-chain gates, a constrained image, staged deployment, declared load and
 multi-instance failure drills, actual DB/broker/key restore and runbooks.
 Specific tool versions, trace DDL/security contract changes and measured

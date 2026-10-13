@@ -11,8 +11,9 @@ its clean quality gate. The functional simulator MVP is complete. Phase 8
 production engineering has completed P8-T01's baseline/design, P8-T02's
 production configuration/management/probes, P8-T03's business metrics and
 P8-T04's asynchronous operational metrics, P8-T05's synchronous tracing and
-P8-T06's durable Outbox trace context and P8-T07's consumer/delayed-worker tracing.
-Remaining hardening
+P8-T06's durable Outbox trace context and P8-T07's consumer/delayed-worker tracing,
+P8-T08's monitoring lab, P8-T09's Webhook egress and P8-T10's approved auth/ingress
+protections. Remaining hardening
 and staging tasks are pending.
 
 ## Implemented flow
@@ -263,6 +264,7 @@ external paging and measured performance thresholds remain later gates.
 - [Task roadmap](docs/task-roadmap.md)
 - [Production engineering design and decision gates](docs/production-engineering.md)
 - [Webhook egress protection and verification](docs/webhook-egress.md)
+- [API/auth security review and ingress policy](docs/api-security-review.md)
 
 Phase documents and `docs/README.md` are local-only planning/reference files,
 not published documentation. The root README and linked tracked documents are
@@ -277,8 +279,8 @@ adds durable Outbox source context. P8-T07 adds asynchronous spans and restart-
 stable worker context. P8-T08 provisions and verifies the isolated monitoring lab,
 dashboards and operational alerts. P8-T09 verifies enforced CONNECT/proxy egress,
 DNS-rebinding/bypass protection and dedicated Apache Webhook transport on Java 21,
-retaining trusted TLS/IP-SAN, signing and deadlines. Load testing, auth/security
-review, repository-wide dependency/image scanning,
+retaining trusted TLS/IP-SAN, signing and deadlines. P8-T10 adds the reviewed
+auth/ingress controls below. Load testing, repository-wide dependency/image scanning,
 packaging/staging, backup/recovery, and runbooks are still pending implementation.
 The functional simulator MVP is not a claim of
 production readiness, real payment processing, guaranteed cross-event ordering,
@@ -294,3 +296,16 @@ final JAR, including production proxy startup and financial integrity during
 telemetry outage/recovery. See the egress record for artifact/runtime evidence,
 proxy-DNS restart requirements and deployment limitations. These fixtures do not
 replace T11-T13 supply-chain, image or actual staging-network acceptance.
+
+P8-T10's user-approved auth protection requires exactly one `X-FlowPay-CSRF: 1`
+header for register/login/refresh/logout POSTs, including non-browser clients.
+Missing/invalid/repeated values return `403 ACCESS_DENIED` before session work.
+Bearer dashboard/financial APIs keep their existing contracts; auth CORS
+preflight is closed. The reviewed NGINX policy adds bounded TCP-peer-IP auth/
+mutation budgets and safe `429 RATE_LIMIT_EXCEEDED`/Retry-After without forwarding
+excess requests or retrying mutations. See the security review for exact
+budgets and owned fixture commands. Final focused 266 tests and full clean verify
+1,405 tests/195 suites pass without failures/errors/skips, along with native edge,
+real-app financial/replay/rate-limit, monitoring and Webhook egress regressions
+on the same final JAR. No public TLS
+staging, image scan, measured capacity or global quota is implied by this policy.

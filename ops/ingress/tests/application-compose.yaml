@@ -1,0 +1,61 @@
+# Owned real-app policy regression, not the T13 TLS staging deployment.
+services:
+  postgres:
+    extends: {file: ../../monitoring/compose.yaml, service: postgres}
+  rabbitmq:
+    extends: {file: ../../monitoring/compose.yaml, service: rabbitmq}
+  app:
+    extends: {file: ../../monitoring/compose.yaml, service: app}
+    environment:
+      TRACING_EXPORT_ENABLED: 'false'
+      TRACING_SAMPLER: always-off
+    depends_on:
+      egress: {condition: service_started}
+  egress:
+    extends: {file: ../../monitoring/compose.yaml, service: egress}
+  edge:
+    image: nginx:1.30.5-alpine@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94
+    user: '101:101'
+    entrypoint: [nginx]
+    command: [-c, /etc/flowpay/nginx.conf, -g, 'daemon off;']
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:size=32m,mode=1777']
+    volumes:
+      - ../nginx.conf:/etc/flowpay/nginx.conf:ro
+      - ../proxy.conf:/etc/flowpay/proxy.conf:ro
+      - ./listen.conf:/etc/flowpay/listen.conf:ro
+    depends_on: [app]
+    networks: [lab, front]
+    mem_limit: 128m
+    cpus: 0.5
+  probe:
+    profiles: [checks]
+    image: python:3.13.12-slim@sha256:f1927c75e81efd1e091dbd64b6c0ecaa5630b38635a3d1c04034ac636e1f94c8
+    user: '10001:10001'
+    entrypoint: [python, -B, /checks/application-probe.py]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ./application-probe.py:/checks/application-probe.py:ro
+      - ./validate.py:/checks/validate.py:ro
+      - ../nginx.conf:/policy/nginx.conf:ro
+      - ../proxy.conf:/policy/proxy.conf:ro
+    networks: [front]
+    mem_limit: 128m
+    cpus: 0.5
+secrets:
+  DB_PASSWORD: {file: '${LAB_SECRETS_DIR}/DB_PASSWORD'}
+  RABBITMQ_PASSWORD: {file: '${LAB_SECRETS_DIR}/RABBITMQ_PASSWORD'}
+  WEBHOOK_SECRET_ENCRYPTION_KEY: {file: '${LAB_SECRETS_DIR}/WEBHOOK_SECRET_ENCRYPTION_KEY'}
+  jwt-public.pem: {file: '${LAB_SECRETS_DIR}/jwt-public.pem'}
+  jwt-private.pem: {file: '${LAB_SECRETS_DIR}/jwt-private.pem'}
+networks:
+  lab: {internal: true, enable_ipv6: true}
+  front: {internal: true, enable_ipv6: true}
+  webhook-egress: {enable_ipv6: true}
+volumes:
+  postgres-data: {}
+  rabbit-data: {}

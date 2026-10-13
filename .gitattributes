@@ -2,3 +2,4 @@
 *.cmd text eol=crlf
 ops/monitoring/**/*.sh text eol=lf
 ops/egress/**/*.sh text eol=lf
+ops/ingress/**/*.sh text eol=lf

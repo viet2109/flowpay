@@ -88,8 +88,9 @@ def business_fixture():
     email, password = "lab-" + suffix + "@example.invalid", secrets.token_urlsafe(24)
     http(base + "/auth/register", "POST", {
         "email": email, "password": password, "firstName": "Lab", "lastName": "Fixture",
-        "merchantName": "Disposable monitoring fixture"}, expected=201)
-    jwt = http(base + "/auth/login", "POST", {"email": email, "password": password})["data"]["accessToken"]
+        "merchantName": "Disposable monitoring fixture"}, {"X-FlowPay-CSRF": "1"}, expected=201)
+    jwt = http(base + "/auth/login", "POST", {"email": email, "password": password},
+               {"X-FlowPay-CSRF": "1"})["data"]["accessToken"]
     key = http(base + "/merchant/api-keys", "POST", {"name": "Monitoring fixture"},
                {"Authorization": "Bearer " + jwt}, expected=201)["data"]["key"]
     headers = {"Authorization": "Bearer " + key, "Idempotency-Key": "lab-create-" + suffix}

@@ -293,22 +293,32 @@ acceptance criteria, and the mandatory implementation order.
 
 ## Phase 8 — Production Engineering
 
-Status: `IN PROGRESS` as of 2026-10-11.
+Status: `IN PROGRESS` as of 2026-10-13.
 
 Completed: P8-T01 baseline/design, P8-T02 production configuration, health and
 management security, P8-T03 Payment/Refund/Idempotency metrics, P8-T04
 Outbox/Ledger/Webhook operational metrics, P8-T05 synchronous tracing and
 P8-T06 durable Outbox trace context, P8-T07 consumer/delayed-worker tracing and
 P8-T08 monitoring lab/dashboards/alerts and P8-T09 effective-destination/egress
-protection. The user approved Apache HttpClient 5 specifically
+protection, plus P8-T10 approved API/auth/ingress security controls.
+The user approved Apache HttpClient 5 specifically
 for Webhook after reproduced JDK Java 21/25 IPv6-literal SNI failures. Java 21,
 strict TLS/IP-SAN, proxy/network enforcement, signing and all financial/API
 contracts remain unchanged. Client 5.6.4/Core 5.4.4 selection and historical
 rejected-spike evidence are recorded in [egress design and review](webhook-egress.md).
 Final verification passes: 205 focused tests, full 1,388 tests/193 suites, all
 34 network/transport/startup assertions and affected native monitoring smoke on
-the same JAR. No failures/errors/skips. Next: P8-T10, PLANNED and unstarted.
-No push/merge or T10 implementation; local-only phase/index corrections remain
+the same JAR. No failures/errors/skips at the T09 checkpoint.
+P8-T10 DONE: reviewed auth/edge contracts approved by the user.
+The implemented auth marker/closed-preflight and pinned NGINX TCP-peer limits
+preserve bearer/financial semantics. Final 266-test focused and full 1,405-test/
+195-suite gates pass, zero failures/errors/skips. Native edge policy, real-app
+financial/replay/rate-limit, monitoring outage/recovery and all 34 Webhook egress
+assertions pass on the final artifact. Historical
+red cookie CSRF reproductions and current controls are recorded in
+[API security review](api-security-review.md).
+Next: P8-T11, PLANNED and unstarted. No push/merge or T11 implementation;
+local-only corrections remain
 unstaged. Phase 8 is still IN PROGRESS, not production/staging accepted.
 
 The user selected staging Linux/container with no provider/external deployment.
@@ -334,7 +344,7 @@ phase branch before completion unless explicitly requested. Existing untracked
 | P8-T07 | Consumer and Webhook Worker Tracing | P8-T06 | DONE |
 | P8-T08 | Monitoring Stack, Dashboards and Alerts | P8-T02, P8-T03, P8-T04, P8-T05, P8-T06, P8-T07 | DONE |
 | P8-T09 | Webhook SSRF, DNS-Rebinding and Egress Protection | P8-T01, P8-T02 | DONE |
-| P8-T10 | API and Authentication Security Review | P8-T01, P8-T02 | PLANNED |
+| P8-T10 | API and Authentication Security Review | P8-T01, P8-T02 | DONE |
 | P8-T11 | CI Verification and Supply-Chain Gates | P8-T01, P8-T10 | PLANNED |
 | P8-T12 | Production Container Image | P8-T02, P8-T11 | PLANNED |
 | P8-T13 | Isolated Linux Staging Deployment | P8-T08, P8-T09, P8-T10, P8-T11, P8-T12 | PLANNED |
@@ -537,6 +547,30 @@ recovery acceptance is claimed; T10-T18 retain their gates. Commit only T09
 tracked files on the phase branch; no push/merge, no T10 work. Ignored phase/index
 corrections are verified locally and never staged; user `.env`/`.github/` remain
 untouched.
+
+P8-T10 completed (2026-10-13): reviewed cookie CSRF and absent ingress-budget
+findings led to explicit user approval of the auth marker/closed-preflight and
+NGINX TCP-peer limits/429 contracts. The chain-local decoded-path marker filter
+rejects invalid auth POSTs before credential/session work; legitimate auth and
+bearer APIs remain intact. Non-root/read-only pinned NGINX 1.30.5 uses bounded
+shared auth 10/minute/burst 5 and mutation 10/second/burst 20 budgets, strips
+forwarded/rewrite identity and disables upstream retries/429 interception.
+Production forwarding strategy is `none`. No Java dependency/schema/financial/
+token/event/locking/TX change; source contracts and client fixtures are updated.
+
+Final focused: 266 tests/21 classes (2m06s); full clean verify: 1,405 tests/195
+suites (8m21s), zero failures/errors/skips, real PostgreSQL/Rabbit. Final native
+policy gate: 26 independent static/runtime assertions plus NGINX config-test;
+real prod/DB/broker ingress gate verifies accepted/rejected replays, refill and
+exactly one provider transaction/refund with two balanced unique Ledger postings.
+Affected monitoring outage/recovery and 34-assertion Webhook network/TLS/HMAC/
+bypass regressions pass on the same final JAR. All eight owned test projects are
+removed and absence is checked; external synthetic secret directories remain
+for manual cleanup, not in the repo. Artifact/resources/limitations are in
+[API security acceptance](api-security-review.md). Ignored phase/index are
+corrected locally and never staged; `.env`/user `.github/` are untouched.
+No T11 implementation, push/merge, TLS staging, supply-chain scan, measured
+capacity or global quota is claimed; Phase 8 remains IN PROGRESS.
 
 ## Agent task template
 

@@ -1,0 +1,64 @@
+services:
+  app:
+    image: python:3.13.12-slim@sha256:f1927c75e81efd1e091dbd64b6c0ecaa5630b38635a3d1c04034ac636e1f94c8
+    user: '10001:10001'
+    command: [python, -B, /checks/fixture.py]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes: [./fixture.py:/checks/fixture.py:ro]
+    networks:
+      backend: {ipv4_address: 172.30.233.9, ipv6_address: 'fd00:233::9'}
+    mem_limit: 128m
+    cpus: 0.5
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/livez', timeout=1)"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+  edge:
+    image: nginx:1.30.5-alpine@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94
+    user: '101:101'
+    entrypoint: [nginx]
+    command: [-c, /etc/flowpay/nginx.conf, -g, 'daemon off;']
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:size=32m,mode=1777']
+    volumes:
+      - ../nginx.conf:/etc/flowpay/nginx.conf:ro
+      - ../proxy.conf:/etc/flowpay/proxy.conf:ro
+      - ./listen.conf:/etc/flowpay/listen.conf:ro
+    depends_on:
+      app: {condition: service_healthy}
+    networks:
+      backend: {}
+      front: {ipv4_address: 172.30.232.3, ipv6_address: 'fd00:232::3'}
+    mem_limit: 128m
+    cpus: 0.5
+  probe:
+    image: python:3.13.12-slim@sha256:f1927c75e81efd1e091dbd64b6c0ecaa5630b38635a3d1c04034ac636e1f94c8
+    user: '10001:10001'
+    entrypoint: [python, -B, /checks/probe.py]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ./probe.py:/checks/probe.py:ro
+      - ./validate.py:/checks/validate.py:ro
+      - ../nginx.conf:/policy/nginx.conf:ro
+      - ../proxy.conf:/policy/proxy.conf:ro
+    networks: [front]
+    mem_limit: 128m
+    cpus: 1
+networks:
+  backend:
+    internal: true
+    enable_ipv6: true
+    ipam:
+      config: [{subnet: 172.30.233.0/24}, {subnet: 'fd00:233::/64'}]
+  front:
+    internal: true
+    enable_ipv6: true
+    ipam:
+      config: [{subnet: 172.30.232.0/24}, {subnet: 'fd00:232::/64'}]

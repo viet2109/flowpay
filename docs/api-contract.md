@@ -159,6 +159,19 @@ Secure   true in production
 
 ## 7. Auth endpoints
 
+P8-T10 reviewed request protection: every POST under `/api/v1/auth/`, including
+register/login/refresh/logout, requires exactly one `X-FlowPay-CSRF: 1` header.
+This fixed browser-request marker is not a secret/token. Missing, empty, repeated
+or other values return `403 ACCESS_DENIED` Problem Details before authentication
+or session mutation, without issuing/clearing cookies. HTTP/non-browser clients
+also supply it. Successful bodies/statuses, token TTL and cookie policy remain
+unchanged. Bearer-authenticated dashboard/financial APIs do not require it.
+
+Cross-origin auth preflights are denied; no credentialed cross-origin CORS or
+wildcard/reflected allowlist is enabled. Serve the browser dashboard through the
+same origin as the reviewed TLS edge. A separate-origin dashboard needs an
+explicit security/Origin/CORS review; forwarded headers do not grant trust.
+
 ### Register
 
 ```http
@@ -1072,5 +1085,24 @@ Webhook:
 Rate limiting:
 
 - `RATE_LIMIT_EXCEEDED`
+
+P8-T10 approved edge contract (when using the enforcing NGINX edge): auth POSTs
+share one TCP-peer-IP budget of 10 requests/minute, burst 5; financial/dashboard
+POST/PUT/PATCH/DELETE share a separate 10 requests/second/IP budget, burst 20.
+Excess is rejected immediately **before** upstream forwarding with `429`,
+`application/problem+json`, `RATE_LIMIT_EXCEEDED`, generated `requestId` and
+`X-Request-Id`, and `Retry-After: 60` (auth) or `1` (mutations). Burst allowances
+are additional to the initial permitted request; no queued delay is introduced.
+The error instance is a safe fixed API scope, not a reflected raw URI/query.
+Clients wait and reuse the same Idempotency-Key; they must not create a new key
+or assume a provider outcome. Replays consume ingress budget. No transport retry,
+upstream call or financial state change occurs for an edge-denied request.
+An upstream-generated 429 is passed through, not rewritten as an edge denial.
+
+Budgets are single-edge per-IP guardrails, not per-account lockouts, tenant/global
+quotas or measured capacity. Shared NAT users share a bucket. Incoming Forwarded/
+X-Forwarded-For/X-Real-IP cannot change the TCP identity; backend bypass ports
+must not be published. Details, fixture results and remaining T13 staging gates
+are recorded in `api-security-review.md`.
 
 Implementation exceptions, SQL names, Hibernate messages, stack traces, and internal IDs must not leak through this contract.
