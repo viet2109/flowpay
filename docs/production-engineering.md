@@ -6,7 +6,9 @@ HTTP/provider/Webhook tracing, P8-T06 durable Outbox trace metadata and P8-T07
 consumer/delayed-worker tracing and P8-T08 monitoring lab/dashboards/alerts
 implemented through 2026-10-11; P8-T09 effective-destination/egress protection
 and approved Apache transport on Java 21 are verified. P8-T10's approved auth/
-ingress controls are verified on 2026-10-13. Phase 8 IN PROGRESS. Remaining
+ingress controls are verified on 2026-10-13. P8-T11 CI gate implementation is
+verified on 2026-10-15, with security acceptance BLOCKED by unwaived baseline
+findings. Phase 8 IN PROGRESS. Remaining
 runtime/operational controls are owned by subsequent tasks. Phase 7 remains
 DONE/FROZEN; the simulator functional MVP remains complete.
 
@@ -53,7 +55,7 @@ documentation-only preparation does not require repeating an unchanged suite.
 | Management security | T02: dedicated loopback-by-default listener; internal scrape allowed, public Actuator denied | T13 must prove private staging network/ingress enforcement |
 | URL/network safety | HTTPS/literal target checks; T09 adds fixed CONNECT/proxy network enforcement and approved Apache transport on Java 21; registration does not resolve merchant DNS | T09 verifies actual DNS/TLS/IP-SAN/rebinding/bypass; T13 proves staging isolation |
 | Health/shutdown | T02: DB + availability readiness, process liveness, bounded HTTP drain verified | T12-T15 prove image signals, workers and staged lifecycle |
-| CI | A workflow exists locally in untracked `.github/`; it is not the repository's committed CI | T11 reviews ownership and introduces approved tracked gates |
+| CI | T11 adopts the workflow with explicit user approval; JDK21/Docker coverage and pinned supply-chain gates are implemented | Security acceptance remains blocked by baseline secret-format findings; no waiver or hosted-CI acceptance is claimed |
 | Packaging/operations | T08 monitoring lab demonstrated on stock JRE/mounted verified JAR; no production image/staging/load/restore acceptance | T12-T18 own remaining implementation and evidence |
 
 This table is an inventory, not a claim that the future controls are already
@@ -819,7 +821,7 @@ policy and real-app/DB/broker ingress gates verify limits, spoofing, non-forward
 replays/refill and unchanged balanced unique financial state. Affected monitoring
 outage/recovery and all 34 Webhook DNS/TLS/HMAC/bypass assertions pass on the same
 JAR; artifact/resource/owned cleanup evidence is recorded in the security review.
-No finding is silently waived and T11 remains unstarted. Reviewed contracts,
+No finding was silently waived; at that T10 checkpoint, T11 was unstarted. Reviewed contracts,
 version rationale, reproducer, artifact and limitation details are in the
 tracked security review rather than inferred from a green unit suite.
 
@@ -830,9 +832,10 @@ Do not attack external services or send load to real merchants/providers.
 
 ## 9. CI and artifact authority (T11-T12)
 
-The pre-existing `.github/` directory is user-owned/untracked at entry. It is
-not adopted by this task. T11 must review the current contents/ownership and
-obtain confirmation before committing or overwriting them.
+The pre-existing `.github/` directory was user-owned/untracked at phase entry.
+T11 reviewed its sole workflow and received explicit user confirmation on
+2026-10-15 before adoption. `.env` and local-only agent/phase/index files remain
+excluded. This is not authority to publish, dispatch CI remotely or deploy.
 
 CI must execute full JDK21 verification with required PostgreSQL/RabbitMQ suites
 and reject missing/skipped required infrastructure coverage. Introduce pinned,
@@ -840,6 +843,34 @@ least-permission dependency/SAST/secret checks and safe SBOM artifacts under a
 documented severity/exception policy. Scanner unavailability is not a clean
 scan. Do not mechanically upgrade dependencies or leak sensitive test output.
 Building/scanning an image is not permission to upload it or deploy a release.
+
+T11 implements independent `verify` and `supply-chain` jobs with SHA-pinned
+checkout/setup/upload actions, read-only repository credentials, no persisted
+checkout token and no shared PR-writable dependency/DB cache. JDK21 preflight
+checks both PATH Java and Maven's actual JVM. Full clean verification is checked
+against every concrete source suite; missing/stale/empty/skipped reports fail.
+Pinned CycloneDX/Grype/Gitleaks/local-rule Semgrep gates use native negative and
+clean controls, fresh integrity-checked advisory data and explicit safe artifact
+projections. A scan/tool/network failure is not a clean result.
+
+The first tracked-source scan found 10 baseline secret-format detections at seven
+locations in five unchanged files (public API-prefix/Idempotency examples and
+synthetic test encryption keys). Only rule/path/line metadata was inspected,
+not published matches. The user explicitly chose **no exceptions; leave the gate
+blocking and review later**. `exceptions.json` stays empty, correct fixtures and
+detectors stay unchanged, and no clean security/release acceptance is claimed.
+Detailed tool scope, severity/30-day exception policy, findings, local verification
+and remote-CI limitations are in [CI supply-chain gates](ci-supply-chain.md).
+
+Final local controls pass: 28 focused gate tests on both Windows and Linux,
+native actionlint, source and dependency negative/clean/unavailable-DB controls,
+and full JDK21 Maven verification with 1,405 tests/195 suites, zero failure/error/
+skip and actual PostgreSQL/RabbitMQ. Grype scans 234 components against valid
+DB v6.1.10 built 2026-10-15T06:30:36Z and reports 29 candidate matches (6 CRITICAL,
+11 HIGH, 11 MEDIUM, 1 LOW). The 17 HIGH/CRITICAL findings also block; no dependency
+waiver/upgrade or exploitability clearance is invented. No POM, app source or
+test fixture changed. GitHub-hosted CI/branch protection remain unexecuted owner
+gates on this unpublished branch, not inferred from local verification.
 
 ## 10. Performance, recovery and operational gates (T14-T17)
 

@@ -293,7 +293,8 @@ acceptance criteria, and the mandatory implementation order.
 
 ## Phase 8 — Production Engineering
 
-Status: `IN PROGRESS` as of 2026-10-13.
+Status: `IN PROGRESS` as of 2026-10-15. Gate implementation and security
+acceptance are separate: P8-T11 is implemented, but its security gate is BLOCKED.
 
 Completed: P8-T01 baseline/design, P8-T02 production configuration, health and
 management security, P8-T03 Payment/Refund/Idempotency metrics, P8-T04
@@ -317,9 +318,14 @@ financial/replay/rate-limit, monitoring outage/recovery and all 34 Webhook egres
 assertions pass on the final artifact. Historical
 red cookie CSRF reproductions and current controls are recorded in
 [API security review](api-security-review.md).
-Next: P8-T11, PLANNED and unstarted. No push/merge or T11 implementation;
-local-only corrections remain
-unstaged. Phase 8 is still IN PROGRESS, not production/staging accepted.
+P8-T11 gate implementation is complete: approved workflow adoption, pinned
+verification/scanners, real infrastructure coverage enforcement, safe SBOM and
+redacted evidence. Focused gate tests and all 1,405 Java tests pass; security
+acceptance does not. Ten baseline secret-format detections and 17 HIGH/CRITICAL
+dependency findings remain blocking, without exceptions or forced upgrades.
+Next planned task: P8-T12, unstarted. This is not a clean supply-chain/release
+approval or permission to bypass the blocked gate. No push/merge; local-only
+corrections remain unstaged. Phase 8 is not production/staging accepted.
 
 The user selected staging Linux/container with no provider/external deployment.
 Phase 7 source `d348b10` was pushed and merged into remote main at `0b96400`;
@@ -331,7 +337,8 @@ not repeated for the final documentation commit.
 
 Work continues on `feature/phase-8-production-engineering`. Do not push the
 phase branch before completion unless explicitly requested. Existing untracked
-`.env` and `.github/` remain user-owned and excluded from this task.
+`.env` remains user-owned and excluded. The sole `.github` workflow is adopted
+only with the user's explicit P8-T11 approval.
 
 | Task | Name | Depends on | Status |
 |---|---|---|---|
@@ -345,7 +352,7 @@ phase branch before completion unless explicitly requested. Existing untracked
 | P8-T08 | Monitoring Stack, Dashboards and Alerts | P8-T02, P8-T03, P8-T04, P8-T05, P8-T06, P8-T07 | DONE |
 | P8-T09 | Webhook SSRF, DNS-Rebinding and Egress Protection | P8-T01, P8-T02 | DONE |
 | P8-T10 | API and Authentication Security Review | P8-T01, P8-T02 | DONE |
-| P8-T11 | CI Verification and Supply-Chain Gates | P8-T01, P8-T10 | PLANNED |
+| P8-T11 | CI Verification and Supply-Chain Gates | P8-T01, P8-T10 | DONE (gates); security BLOCKED |
 | P8-T12 | Production Container Image | P8-T02, P8-T11 | PLANNED |
 | P8-T13 | Isolated Linux Staging Deployment | P8-T08, P8-T09, P8-T10, P8-T11, P8-T12 | PLANNED |
 | P8-T14 | Load, Stress and Soak Verification | P8-T13 | PLANNED |
@@ -571,6 +578,29 @@ for manual cleanup, not in the repo. Artifact/resources/limitations are in
 corrected locally and never staged; `.env`/user `.github/` are untouched.
 No T11 implementation, push/merge, TLS staging, supply-chain scan, measured
 capacity or global quota is claimed; Phase 8 remains IN PROGRESS.
+
+### P8-T11 implementation checkpoint (2026-10-15)
+
+User-approved adoption of the pre-existing sole CI workflow adds independent
+JDK21 `clean verify` and pinned supply-chain gates, read-only credentials,
+mandatory fresh/non-skipped coverage for all source suites, bounded native
+scanners/negative controls and explicit seven-day safe artifact projections.
+No app/POM/schema/API/financial/fixture changes; no runtime dependency upgrades.
+28 focused gate tests pass on Windows and Linux; actionlint passes. Full JDK21
+Maven verification passes 1,405 tests/195 suites, zero failures/errors/skips,
+actual PostgreSQL/RabbitMQ. Native source/dependency/clean/unavailable-DB controls
+pass; scan covers 234 Maven components with a fresh valid DB.
+
+Security remains BLOCKED: Gitleaks reports ten baseline detections at seven
+locations in five unchanged example/test files; Grype reports 29 candidate
+package/advisory matches (6 CRITICAL, 11 HIGH, 11 MEDIUM, 1 LOW). These are scan
+findings requiring review, not claims of proven exploitation. The user explicitly
+chose no secret exceptions and later review. No dependency exception is granted
+either; policy remains empty, all blocking findings stay blocking. Evidence,
+artifact/environment, tool scope and owner-side CI limitations are in
+[CI supply-chain gates](ci-supply-chain.md). GitHub-hosted CI has not run because
+this phase is unpublished; no push/dispatch/merge/deploy/T12 work occurred.
+Local phase/index corrections remain ignored and unstaged.
 
 ## Agent task template
 

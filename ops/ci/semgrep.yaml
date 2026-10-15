@@ -1,0 +1,55 @@
+# Bounded local Java SAST rules, not a claim of complete taint/security analysis.
+# No remote registry, service login, telemetry or inline nosemgrep bypasses.
+rules:
+  - id: java-process-execution
+    languages: [java]
+    severity: ERROR
+    message: Review process execution; shelling out is not permitted in application code.
+    pattern-either:
+      - pattern: Runtime.getRuntime().exec(...)
+      - pattern: new ProcessBuilder(...)
+  - id: java-sql-concatenation
+    languages: [java]
+    severity: ERROR
+    message: Use bound SQL parameters, not concatenated statements.
+    pattern-either:
+      - pattern: $S.executeQuery($A + $B)
+      - pattern: $S.executeUpdate($A + $B)
+      - pattern: $C.prepareStatement($A + $B)
+      - pattern: $E.createNativeQuery($A + $B)
+  - id: java-native-deserialization
+    languages: [java]
+    severity: ERROR
+    message: Native object deserialization requires explicit security review.
+    pattern: new ObjectInputStream(...)
+  - id: java-trust-all-tls
+    languages: [java]
+    severity: ERROR
+    message: Do not bypass hostname or certificate verification.
+    pattern-either:
+      - pattern: new NoopHostnameVerifier(...)
+      - pattern: NoopHostnameVerifier.INSTANCE
+      - pattern: TrustAllStrategy.INSTANCE
+      - pattern: SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER
+      - pattern: HttpsURLConnection.setDefaultHostnameVerifier(...)
+  - id: java-weak-digest
+    languages: [java]
+    severity: ERROR
+    message: Avoid MD5/SHA1 in security-sensitive hashing.
+    pattern-either:
+      - pattern: MessageDigest.getInstance("MD5")
+      - pattern: MessageDigest.getInstance("SHA-1")
+  - id: java-weak-cipher
+    languages: [java]
+    severity: ERROR
+    message: Avoid DES/RC4 and ECB encryption.
+    patterns:
+      - pattern: Cipher.getInstance($ALG)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: '"(DES.*|RC4|.*\/ECB\/.*)"'
+  - id: java-unsafe-yaml
+    languages: [java]
+    severity: ERROR
+    message: Use an explicitly safe YAML constructor.
+    pattern: new Yaml()

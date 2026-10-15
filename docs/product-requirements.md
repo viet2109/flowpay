@@ -213,7 +213,7 @@ these boundaries. Phase 6 remains DONE/FROZEN; Phase 8 hardening is not included
 
 ### Phase 8 — Production engineering
 
-Status: `IN PROGRESS` as of 2026-10-13; P8-T01 baseline/design, P8-T02
+Status: `IN PROGRESS` as of 2026-10-15; P8-T01 baseline/design, P8-T02
 production configuration/management, P8-T03 business metrics, P8-T04
 asynchronous operational metrics, P8-T05 synchronous tracing and P8-T06 durable
 Outbox trace context, P8-T07 consumer/delayed-worker tracing, P8-T08 monitoring
@@ -285,8 +285,17 @@ Webhook egress regressions pass without weakening token/financial/TX semantics.
 The single-edge/per-IP, same-origin UI and pending TLS/scan/capacity limitations
 have explicit owners in `api-security-review.md`; this is not real-money readiness.
 
-The remaining eight tasks cover
-CI/supply-chain gates, a constrained image, staged deployment, declared load and
+P8-T11 implements CI/supply-chain gates with approved workflow adoption,
+mandatory real infrastructure coverage, pinned scanners/negative controls and
+safe SBOM/evidence. Gate implementation is complete, **security acceptance is
+BLOCKED**: ten baseline secret-format detections and 17 HIGH/CRITICAL dependency
+findings remain unwaived; the user chose later review, not fixture rewrites or
+scanner bypass. Full Java verification passes 1,405 tests/195 suites with no
+failures/errors/skips. This is not a clean security or hosted-CI acceptance claim.
+See [CI scope, policy and evidence](ci-supply-chain.md).
+
+The remaining seven implementation tasks cover
+a constrained image, staged deployment, declared load and
 multi-instance failure drills, actual DB/broker/key restore and runbooks.
 Specific tool versions, trace DDL/security contract changes and measured
 performance/recovery targets have explicit owner/review gates in

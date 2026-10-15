@@ -16,6 +16,11 @@ P8-T08's monitoring lab, P8-T09's Webhook egress and P8-T10's approved auth/ingr
 protections. Remaining hardening
 and staging tasks are pending.
 
+P8-T11 adds [CI verification and supply-chain gates](docs/ci-supply-chain.md).
+Security acceptance is currently **blocked**, not clean: the owner explicitly
+chose to retain baseline secret-format findings without exceptions for later
+review. CI adoption does not publish/deploy anything or complete Phase 8.
+
 ## Implemented flow
 
 ```text
