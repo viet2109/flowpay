@@ -136,6 +136,8 @@ class GateTest(unittest.TestCase):
             self.assertFalse(any(call.args[0][:3] == ["docker", "volume", "rm"] for call in invoked.call_args_list))
 
     def test_verify_orchestration_uses_clean_and_checks_fresh_reports(self):
+        for name in ("pom.xml", "mvnw", "mvnw.cmd"):
+            (self.root / name).write_text("build-input-fixture")
         (self.root / "target").mkdir()
         jar = self.root / "target/backend-test.jar"
         jar.write_bytes(b"test-only")
@@ -147,6 +149,7 @@ class GateTest(unittest.TestCase):
         self.assertEqual(invoked.call_args.args[0], ["clean", "verify"])
         self.assertGreater(reports.call_args.args[1], time.time() - 5)
         self.assertEqual(evidence["jarSha256"], gate.sha256(jar))
+        self.assertEqual(evidence["applicationInputsSha256"], gate.application_inputs_digest(self.root))
 
     def test_main_replaces_stale_pass_with_safe_failure_evidence(self):
         safe = self.root / "safe"

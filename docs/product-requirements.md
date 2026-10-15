@@ -294,8 +294,14 @@ scanner bypass. Full Java verification passes 1,405 tests/195 suites with no
 failures/errors/skips. This is not a clean security or hosted-CI acceptance claim.
 See [CI scope, policy and evidence](ci-supply-chain.md).
 
-The remaining seven implementation tasks cover
-a constrained image, staged deployment, declared load and
+P8-T12 adds an artifact-bound non-root Java21 runtime image, finite runtime
+budgets, external secret/key continuity and isolated API/Ledger/Webhook recovery
+gates. Image security remains a separate fail-closed release gate; see
+[runtime contract and current acceptance](container-runtime.md). No provider,
+registry publication, public API hosting or frontend deployment is selected.
+
+The remaining six implementation tasks cover
+staged deployment, declared load and
 multi-instance failure drills, actual DB/broker/key restore and runbooks.
 Specific tool versions, trace DDL/security contract changes and measured
 performance/recovery targets have explicit owner/review gates in

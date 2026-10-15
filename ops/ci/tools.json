@@ -1,5 +1,6 @@
 {
   "cyclonedx": "2.9.3",
+  "syft": "anchore/syft:v1.45.0@sha256:e9695f12fca6bf93a6e106c8f7001a13d00608b92e8a73930aacc401a8727ac8",
   "actionlint": {
     "version": "1.7.12",
     "linuxSha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8",

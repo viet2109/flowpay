@@ -323,9 +323,11 @@ verification/scanners, real infrastructure coverage enforcement, safe SBOM and
 redacted evidence. Focused gate tests and all 1,405 Java tests pass; security
 acceptance does not. Ten baseline secret-format detections and 17 HIGH/CRITICAL
 dependency findings remain blocking, without exceptions or forced upgrades.
-Next planned task: P8-T12, unstarted. This is not a clean supply-chain/release
-approval or permission to bypass the blocked gate. No push/merge; local-only
-corrections remain unstaged. Phase 8 is not production/staging accepted.
+P8-T12 now implements the verified-artifact runtime image and image acceptance
+gates; runtime verification and image-security acceptance are recorded in
+[container runtime](container-runtime.md). It is not release clearance or
+permission to bypass the blocked gates. No push/merge; local-only corrections
+remain unstaged. Phase 8 is not production/staging accepted. T13 is not started.
 
 The user selected staging Linux/container with no provider/external deployment.
 Phase 7 source `d348b10` was pushed and merged into remote main at `0b96400`;
@@ -353,7 +355,7 @@ only with the user's explicit P8-T11 approval.
 | P8-T09 | Webhook SSRF, DNS-Rebinding and Egress Protection | P8-T01, P8-T02 | DONE |
 | P8-T10 | API and Authentication Security Review | P8-T01, P8-T02 | DONE |
 | P8-T11 | CI Verification and Supply-Chain Gates | P8-T01, P8-T10 | DONE (gates); security BLOCKED |
-| P8-T12 | Production Container Image | P8-T02, P8-T11 | PLANNED |
+| P8-T12 | Production Container Image | P8-T02, P8-T11 | IMPLEMENTED/runtime verified; security BLOCKED (not fully accepted) |
 | P8-T13 | Isolated Linux Staging Deployment | P8-T08, P8-T09, P8-T10, P8-T11, P8-T12 | PLANNED |
 | P8-T14 | Load, Stress and Soak Verification | P8-T13 | PLANNED |
 | P8-T15 | Multi-Instance and Operational Failure Drills | P8-T13, P8-T14 | PLANNED |
@@ -601,6 +603,30 @@ artifact/environment, tool scope and owner-side CI limitations are in
 [CI supply-chain gates](ci-supply-chain.md). GitHub-hosted CI has not run because
 this phase is unpublished; no push/dispatch/merge/deploy/T12 work occurred.
 Local phase/index corrections remain ignored and unstaged.
+
+### P8-T12 implementation checkpoint (2026-10-15)
+
+Artifact-first reviewed equivalent packages the exact clean-verified JAR into a
+digest-pinned Temurin21.0.12.1 JRE image, non-root Java PID1, read-only/finite
+runtime, external persistent keys, no source/local.env/key material bundled.
+CI adds image build/runtime/OS+Java scan with explicit safe evidence only, no
+registry upload. No Java/POM/financial/API/schema/TX/retry changes.
+
+55 focused controls pass on Windows/Linux; actionlint/Compose validation and
+native source/dependency/absent-DB controls pass. Full clean verification passes
+1,405 tests/195 suites, no failures/errors/skips, real PostgreSQL/Rabbit. Final
+actual image smoke passes active-worker SIGTERM, source commit during broker
+outage, persisted key/JWT/replay continuity and recovered duplicate-safe balanced
+Ledger/signed TLS Webhooks, with owned resource/secret cleanup.
+
+Security is BLOCKED, not accepted:299 software-component image inventory yields
+181 candidate advisory matches (6 CRITICAL,12 HIGH,107 MEDIUM,47 LOW,9 NEGLIGIBLE);
+18 HIGH/CRITICAL matches block. Image application-secret scan is clean, but
+tracked-source rescan retains10 baseline findings and0 SAST findings. No waiver,
+fixture rewrite or dependency upgrade is added. Actual artifact/environment,
+native gates and bounded scope are in [container runtime](container-runtime.md).
+T12 is not fully Done, T13 is unstarted, no push/merge/public/cloud deployment.
+Ignored phase/index are corrected locally and remain unstaged.
 
 ## Agent task template
 

@@ -1,0 +1,4 @@
+# Builds are only supported via the verified-artifact script's minimal context.
+# A direct repository-root build must fail rather than upload source or secrets.
+**
+!Dockerfile

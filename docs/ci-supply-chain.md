@@ -6,7 +6,8 @@ P8-T11 adopts the sole pre-existing user-owned `.github/workflows/ci.yml` with
 the user's explicit confirmation on 2026-10-15. `.env`, local agent instructions,
 `docs/README.md` and `docs/phase-*.md` are not adopted. The phase branch remains
 local until publication is separately requested. No runtime dependency upgrade,
-API/schema change, image build/publication, deployment, merge or release is added.
+API/schema change, deployment, merge or release is added. T12 extends the local
+image build/scan checks as described below; registry publication remains absent.
 
 CI runs on pull requests, pushes to main/phase branches and explicit manual
 dispatch. Both `verify` and `supply-chain` must succeed. Repository branch
@@ -68,14 +69,25 @@ affected gates. No curl-to-shell installer or floating scanner action is used.
 | Gitleaks 8.30.1 | Built-in secret detectors plus a nonfunctional regression canary | All tracked working-tree files; not untracked `.env`, ignored local docs, or Git history |
 | Semgrep CE 1.181.0 | Seven local Java SAST rules | Main Java source only; not comprehensive interprocedural taint analysis or a manual security review replacement |
 
+T12 extends `verify` after clean Java verification with exact-JAR image build,
+isolated prod runtime/restart recovery, and an image security gate. A successful
+build is required for runtime/scan; image scan still runs after a runtime failure
+so its evidence is not hidden. The independent source supply-chain job remains
+mandatory. Safe explicit image reports/inventory join the seven-day artifacts;
+no image archive, secret or raw logs are uploaded. Syft1.45.0 and Grype catalog/
+scan the actual saved image's OS and Java inventory without socket mounts.
+See [container gates and limitations](container-runtime.md); no image waivers
+or registry credentials are added.
+
 The Java rules cover process execution, concatenated SQL at selected statement
 sinks, native object deserialization, common trust-all TLS APIs, weak digest/
 cipher construction and unsafe default YAML loading. They are versioned local
 rules, without registry downloads, service login, metrics, inline `nosemgrep`
 suppression or directory-wide test/doc waivers. The secret scan includes tracked
 tests, documentation, scripts and CI. Runtime-created fake canaries are never
-committed credentials. History scanning and production-image scanning remain
-separate scopes; adding a fresh gate cannot prove old Git history secret-free.
+committed credentials. T12 adds image inventory/application-resource checks
+described in [container runtime](container-runtime.md). Git-history scanning is
+still separate; a fresh source/image gate cannot prove old history secret-free.
 
 Scanner containers have read-only roots/source, dropped capabilities, no-new-
 privileges, finite CPU/memory/PID/tmpfs limits and no Docker socket. Gitleaks and
@@ -116,7 +128,8 @@ before removal. Timed-out scanner containers have unique names/labels and only
 that exact owned container may be stopped; never clean unrelated Docker data.
 Each scan must check for updates,
 validate DB integrity and enforce maximum DB build age **72 hours**. Downloads
-and commands have finite timeouts; jobs are bounded to 30/25 minutes. Network,
+and commands have finite timeouts; jobs are bounded to 50/25 minutes after the
+T12 image checks extended the verification job. Network,
 rate-limit, registry and advisory-data outages are failures: rerun after repair,
 do not turn off age/update/hash checks or label an unavailable scan clean.
 Local Maven caches are only acceleration, not accepted scanner evidence.

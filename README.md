@@ -21,6 +21,11 @@ Security acceptance is currently **blocked**, not clean: the owner explicitly
 chose to retain baseline secret-format findings without exceptions for later
 review. CI adoption does not publish/deploy anything or complete Phase 8.
 
+P8-T12 adds a [verified-artifact runtime image](docs/container-runtime.md) and
+isolated restart/API-to-Ledger/Webhook gates. Runtime success is separate from
+security acceptance: blocked findings still prevent release. No registry upload
+or public/staging deployment is included.
+
 ## Implemented flow
 
 ```text

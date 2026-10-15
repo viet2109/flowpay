@@ -164,6 +164,19 @@ def verify(evidence):
     jars = list((ROOT / "target").glob("backend-*.jar"))
     require(len(jars) == 1, "expected exactly one executable JAR")
     evidence["jarSha256"] = sha256(jars[0])
+    evidence["applicationInputsSha256"] = application_inputs_digest(ROOT)
+
+
+def application_inputs_digest(root):
+    """Bind packaging evidence to build/test inputs, not later documentation edits."""
+    paths = [root / name for name in ("pom.xml", "mvnw", "mvnw.cmd")]
+    for name in ("src", ".mvn"):
+        paths += [path for path in (root / name).rglob("*") if path.is_file()]
+    digest = hashlib.sha256()
+    for path in sorted(paths):
+        require(not path.is_symlink(), "symlink build input")
+        digest.update(path.relative_to(root).as_posix().encode() + b"\0" + sha256(path).encode() + b"\0")
+    return digest.hexdigest()
 
 
 def lint_workflow():

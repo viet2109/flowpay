@@ -21,7 +21,7 @@ defaults:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 50
     env:
       MAVEN_ARGS: ''
       MAVEN_OPTS: ''
@@ -40,12 +40,25 @@ jobs:
         run: python3 -B -m unittest discover -s ops/ci/tests -v
       - name: Clean verification with mandatory infrastructure coverage
         run: python3 -B ops/ci/gate.py verify
+      - name: Build exact verified JAR into a pinned non-root image
+        id: image
+        run: python3 -B ops/container/image.py build
+      - name: Isolated production image restart and API to Ledger Webhook gates
+        run: python3 -B ops/container/image.py runtime
+      - name: Image inventory, secrets and OS Java vulnerability gate
+        if: ${{ !cancelled() && steps.image.outcome == 'success' }}
+        run: python3 -B ops/container/image.py scan
       - name: Safe verification evidence only
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: verification-${{ github.run_id }}-${{ github.run_attempt }}
-          path: target/ci-safe/verification.json
+          path: |
+            target/ci-safe/verification.json
+            target/ci-safe/image-build.json
+            target/ci-safe/image-runtime.json
+            target/ci-safe/image-scan.json
+            target/ci-safe/image-sbom.cdx.json
           if-no-files-found: error
           retention-days: 7
 

@@ -8,8 +8,9 @@ implemented through 2026-10-11; P8-T09 effective-destination/egress protection
 and approved Apache transport on Java 21 are verified. P8-T10's approved auth/
 ingress controls are verified on 2026-10-13. P8-T11 CI gate implementation is
 verified on 2026-10-15, with security acceptance BLOCKED by unwaived baseline
-findings. Phase 8 IN PROGRESS. Remaining
-runtime/operational controls are owned by subsequent tasks. Phase 7 remains
+findings. P8-T12 adds the verified-artifact image and isolated runtime/recovery
+gates; its acceptance is recorded in [container runtime](container-runtime.md).
+Phase 8 IN PROGRESS. Staging/load/recovery operations remain owned by subsequent tasks. Phase 7 remains
 DONE/FROZEN; the simulator functional MVP remains complete.
 
 This tracked document records shared scope and decision gates. The detailed
@@ -56,7 +57,7 @@ documentation-only preparation does not require repeating an unchanged suite.
 | URL/network safety | HTTPS/literal target checks; T09 adds fixed CONNECT/proxy network enforcement and approved Apache transport on Java 21; registration does not resolve merchant DNS | T09 verifies actual DNS/TLS/IP-SAN/rebinding/bypass; T13 proves staging isolation |
 | Health/shutdown | T02: DB + availability readiness, process liveness, bounded HTTP drain verified | T12-T15 prove image signals, workers and staged lifecycle |
 | CI | T11 adopts the workflow with explicit user approval; JDK21/Docker coverage and pinned supply-chain gates are implemented | Security acceptance remains blocked by baseline secret-format findings; no waiver or hosted-CI acceptance is claimed |
-| Packaging/operations | T08 monitoring lab demonstrated on stock JRE/mounted verified JAR; no production image/staging/load/restore acceptance | T12-T18 own remaining implementation and evidence |
+| Packaging/operations | T12 verified-artifact non-root image and isolated runtime/recovery gates implemented; security acceptance remains separately gated | T13-T18 own actual staging/load/failure/restore acceptance; no release while security is blocked |
 
 This table is an inventory, not a claim that the future controls are already
 available. Never document a passing Java suite as proof of load capacity, DNS
@@ -594,10 +595,10 @@ REFUSING_TRAFFIC availability state makes readiness OUT_OF_SERVICE/503.
 `spring.lifecycle.timeout-per-shutdown-phase=30s`. Context closure drains an
 in-flight HTTP request and stops new acceptance through Boot's server lifecycle.
 This is a timeout **per lifecycle phase**, not a guaranteed whole-process 30s
-deadline. T12/T13 must choose the container termination grace period accordingly;
-image SIGTERM propagation and worker/lease/multi-instance recovery belong to
-T12-T15, not this HTTP-context test. CPU/memory/JVM limits are not yet configured
-in a runtime image; T12-T14 own declared resource limits and measured tuning.
+deadline. T12 chooses a 120s container grace period and verifies image SIGTERM
+and durable worker/source recovery. Those results are separate from this T02
+HTTP-context test; multi-instance recovery remains T15. T12 now declares finite
+image/runtime CPU/memory/JVM budgets; T14 still owns measured capacity/tuning.
 
 The implementation follows Boot's [separate management listener](https://docs.spring.io/spring-boot/reference/actuator/monitoring.html),
 [health groups and additional probe paths](https://docs.spring.io/spring-boot/reference/actuator/endpoints.html),
@@ -725,12 +726,15 @@ only, no push/merge. External paging/HA, security scanning, production image/TLS
 staging and performance/recovery evidence remain later gates. At that T08
 checkpoint, T09 was unstarted; its acceptance is recorded in section 8 below.
 
-T12 must provide a non-root runtime image with a correct signal/entrypoint path, no embedded
-secrets and declared writable temp/read-only/resource requirements. Source,
-dependency and image checks/SBOM are separate evidence from functional tests.
+T12 provides an artifact-first equivalent to a multi-stage build: the exact
+clean-verified JAR in a pinned Java21 JRE image. Non-root Java PID1, no embedded
+local secrets/source, finite JVM/cgroup/temp budgets, read-only execution and
+isolated stop/restart/API/Ledger/Webhook checks are described in
+[container runtime](container-runtime.md). Source, dependency and image
+checks/SBOM remain separate release evidence from functional tests.
 Provision all six queue bindings and separate consumer DLQs before enabling the
 source release. Test fresh startup, forward upgrade, shutdown/restart and
-application rollback compatibility; never auto-roll back database migrations.
+application rollback compatibility in T13; never auto-roll back database migrations.
 
 Using a distinct production configuration is consistent with [Docker's Compose
 deployment guidance](https://docs.docker.com/compose/how-tos/production/).
@@ -871,6 +875,19 @@ DB v6.1.10 built 2026-10-15T06:30:36Z and reports 29 candidate matches (6 CRITIC
 waiver/upgrade or exploitability clearance is invented. No POM, app source or
 test fixture changed. GitHub-hosted CI/branch protection remain unexecuted owner
 gates on this unpublished branch, not inferred from local verification.
+
+### T12 implementation/runtime checkpoint (2026-10-15)
+
+T12 implementation/runtime checkpoint:55 focused Windows/Linux controls and
+full1,405-test/195-suite Java clean verification pass, no failures/errors/skips.
+Actual image prod/restart/API/Ledger/Webhook/outage/key-continuity gates pass.
+Image inventory covers299 software components;18 HIGH/CRITICAL candidate
+matches remain unwaived and block acceptance. Image application resources have
+zero secret findings, but source retains10 baseline detections and0 SAST
+findings. Native scanner/DB-unavailable controls pass; security is **BLOCKED**,
+not a scanner outage or approval to deploy. Exact artifact/tool/resource/scan
+evidence and limitations are in [container runtime](container-runtime.md).
+No runtime application dependency, financial schema/API/TX/retry change.
 
 ## 10. Performance, recovery and operational gates (T14-T17)
 
