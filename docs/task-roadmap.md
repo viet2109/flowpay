@@ -327,7 +327,9 @@ P8-T12 now implements the verified-artifact runtime image and image acceptance
 gates; runtime verification and image-security acceptance are recorded in
 [container runtime](container-runtime.md). It is not release clearance or
 permission to bypass the blocked gates. No push/merge; local-only corrections
-remain unstaged. Phase 8 is not production/staging accepted. T13 is not started.
+remain unstaged. Phase 8 is not production/staging accepted. T13 isolated staging
+implementation/runtime verification now passes; see
+[staging deployment](staging-deployment.md). Security release remains BLOCKED.
 
 The user selected staging Linux/container with no provider/external deployment.
 Phase 7 source `d348b10` was pushed and merged into remote main at `0b96400`;
@@ -356,7 +358,7 @@ only with the user's explicit P8-T11 approval.
 | P8-T10 | API and Authentication Security Review | P8-T01, P8-T02 | DONE |
 | P8-T11 | CI Verification and Supply-Chain Gates | P8-T01, P8-T10 | DONE (gates); security BLOCKED |
 | P8-T12 | Production Container Image | P8-T02, P8-T11 | IMPLEMENTED/runtime verified; security BLOCKED (not fully accepted) |
-| P8-T13 | Isolated Linux Staging Deployment | P8-T08, P8-T09, P8-T10, P8-T11, P8-T12 | PLANNED |
+| P8-T13 | Isolated Linux Staging Deployment | P8-T08, P8-T09, P8-T10, P8-T11, P8-T12 | IMPLEMENTED/runtime verified; security BLOCKED (not fully accepted) |
 | P8-T14 | Load, Stress and Soak Verification | P8-T13 | PLANNED |
 | P8-T15 | Multi-Instance and Operational Failure Drills | P8-T13, P8-T14 | PLANNED |
 | P8-T16 | Backup, Restore and Disaster-Recovery Drill | P8-T13, P8-T15 | PLANNED |
@@ -625,8 +627,45 @@ Security is BLOCKED, not accepted:299 software-component image inventory yields
 tracked-source rescan retains10 baseline findings and0 SAST findings. No waiver,
 fixture rewrite or dependency upgrade is added. Actual artifact/environment,
 native gates and bounded scope are in [container runtime](container-runtime.md).
-T12 is not fully Done, T13 is unstarted, no push/merge/public/cloud deployment.
+At this checkpoint T12 was not fully Done and T13 was unstarted; no
+push/merge/public/cloud deployment. The later T13 checkpoint below supersedes
+only that task status, not the historical scan evidence.
 Ignored phase/index are corrected locally and remain unstaged.
+
+### P8-T13 implementation checkpoint (2026-10-17)
+
+Independent immutable-image simulator staging now verifies fresh and Phase7 DB
+cases. TLS-only loopback edge, private persistence/monitoring, enforced Webhook
+proxy and complete broker bindings/separate DLQs before producers are covered.
+Actual dual-stack ingress/private-IP/direct-bypass probes, two-replica telemetry
+discovery/dashboard/stored trace, SUCCESS/DECLINED/UNKNOWN and exact replay,
+balanced unique Ledger/public events/deliveries, controlled consumer duplicates,
+failed-key configuration rollback and graceful restart all pass. Phase7 migration
+checks retain V001-V011/checksums, complete financial/ciphertext rows and signing
+with the existing key after additive V012/V013. No schema downgrade or financial
+reset, historical-binary rollback or external firewall certification is claimed.
+
+83 Python gate controls pass separately on Windows and pinned Linux Python;
+native actionlint, Compose, shell, NGINX, promtool and Collector validation pass.
+Full clean Java gate passes **1,407 tests /196 suites**, zero failures/errors/
+skips with actual PostgreSQL/RabbitMQ. The two new PostgreSQL upgrade checks are
+included; focused migration iteration also passed separately. No application
+Java/POM/schema/API/TX/locking/state/retry change. A shallow-CI checkout issue and
+64MiB proxy cold-start OOM were corrected; the final run uses the verified T08
+128MiB Squid baseline and rejects OOM/stopped infrastructure, not a relaxed test.
+
+Artifacts, resources, security boundary and remaining acceptance limits are in
+[the staging runbook](staging-deployment.md). All owned synthetic projects,
+volumes/networks and external secrets were cleaned; `.env` stays unread and
+untracked. Security release remains BLOCKED independently of these functional
+results; no waiver, push/merge, cloud account, public endpoint, measured capacity
+or T14 implementation is included. Local phase/index corrections stay unstaged.
+Fresh current-image scan retains18 blocking matches (6 CRITICAL/12 HIGH) in299
+software components; image application-secret scan0. Valid GrypeDBv6.1.10 built
+2026-10-16 and native vulnerable/unavailable controls pass. Source804 files retain
+10 secret-format/0 SAST findings, with native controls/complete coverage passing.
+Both gates remain failed under the no-exception policy; no full Maven dependency
+SBOM/T12 broker-outage fixture rerun or clean supply-chain claim is inferred.
 
 ## Agent task template
 

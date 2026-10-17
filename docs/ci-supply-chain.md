@@ -79,6 +79,17 @@ scan the actual saved image's OS and Java inventory without socket mounts.
 See [container gates and limitations](container-runtime.md); no image waivers
 or registry credentials are added.
 
+T13 adds the isolated TLS staging smoke to `verify`, after production-image
+runtime and before the image scan. Both fresh and Phase7-upgrade cases must
+pass; only `staging.json` joins the explicit safe artifact list. This uses
+synthetic-only external keys and private owned resources, not a hosted stage.
+The image scan still runs after a staging failure and the independent source
+security job remains mandatory. A local functional pass cannot override either
+security gate. See [staging boundaries and reproduction](staging-deployment.md).
+The verification checkout fetches complete Git history so V001-V011 can be
+compared to the merged Phase7 baseline; credentials are still not persisted.
+This does not extend the tracked-source secret scan to Git-history scanning.
+
 The Java rules cover process execution, concatenated SQL at selected statement
 sinks, native object deserialization, common trust-all TLS APIs, weak digest/
 cipher construction and unsafe default YAML loading. They are versioned local

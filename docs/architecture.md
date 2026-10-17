@@ -1124,7 +1124,14 @@ not publish backend/management ports or provision TLS staging. T13 must supply
 reviewed TLS listen/ingress and prove no backend bypass on the selected host;
 T11/T12 own scanners/image acceptance and T14/T15 own load/multi-instance quotas.
 
-Staging, load, multi-instance failure and DB/broker/key restore evidence remain
+P8-T13 implements the separate [TLS staging topology](staging-deployment.md),
+private operator/telemetry networks, topology-before-producers and immutable-image
+fresh/Phase7-upgrade checks. It reuses approved contracts/policies and applies only
+existing additive V012/V013 trace migrations; no business/schema/transaction or
+retry changes. Native Docker-network proof is not external firewall certification.
+Security acceptance remains independently blocking. No cloud is provisioned.
+
+Load, extended multi-instance failure and DB/broker/key restore evidence remain
 separate from Java unit/integration tests. Performance and recovery targets are
 declared before their respective acceptance runs on recorded artifacts/resources.
 No external hosting/cloud provisioning, destructive dev reset, automatic DLQ

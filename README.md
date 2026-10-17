@@ -13,8 +13,8 @@ production configuration/management/probes, P8-T03's business metrics and
 P8-T04's asynchronous operational metrics, P8-T05's synchronous tracing and
 P8-T06's durable Outbox trace context and P8-T07's consumer/delayed-worker tracing,
 P8-T08's monitoring lab, P8-T09's Webhook egress and P8-T10's approved auth/ingress
-protections. Remaining hardening
-and staging tasks are pending.
+protections. Remaining security acceptance, performance and operational-recovery
+tasks are pending.
 
 P8-T11 adds [CI verification and supply-chain gates](docs/ci-supply-chain.md).
 Security acceptance is currently **blocked**, not clean: the owner explicitly
@@ -25,6 +25,11 @@ P8-T12 adds a [verified-artifact runtime image](docs/container-runtime.md) and
 isolated restart/API-to-Ledger/Webhook gates. Runtime success is separate from
 security acceptance: blocked findings still prevent release. No registry upload
 or public/staging deployment is included.
+
+P8-T13 adds [isolated Linux/container staging](docs/staging-deployment.md):
+TLS ingress, private persistence/telemetry, topology-before-producers,
+external keys and fresh/Phase7 upgrade/recovery checks. It does not provision
+hosting or override blocked release security gates.
 
 ## Implemented flow
 

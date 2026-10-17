@@ -300,8 +300,12 @@ gates. Image security remains a separate fail-closed release gate; see
 [runtime contract and current acceptance](container-runtime.md). No provider,
 registry publication, public API hosting or frontend deployment is selected.
 
-The remaining six implementation tasks cover
-staged deployment, declared load and
+P8-T13 supplies [isolated TLS staging](staging-deployment.md), private
+persistence/broker/telemetry, external key continuity, topology-before-producers
+and fresh/Phase7 upgrade/recovery verification. This local simulator environment
+does not grant release clearance while T11/T12 security gates remain blocked.
+
+The remaining five implementation tasks cover declared load and
 multi-instance failure drills, actual DB/broker/key restore and runbooks.
 Specific tool versions, trace DDL/security contract changes and measured
 performance/recovery targets have explicit owner/review gates in

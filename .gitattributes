@@ -3,3 +3,4 @@
 ops/monitoring/**/*.sh text eol=lf
 ops/egress/**/*.sh text eol=lf
 ops/ingress/**/*.sh text eol=lf
+ops/staging/**/*.sh text eol=lf

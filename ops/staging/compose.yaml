@@ -1,0 +1,197 @@
+# P8-T13 Linux/container staging. External operator-owned secrets, no dev state.
+# Always use --env-file explicitly; the supported runner never reads root .env.
+x-sandbox: &sandbox
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 256
+  tmpfs: ['/tmp:rw,nosuid,nodev,size=32m,mode=1777']
+
+services:
+  postgres:
+    image: postgres:16.15-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    environment:
+      POSTGRES_DB: flowpay_stage
+      POSTGRES_USER: flowpay_stage
+      POSTGRES_PASSWORD_FILE: /run/secrets/DB_PASSWORD
+    secrets: [DB_PASSWORD]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U flowpay_stage -d flowpay_stage']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [data]
+    mem_limit: 384m
+    cpus: 1
+  rabbitmq:
+    image: rabbitmq:4.3.0-management-alpine@sha256:1a43764bdcf116542e7c8c794adc67c79461727da16d474e9e21483fe7f716d3
+    environment:
+      RABBITMQ_DEFAULT_USER: flowpay_bootstrap
+    entrypoint: [sh, -ec]
+    command: ['export RABBITMQ_DEFAULT_PASS="$$(cat /run/secrets/RABBITMQ_ADMIN_PASSWORD)"; exec docker-entrypoint.sh rabbitmq-server']
+    secrets: [RABBITMQ_ADMIN_PASSWORD]
+    volumes:
+      - rabbit-data:/var/lib/rabbitmq
+      - ../monitoring/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [data, observe]
+    mem_limit: 384m
+    cpus: 1
+  topology:
+    <<: *sandbox
+    image: python:3.13.12-slim@sha256:f1927c75e81efd1e091dbd64b6c0ecaa5630b38635a3d1c04034ac636e1f94c8
+    user: '10001:10001'
+    entrypoint: [python, -B, /bootstrap/rabbit.py]
+    volumes:
+      - ./rabbit.py:/bootstrap/rabbit.py:ro
+      - ./rabbit-definitions.json:/bootstrap/definitions.json:ro
+    secrets: [RABBITMQ_ADMIN_PASSWORD, RABBITMQ_PASSWORD]
+    depends_on:
+      rabbitmq: {condition: service_healthy}
+    networks: [data]
+    mem_limit: 64m
+    cpus: 0.5
+  app:
+    <<: *sandbox
+    image: ${FLOWPAY_IMAGE:?Use the verified immutable application image ID}
+    tmpfs: ['/tmp:rw,nosuid,nodev,size=128m,mode=1777']
+    stop_grace_period: 120s
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
+      DB_URL: jdbc:postgresql://postgres:5432/flowpay_stage
+      DB_USERNAME: flowpay_stage
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: flowpay_stage
+      JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
+      JWT_PRIVATE_KEY_LOCATION: file:/run/secrets/jwt-private.pem
+      MANAGEMENT_SERVER_ADDRESS: 0.0.0.0
+      MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: 'false'
+      TRACING_EXPORT_ENABLED: 'true'
+      TRACING_SAMPLER: parent-based-always-on
+      TRACING_SAMPLING_PROBABILITY: '1.0'
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://collector:4318/v1/traces
+      WEBHOOK_EGRESS_PROXY_HOST: egress
+      WEBHOOK_EGRESS_PROXY_PORT: '3128'
+    secrets: [DB_PASSWORD, RABBITMQ_PASSWORD, WEBHOOK_SECRET_ENCRYPTION_KEY, jwt-public.pem, jwt-private.pem]
+    depends_on:
+      postgres: {condition: service_healthy}
+      topology: {condition: service_completed_successfully}
+      egress: {condition: service_started}
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --output, /dev/null, http://localhost:8080/readyz]
+      interval: 5s
+      timeout: 3s
+      retries: 45
+      start_period: 20s
+    networks: [ingress, data, observe, webhook]
+    mem_limit: 1536m
+    cpus: 2
+  edge:
+    <<: *sandbox
+    image: nginx:1.30.5-alpine@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94
+    user: '101:101'
+    entrypoint: [nginx]
+    command: [-c, /etc/flowpay/nginx.conf, -g, 'daemon off;']
+    volumes:
+      - ./nginx.conf:/etc/flowpay/nginx.conf:ro
+      - ../ingress/proxy.conf:/etc/flowpay/proxy.conf:ro
+    secrets: [edge-cert.pem, edge-key.pem]
+    ports: ['127.0.0.1:${STAGING_HTTPS_PORT:-18443}:8443']
+    depends_on:
+      app: {condition: service_healthy}
+    networks: [front, ingress]
+    mem_limit: 64m
+    cpus: 0.5
+  egress:
+    <<: *sandbox
+    image: ubuntu/squid:6.6-24.04_beta@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029
+    user: '13:13'
+    tmpfs: ['/tmp:rw,nosuid,nodev,size=16m,mode=1777']
+    entrypoint: [sh, /egress/start-proxy.sh]
+    command: [/etc/squid/flowpay.conf]
+    volumes:
+      - ../egress/squid.conf:/etc/squid/flowpay.conf:ro
+      - ../egress/start-proxy.sh:/egress/start-proxy.sh:ro
+    networks: [webhook, outbound]
+    # Match the verified T08/T09 proxy baseline; 64MiB OOMs during cold init.
+    mem_limit: 128m
+    cpus: 0.5
+  prometheus:
+    <<: *sandbox
+    image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
+    command: [--config.file=/etc/prometheus/prometheus.yaml, --storage.tsdb.path=/prometheus, --storage.tsdb.retention.time=48h, --storage.tsdb.retention.size=256MB]
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - ../monitoring/prometheus/rules.yaml:/etc/prometheus/rules.yaml:ro
+      - prometheus-data:/prometheus
+    networks: [observe]
+    mem_limit: 256m
+    cpus: 1
+  grafana:
+    <<: *sandbox
+    image: grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572
+    environment:
+      GF_SECURITY_ADMIN_USER: lab-admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/GRAFANA_ADMIN_PASSWORD
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: 'false'
+      GF_LOG_LEVEL: warn
+    secrets: [GRAFANA_ADMIN_PASSWORD]
+    volumes:
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks: [observe]
+    mem_limit: 192m
+    cpus: 1
+  collector:
+    <<: *sandbox
+    image: otel/opentelemetry-collector:0.162.0@sha256:310a800ad69ee430e7c541796852a242c9c7db97aaad4daa5ccf843c525fbdb2
+    command: [--config=/etc/otel/config.yaml]
+    volumes: [../monitoring/collector.yaml:/etc/otel/config.yaml:ro]
+    networks: [observe]
+    mem_limit: 256m
+    cpus: 1
+  tempo:
+    <<: *sandbox
+    image: grafana/tempo:2.10.4@sha256:a6616c9d224770c883a67b50e4941e99c5df81b076ef05f516bb7cce5a96cec0
+    command: [-config.file=/etc/tempo/config.yaml]
+    volumes:
+      - ../monitoring/tempo.yaml:/etc/tempo/config.yaml:ro
+      - tempo-data:/var/tempo
+    networks: [observe]
+    mem_limit: 256m
+    cpus: 1
+
+secrets:
+  DB_PASSWORD: {file: '${STAGING_SECRETS_DIR:?External staging secrets directory}/DB_PASSWORD'}
+  RABBITMQ_ADMIN_PASSWORD: {file: '${STAGING_SECRETS_DIR}/RABBITMQ_ADMIN_PASSWORD'}
+  RABBITMQ_PASSWORD: {file: '${STAGING_SECRETS_DIR}/RABBITMQ_PASSWORD'}
+  WEBHOOK_SECRET_ENCRYPTION_KEY: {file: '${STAGING_SECRETS_DIR}/WEBHOOK_SECRET_ENCRYPTION_KEY'}
+  GRAFANA_ADMIN_PASSWORD: {file: '${STAGING_SECRETS_DIR}/GRAFANA_ADMIN_PASSWORD'}
+  jwt-public.pem: {file: '${STAGING_SECRETS_DIR}/jwt-public.pem'}
+  jwt-private.pem: {file: '${STAGING_SECRETS_DIR}/jwt-private.pem'}
+  edge-cert.pem: {file: '${STAGING_SECRETS_DIR}/edge-cert.pem'}
+  edge-key.pem: {file: '${STAGING_SECRETS_DIR}/edge-key.pem'}
+networks:
+  front: {enable_ipv6: true}
+  ingress: {internal: true, enable_ipv6: true}
+  data: {internal: true, enable_ipv6: true}
+  observe: {internal: true, enable_ipv6: true}
+  webhook: {internal: true, enable_ipv6: true}
+  outbound: {enable_ipv6: true}
+volumes:
+  postgres-data: {}
+  rabbit-data: {}
+  prometheus-data: {}
+  grafana-data: {}
+  tempo-data: {}

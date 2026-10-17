@@ -621,6 +621,16 @@ it does not access development infrastructure or claim deployment readiness.
 
 ## 7. Staging topology and monitoring (T08/T12-T13)
 
+P8-T13 supplies the independent definition in `ops/staging/compose.yaml` and
+[staging deployment runbook](staging-deployment.md). It reuses the T08 dashboards/
+rules and T09/T10 policies, not the development volumes or the T08 JAR-mount lab.
+Only loopback TLS ingress is published; all management/monitoring remains private.
+The bootstrap verifies all source bindings and separate consumer DLQs before
+producers, using a non-admin application broker identity. Fresh/V011 upgrade,
+key continuity, native dual-stack boundaries and same-image configuration
+rollback are separate evidence from security release acceptance. Existing
+source/image findings still block release; no external deployment is authorized.
+
 Linux containers are the chosen lab target. Use a separate staging definition
 with independently named volumes/networks and no fixed dev container names.
 Public ingress goes through the reviewed TLS edge; PostgreSQL, RabbitMQ,
