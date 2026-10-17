@@ -359,7 +359,7 @@ only with the user's explicit P8-T11 approval.
 | P8-T11 | CI Verification and Supply-Chain Gates | P8-T01, P8-T10 | DONE (gates); security BLOCKED |
 | P8-T12 | Production Container Image | P8-T02, P8-T11 | IMPLEMENTED/runtime verified; security BLOCKED (not fully accepted) |
 | P8-T13 | Isolated Linux Staging Deployment | P8-T08, P8-T09, P8-T10, P8-T11, P8-T12 | IMPLEMENTED/runtime verified; security BLOCKED (not fully accepted) |
-| P8-T14 | Load, Stress and Soak Verification | P8-T13 | PLANNED |
+| P8-T14 | Load, Stress and Soak Verification | P8-T13 | DONE: independent steady/peak/stress/30-minute soak accepted on frozen host/artifact; security release remains BLOCKED |
 | P8-T15 | Multi-Instance and Operational Failure Drills | P8-T13, P8-T14 | PLANNED |
 | P8-T16 | Backup, Restore and Disaster-Recovery Drill | P8-T13, P8-T15 | PLANNED |
 | P8-T17 | Operational Runbooks and Release Checklist | P8-T08, P8-T13, P8-T14, P8-T15, P8-T16 | PLANNED |
@@ -666,6 +666,37 @@ software components; image application-secret scan0. Valid GrypeDBv6.1.10 built
 10 secret-format/0 SAST findings, with native controls/complete coverage passing.
 Both gates remain failed under the no-exception policy; no full Maven dependency
 SBOM/T12 broker-outage fixture rerun or clean supply-chain claim is inferred.
+
+### P8-T14 implementation and measured acceptance complete (2026-10-17)
+
+P8-T14 is recorded in [load testing](load-testing.md): frozen open-model
+manifest, pinned k6, bounded numeric reports, real retry/drain and whole-project
+financial/HMAC/identity audits.114 focused controls pass on Windows and pinned
+Linux Python; native k6 protocol/schema and workload inspection pass.
+
+The owner delegated target selection; the unchanged numeric proposal was bound
+to calibration before a new acceptance project. A first bootstrap failed before
+workload execution and cleaned up. Strict preflight then rejected a4096-byte
+Docker MemTotal difference; the actual host was explicitly refrozen and freshly
+calibrated, without changing targets. Full report/workload hashes and this
+history are retained in the runbook and `ops/load/{proposal,acceptance}.json`.
+
+Independent warmup/steady/peak/stress/30-minute soak acceptance passed all fixed
+limits, with0 unexpected server/transport/contract errors,0 drops and all audits
+passing. Stress112 policy429 remains separate:8/120 complete workflows, delivery
+lag p99 210.47s and drain180.86s. Soak181/181 workflows and3,600 query iterations
+complete; aggregate API p95/p99 21.00/52.72ms, worst regular-route p99 124.80ms,
+provider p99 upper bound10ms, delivery lag p99 17.25s, drain16.32s and heap-mean
+growth0.674MiB. No OOM/restart was observed; sampled pool pending is0.
+Final audit:359 payments,358 provider successes,253 refunds,611 unique balanced
+postings,1,222 public events and3,666 delivered subscriptions. Owned cleanup
+passes. Operational guards are retained, not raised to hide stress; no
+unconstrained backend capacity or alert-notification timeline is claimed.
+
+The exact T13 verified1,407-test artifact and production inputs remain unchanged;
+no new full Maven verification or security-scan pass is claimed. Source/image
+findings remain unwaived and release is BLOCKED. No push/merge or T15 work is
+included; local-only phase/index corrections stay unstaged.
 
 ## Agent task template
 

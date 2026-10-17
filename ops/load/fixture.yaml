@@ -1,0 +1,34 @@
+# Third overlay, relative paths resolve against ops/staging/compose.yaml.
+# No app setting, retry, edge budget, pool, schema or resource tuning.
+services:
+  receiver:
+    entrypoint: [python, -B, /load/receiver.py]
+    volumes: [../load/receiver.py:/load/receiver.py:ro]
+    secrets: !override [cert.pem, key.pem]
+  probe:
+    volumes: [../load/observe.py:/load/observe.py:ro]
+    secrets: !override [edge-cert.pem]
+  load:
+    profiles: [checks]
+    image: grafana/k6:2.0.0@sha256:a33a0cfdc4d2483d6b7a3a22e726a499ff2831a671a49239104cd34a9937523c
+    user: '10001:10001'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    tmpfs: ['/tmp:rw,nosuid,nodev,size=32m,mode=1777']
+    entrypoint: [k6]
+    environment:
+      SSL_CERT_FILE: /run/secrets/edge-cert.pem
+      K6_NO_USAGE_REPORT: 'true'
+      K6_NO_COLOR: 'true'
+      K6_WEB_DASHBOARD: 'false'
+      K6_AUTO_EXTENSION_RESOLUTION: 'false'
+    secrets: [edge-cert.pem]
+    volumes:
+      - ../load/workload.js:/load/workload.js:ro
+      - ../load/contract.js:/load/contract.js:ro
+      - ../load/manifest.json:/load/manifest.json:ro
+    networks: [front, webhook]
+    mem_limit: 256m
+    cpus: 1

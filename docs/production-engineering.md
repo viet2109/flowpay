@@ -901,6 +901,20 @@ No runtime application dependency, financial schema/API/TX/retry change.
 
 ## 10. Performance, recovery and operational gates (T14-T17)
 
+The T14 implementation is in [load testing](load-testing.md), with its frozen
+manifest and pinned k6 in `ops/load/`. It uses the unchanged T13 artifact and
+one-replica host baseline. Real open-model offered/dropped/partial work, per-route
+HTTPS tails, fixed-bucket provider bounds, source/delivery lag, real503 retries
+and whole-project financial audits are distinct from numeric acceptance.
+The owner delegated target selection on2026-10-17; the unchanged calibrated
+proposal was recorded before independent acceptance/30-minute soak, which
+passed on the frozen T13 image/host: zero unexpected errors/drops/invariant
+failures, with stress112 policy429 kept separate. Soak API aggregate p99 is
+52.72ms, worst regular-route p99 is124.80ms; soak heap-mean growth is0.674MiB.
+All declared lag/drain/resource gates pass; the report and limits are retained
+in the runbook. No production capacity, HA or security clearance is inferred.
+Retry/edge/pool settings and operational guardrails are not tuned.
+
 No numeric universal RPS/p95, production availability or zero-loss guarantee is
 selected at T01. T13 records artifact/image/tool/host/resource identity. T14
 separates exploratory calibration from an independent acceptance run: record

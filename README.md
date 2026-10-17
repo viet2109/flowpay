@@ -13,7 +13,7 @@ production configuration/management/probes, P8-T03's business metrics and
 P8-T04's asynchronous operational metrics, P8-T05's synchronous tracing and
 P8-T06's durable Outbox trace context and P8-T07's consumer/delayed-worker tracing,
 P8-T08's monitoring lab, P8-T09's Webhook egress and P8-T10's approved auth/ingress
-protections. Remaining security acceptance, performance and operational-recovery
+protections. Remaining security acceptance and operational-recovery
 tasks are pending.
 
 P8-T11 adds [CI verification and supply-chain gates](docs/ci-supply-chain.md).
@@ -30,6 +30,12 @@ P8-T13 adds [isolated Linux/container staging](docs/staging-deployment.md):
 TLS ingress, private persistence/telemetry, topology-before-producers,
 external keys and fresh/Phase7 upgrade/recovery checks. It does not provision
 hosting or override blocked release security gates.
+
+P8-T14's [load/stress/soak harness](docs/load-testing.md) passes independent
+warmup/steady/peak/stress/30-minute soak acceptance on the frozen T13 artifact
+and host, with unchanged owner-delegated targets and financial/identity audits.
+This is bounded simulator evidence, not a production capacity SLO or release
+security clearance.
 
 ## Implemented flow
 
@@ -295,8 +301,11 @@ stable worker context. P8-T08 provisions and verifies the isolated monitoring la
 dashboards and operational alerts. P8-T09 verifies enforced CONNECT/proxy egress,
 DNS-rebinding/bypass protection and dedicated Apache Webhook transport on Java 21,
 retaining trusted TLS/IP-SAN, signing and deadlines. P8-T10 adds the reviewed
-auth/ingress controls below. Load testing, repository-wide dependency/image scanning,
-packaging/staging, backup/recovery, and runbooks are still pending implementation.
+auth/ingress controls below. P8-T11/T12 add dependency/image security gates and
+verified-artifact packaging; findings still block release. P8-T13 adds isolated
+staging and P8-T14 verifies the declared load/stress/30-minute soak workload.
+Multi-instance failure drills, backup/restore acceptance and final operational
+runbooks/exit gates remain pending.
 The functional simulator MVP is not a claim of
 production readiness, real payment processing, guaranteed cross-event ordering,
 or exactly-once external HTTP delivery. Endpoint re-enable, dual-secret grace,

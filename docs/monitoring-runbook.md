@@ -105,7 +105,18 @@ policy needs separately approved operator credentials/destination. Never interpr
 silent monitoring as a healthy service.
 
 All thresholds below are provisional operational guardrails, not throughput/
-latency SLOs. T14 must review workload-derived thresholds before acceptance.
+latency SLOs. T14 reviewed workload-derived targets before independent acceptance.
+The [T14 harness](load-testing.md) measures controlled750ms/first503
+subscribers on the frozen T13 host. The owner delegated selection of its
+calibrated numeric targets before independent acceptance/soak.
+That acceptance passed, including30-minute soak; stress durable delivery lag
+p99 is210.47s and drain180.86s, versus soak17.25s/16.32s. The shared cached
+overdue-age gauge reached141.67s during soak; it is not filtered to new-scenario
+rows. The benchmark does not collect an alert firing/notification timeline, so
+do not infer that no alert fired or equate a cached age with durable lag.
+Retain the existing120s age/85% heap/80% pool and error guards; do not raise
+an operational alert threshold merely to hide the deliberate stress backlog.
+Report resulting alerts and durable drain/recovery alongside the workload.
 Every alert has no `keep_firing_for`: it resolves on the first successful 15s
 evaluation where the predicate clears. Rate-window conditions can take up to 5m
 to decay. Missing telemetry can also make an alert disappear: recovery requires
