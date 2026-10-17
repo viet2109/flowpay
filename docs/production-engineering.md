@@ -943,14 +943,27 @@ subscriptions and21 retained attempts. Rolling records230 successful reads and
 All owned resources are cleaned. No financial-state repair, runtime tuning,
 new Java/full-gate claim, T14 performance reapproval or security waiver occurs.
 
-T16 freezes RPO/RTO/cadence/confidentiality/retention targets at task entry before
-an acceptance restore drill. Restore into a separately named validated target.
-Preserve consistent PostgreSQL snapshots, broker definitions/durable state and
-separately protected encryption/JWT keys. A database dump alone cannot prove
-recovery. PUBLISHED does not imply completed Ledger/Webhook consumption;
-DB/broker checkpoint mismatch needs a reviewed controlled recovery procedure
-using original facts/event IDs and explicit operator authority, never blind
-replay/state reset or provider reconciliation.
+T16's [backup/restore lab](backup-restore.md) records the owner-delegated policy
+before acceptance: RPO target24h, daily cadence,7 daily/4 weekly retention and
+RTO lab15m. DB/cold broker data and the application-key bundle use separate
+authenticated encryption recipients. A new empty UUID destination restores
+all19 public tables including Flyway, sequences and logical schema enforcement;
+PostgreSQL CHECK deparse normalization is compared against a pre-loss schema-only
+restore of the same trusted dump, not hidden by skipped checks or regex.
+Broker definitions/credentials and durable data require the pinned original node
+identity/version. Pre-backup JWT/API replay, original Webhook key/HMAC, immutable
+history, duplicate-safe balanced Ledger, pending work and restart are verified.
+PUBLISHED does not imply completed Ledger/Webhook consumption: mismatched
+checkpoints block with consumers disabled before the explicitly approved lab-only
+replay of original facts/IDs/transport headers. No state reset/provider repair.
+Independent off-host stores, operational scheduling/retention, historical telemetry
+backup and production RPO/HA are not provisioned or inferred from this lab.
+Final native cold/mismatch restores pass at101.28/109.23s with snapshot ages
+121.42/401.80s, original transport/source trace identity and complete financial/
+key/history/restart audits. All162 focused controls pass on Windows/pinned Linux;
+owned cleanup passes. The exact T13 verified artifact remains unchanged: no new
+full Java run or security clearance is claimed. The runbook retains final hashes,
+CHECK normalization evidence and the failed/preliminary-versus-final distinction.
 
 T17's runbook reflects actual alert/load/failure/restore evidence. Separate
 read-only triage, approved reversible actions and irreversible operations.

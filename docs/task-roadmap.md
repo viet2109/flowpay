@@ -361,7 +361,7 @@ only with the user's explicit P8-T11 approval.
 | P8-T13 | Isolated Linux Staging Deployment | P8-T08, P8-T09, P8-T10, P8-T11, P8-T12 | IMPLEMENTED/runtime verified; security BLOCKED (not fully accepted) |
 | P8-T14 | Load, Stress and Soak Verification | P8-T13 | DONE: independent steady/peak/stress/30-minute soak accepted on frozen host/artifact; security release remains BLOCKED |
 | P8-T15 | Multi-Instance and Operational Failure Drills | P8-T13, P8-T14 | DONE: eight owned two-replica failure/recovery drills and financial/history audits pass; release security remains BLOCKED |
-| P8-T16 | Backup, Restore and Disaster-Recovery Drill | P8-T13, P8-T15 | PLANNED |
+| P8-T16 | Backup, Restore and Disaster-Recovery Drill | P8-T13, P8-T15 | DONE: encrypted isolated cold/mismatch restores, key/history/invariant audits and fixed lab recovery targets pass; off-host schedule unprovisioned, release security BLOCKED |
 | P8-T17 | Operational Runbooks and Release Checklist | P8-T08, P8-T13, P8-T14, P8-T15, P8-T16 | PLANNED |
 | P8-T18 | Production Engineering Quality Gate and Documentation Freeze | P8-T01 through P8-T17 | PLANNED |
 
@@ -729,6 +729,34 @@ inputs remain unchanged: no new full Java gate or security-scan pass is claimed.
 Security findings remain unwaived/BLOCKED; no zero-error availability, cloud HA,
 restore acceptance, push/merge or T16 implementation. Local phase/index are
 corrected separately and stay unstaged.
+
+### P8-T16 implementation and native acceptance complete (2026-10-17)
+
+[Backup/restore](backup-restore.md) records the owner-delegated RPO24h/daily,
+7 daily/4 weekly retention and RTO lab15m policy before acceptance. Consistent
+PostgreSQL/custom dump, cold same-node/version Rabbit data/definitions and
+separately encrypted application keys restore into two fresh empty destinations.
+All19 public tables, sequences, schema enforcement and credential definitions
+match; PostgreSQL CHECK cast normalization uses a trusted pre-loss schema-only
+restore of the exact dump, not skipped checks or source-schema changes.
+
+Final unchanged native cold/mismatch restores pass at101.28/109.23s; snapshot
+ages121.42/401.80s meet the declared lab targets, without claiming RPO zero or
+post-snapshot commit recovery. The empty-broker mismatch blocks with consumers
+disabled before the approved lab-only replay of original envelopes/IDs/headers.
+Each recovery has3 payments/refunds,6 balanced unique postings,12 public events,
+6 signed delivered subscriptions and6 closed attempts. JWT/API replay,
+duplicate/no-extra-HTTP, source trace identity, restart, wrong backup recipient/
+tamper, missing/wrong AES and original-key retry/retained history controls pass.
+A fourth real workflow passes on the matched destination. Owned cleanup passes.
+
+162 focused controls pass on Windows/pinned Linux; static checks pass. The T13
+verified1,407-test artifact is unchanged; no new full Java or clean-security run
+is claimed. The runbook records exact hashes, measured host and iteration limits.
+Operational off-host storage/scheduling/retention and historical telemetry
+backup are not provisioned. Source/image findings stay unwaived/BLOCKED; no
+public deployment, push/merge, T17 implementation or phase completion claim.
+Local phase/index corrections stay unstaged.
 
 ## Agent task template
 
