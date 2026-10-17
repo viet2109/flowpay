@@ -10,8 +10,10 @@ ingress controls are verified on 2026-10-13. P8-T11 CI gate implementation is
 verified on 2026-10-15, with security acceptance BLOCKED by unwaived baseline
 findings. P8-T12 adds the verified-artifact image and isolated runtime/recovery
 gates; its acceptance is recorded in [container runtime](container-runtime.md).
-Phase 8 IN PROGRESS. Staging/load/recovery operations remain owned by subsequent tasks. Phase 7 remains
-DONE/FROZEN; the simulator functional MVP remains complete.
+P8-T13–T16 staging/load/failure/restore evidence and P8-T17 verified operational
+runbooks are now recorded below. Phase8 remains IN PROGRESS; T18 final gates
+are unstarted and security remains BLOCKED. Phase7 remains DONE/FROZEN; the
+simulator functional MVP remains complete.
 
 This tracked document records shared scope and decision gates. The detailed
 `phase-8-production-engineering.md` assignment plan is a local-only companion,
@@ -965,11 +967,21 @@ owned cleanup passes. The exact T13 verified artifact remains unchanged: no new
 full Java run or security clearance is claimed. The runbook retains final hashes,
 CHECK normalization evidence and the failed/preliminary-versus-final distinction.
 
-T17's runbook reflects actual alert/load/failure/restore evidence. Separate
-read-only triage, approved reversible actions and irreversible operations.
-UNKNOWN is investigation/escalation, not permission to release refund capacity
-or mark terminal failure. No deletion of financial/event/attempt history or
-automatic DLQ replay is added under a documentation task.
+T17's [operational runbook](operations-runbook.md) and
+[release checklist](release-checklist.md) bind actual alert/load/failure/restore
+evidence to read-only triage, approved operational actions and irreversible
+effects. UNKNOWN remains investigation/escalation, not permission to release
+capacity or force terminal states. DEAD retry uses the existing merchant-owned
+JWT API; real DLQ replay has no automatic tool or standing approval. Key exposure,
+continuity, resource pressure, private access, rollout/rollback and independent
+off-host/paging/privilege prerequisites remain explicit. No admin API, financial
+history correction or new operational mutation/reconciliation is introduced.
+Final owned native rehearsal proves diagnostic SQL/queue/health/metric reads,
+dashboard list/detail200 and rejected DELIVERED retry409 leave all19-table/
+sequence/schema snapshots unchanged. Financial/HMAC/trace/cleanup and expected
+real release-preflight block pass.178 focused Windows/pinned-Linux controls and
+19 final link/anchor/source-config checks pass. No full Java/security/long-drill rerun
+is claimed for this unchanged T13 artifact; T18/NO-GO release gates remain open.
 
 ## 11. Implementation decision ownership
 

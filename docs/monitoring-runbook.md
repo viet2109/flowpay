@@ -1,5 +1,11 @@
 # Monitoring lab and alert runbook (P8-T08)
 
+For the current staging incident/approval workflow and release blockers, use
+the [operational runbook](operations-runbook.md) and
+[release checklist](release-checklist.md). The3300 Grafana access below belongs
+only to this older monitoring lab; T13 staging keeps Grafana/private management
+unpublished. Alert predicates/anchors in this document remain authoritative.
+
 This is an isolated **simulator lab**, not a deployment/release gate or financial
 source of truth. Use the built and verified JAR; no new application image is built
 here. Never reuse the development Compose file, its container names or volumes.

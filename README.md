@@ -50,6 +50,12 @@ approved only for its synthetic mismatch case; both native restores pass within
 the predeclared bounds. RPO target24h/RTO lab15m do not
 provision daily/off-host backups, production HA or security clearance.
 
+P8-T17 adds [operational runbooks](docs/operations-runbook.md), an explicit
+[NO-GO release checklist](docs/release-checklist.md) and tested read-only staging
+triage. UNKNOWN, DEAD/DLQ, key exposure and rollout/restore actions have distinct
+approval boundaries. Native diagnosis/rejected-retry checks preserve persisted
+history; no automatic repair/replay or deployment authorization is added.
+
 ## Implemented flow
 
 ```text
@@ -319,7 +325,8 @@ verified-artifact packaging; findings still block release. P8-T13 adds isolated
 staging and P8-T14 verifies the declared load/stress/30-minute soak workload.
 P8-T15 verifies bounded two-instance operational failure drills. P8-T16 implements
 isolated encrypted backup/restore and approved original-event mismatch recovery.
-Final operational runbooks/exit gates remain pending.
+P8-T17 verifies operational runbooks/read-only rehearsal. T18 final exit gates
+remain pending; release security and external operational prerequisites still block.
 The functional simulator MVP is not a claim of
 production readiness, real payment processing, guaranteed cross-event ordering,
 or exactly-once external HTTP delivery. Endpoint re-enable, dual-secret grace,

@@ -1,0 +1,7 @@
+# Rehearsal only: owned synthetic API client, no operator credentials.
+services:
+  probe:
+    entrypoint: [python, -B, /runbooks/probe.py]
+    volumes:
+      - ../runbooks/probe.py:/runbooks/probe.py:ro
+      - ../resilience/probe.py:/runbooks/base.py:ro

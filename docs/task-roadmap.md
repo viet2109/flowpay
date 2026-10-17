@@ -362,7 +362,7 @@ only with the user's explicit P8-T11 approval.
 | P8-T14 | Load, Stress and Soak Verification | P8-T13 | DONE: independent steady/peak/stress/30-minute soak accepted on frozen host/artifact; security release remains BLOCKED |
 | P8-T15 | Multi-Instance and Operational Failure Drills | P8-T13, P8-T14 | DONE: eight owned two-replica failure/recovery drills and financial/history audits pass; release security remains BLOCKED |
 | P8-T16 | Backup, Restore and Disaster-Recovery Drill | P8-T13, P8-T15 | DONE: encrypted isolated cold/mismatch restores, key/history/invariant audits and fixed lab recovery targets pass; off-host schedule unprovisioned, release security BLOCKED |
-| P8-T17 | Operational Runbooks and Release Checklist | P8-T08, P8-T13, P8-T14, P8-T15, P8-T16 | PLANNED |
+| P8-T17 | Operational Runbooks and Release Checklist | P8-T08, P8-T13, P8-T14, P8-T15, P8-T16 | DONE: actionable approval-bound runbooks, NO-GO checklist and owned read-only command rehearsal; release security BLOCKED |
 | P8-T18 | Production Engineering Quality Gate and Documentation Freeze | P8-T01 through P8-T17 | PLANNED |
 
 See the tracked [production-engineering design record](production-engineering.md)
@@ -756,6 +756,36 @@ is claimed. The runbook records exact hashes, measured host and iteration limits
 Operational off-host storage/scheduling/retention and historical telemetry
 backup are not provisioned. Source/image findings stay unwaived/BLOCKED; no
 public deployment, push/merge, T17 implementation or phase completion claim.
+Local phase/index corrections stay unstaged.
+
+### P8-T17 implementation and owned rehearsal complete (2026-10-17)
+
+[Operational runbook](operations-runbook.md) and
+[release checklist](release-checklist.md) cover private management/monitoring,
+deployment/compatible config rollback, DB/broker outage, UNKNOWN escalation,
+Outbox/DLQ/DEAD triage, existing manual retry, key continuity/exposure, saturation
+and backup/restore. Read-only diagnosis, approval-required reversible operations
+and irreversible remote/key/data effects are separated. No new admin API,
+provider reconciliation, SQL financial repair or automatic broker replay.
+
+The sanitized staging triage tool validates exact UUID project/container labels,
+uses bounded read-only SQL/queue/health/metric projections and does not load.env
+or expose raw payload/credential/ID data. Final native rehearsal on the unchanged
+verified T13 image passes: dashboard list/detail200, DELIVERED retry409, exact
+19-table/sequence/schema snapshots unchanged, one payment/refund/two balanced
+postings/four public events/two signed delivered subscriptions and financial/
+HMAC/source-trace audits. Four queues are empty; actual release preflight stays
+BLOCKED. Owned resource/temporary-key cleanup and no-container residue pass.
+
+178 focused tests pass on Windows/pinned Linux;19 final local links/anchors plus source
+controller/auth/retry/drain policy checks and static diff checks pass. The runbook
+records final command/report hashes and the inherited-probe regression iteration.
+No new full Maven/security/load/failure/restore gate is claimed; compiled inputs
+and the verified1,407-test T13 artifact remain unchanged. Successful DEAD202 has
+existing verified PostgreSQL API coverage, not a newly rehearsed exhaustion case.
+No cloud/public deployment, key rotation/live remediation, real DLQ replay,
+hosted-CI acceptance, push/merge or T18 implementation. Security, independent
+backups/paging/least-privilege and final exit gates remain explicit NO-GO items.
 Local phase/index corrections stay unstaged.
 
 ## Agent task template
