@@ -37,6 +37,12 @@ and host, with unchanged owner-delegated targets and financial/identity audits.
 This is bounded simulator evidence, not a production capacity SLO or release
 security clearance.
 
+P8-T15's [two-replica failure/recovery drills](docs/operational-drills.md) pass
+broker/DB interruption, worker kill and stale-result fencing, real slow-receiver
+retry, monitoring outage/fresh scrape recovery and graceful rolling restart.
+Financial/history/HMAC audits pass; observed rolling GET transients remain
+explicit, not a zero-downtime or multi-host HA claim. Security release stays blocked.
+
 ## Implemented flow
 
 ```text
@@ -304,8 +310,8 @@ retaining trusted TLS/IP-SAN, signing and deadlines. P8-T10 adds the reviewed
 auth/ingress controls below. P8-T11/T12 add dependency/image security gates and
 verified-artifact packaging; findings still block release. P8-T13 adds isolated
 staging and P8-T14 verifies the declared load/stress/30-minute soak workload.
-Multi-instance failure drills, backup/restore acceptance and final operational
-runbooks/exit gates remain pending.
+P8-T15 verifies bounded two-instance operational failure drills. Backup/restore
+acceptance and final operational runbooks/exit gates remain pending.
 The functional simulator MVP is not a claim of
 production readiness, real payment processing, guaranteed cross-event ordering,
 or exactly-once external HTTP delivery. Endpoint re-enable, dual-secret grace,

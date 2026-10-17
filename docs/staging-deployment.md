@@ -185,6 +185,12 @@ uses global prune or deletes development volumes. Do not copy its destructive
 `down --volumes` cleanup to a retained environment. Docker/host administrators
 remain trusted; external retained-stage provisioning is out of scope.
 
+The later [P8-T15 operational drills](operational-drills.md) separately verify
+two-instance broker/DB/process/monitoring failure and same-image rolling restart
+on this unchanged artifact/configuration. They retain source/attempt history and
+record actual transients; they do not turn this T13 functional checkpoint into
+host HA, zero-downtime deployment, backup/restore or release security clearance.
+
 ## Evidence checkpoint
 
 2026-10-17: **implementation/runtime verified; security release BLOCKED**.

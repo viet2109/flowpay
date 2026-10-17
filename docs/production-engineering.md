@@ -932,6 +932,17 @@ stale/slow HTTP, rolling restart and monitoring outage. Financial snapshots and
 eventual recovery evidence accompany durations; a timeout is not automatically
 a known provider failure. External HTTP duplicates remain possible.
 
+T15's [verified operational drills](operational-drills.md) now pass eight real
+two-replica cases on the unchanged T13 artifact, with134 focused script controls
+on Windows/Linux. Actual source commits, original-event deduplication, DB snapshot
+preservation, survivor lease recovery/stale-attempt fencing, real retry, fresh
+post-outage scrapes and graceful rolling restart are checked. Final9 payments/
+refunds yield18 balanced unique postings,36 public events/18 delivered
+subscriptions and21 retained attempts. Rolling records230 successful reads and
+6 explicit transients: this is not zero-error availability or host/provider HA.
+All owned resources are cleaned. No financial-state repair, runtime tuning,
+new Java/full-gate claim, T14 performance reapproval or security waiver occurs.
+
 T16 freezes RPO/RTO/cadence/confidentiality/retention targets at task entry before
 an acceptance restore drill. Restore into a separately named validated target.
 Preserve consistent PostgreSQL snapshots, broker definitions/durable state and
