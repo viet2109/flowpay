@@ -11,16 +11,21 @@ verified on 2026-10-15, with security acceptance BLOCKED by unwaived baseline
 findings. P8-T12 adds the verified-artifact image and isolated runtime/recovery
 gates; its acceptance is recorded in [container runtime](container-runtime.md).
 P8-T13–T16 staging/load/failure/restore evidence and P8-T17 verified operational
-runbooks are now recorded below. Phase8 remains IN PROGRESS; T18 final gates
-are in progress. Approved dependency/image remediation and bounded source review
-pass their scans; final current-source/committed attestation remains open.
+runbooks are now recorded below. **Phase8 is DONE/FROZEN as of2026-10-18** for
+the selected disposable Linux/container simulator scope. T18 local operational,
+clean-committed source/preflight and hosted verification/security gates pass.
+Approved dependency/image remediation and exact expiring source reviews remain
+explicit; no real-secret waiver or automatic renewal exists.
 Phase7 remains DONE/FROZEN; the
 simulator functional MVP remains complete.
 
 The [T18 exit audit](production-exit-audit.md) separates the fresh final
 verification/security results from historical operational proofs and the new
-artifact's rejected workload preflights. This is an incomplete exit gate,
-not a documentation freeze or an authorization to deploy.
+artifact's rejected workload preflights. The accepted implementation is
+`43ae0f3f26ecb36f5bead93133752e2b683b05e8`, verified by
+[run39110490452](https://github.com/viet2109/flowpay/actions/runs/39110490452).
+Documentation freeze changes no executable/CI/build inputs. This is not an
+authorization to merge, publish an image, select paid services or deploy.
 
 This tracked document records shared scope and decision gates. The detailed
 `phase-8-production-engineering.md` assignment plan is a local-only companion,
@@ -1030,7 +1035,7 @@ Phase 8 is DONE/FROZEN only after T18 verifies all required outcomes and residua
 risks for the selected lab. That does not authorize cloud deployment, guarantee
 exactly-once/ordered delivery, imply real-money readiness or permit a next phase.
 
-### T18 current exit attempt (2026-10-17)
+### T18 historical exit attempt (2026-10-17)
 
 The [exit audit](production-exit-audit.md) is BLOCKED, not a freeze. Fresh final
 verification passes1,407 tests/196 required suites without failures/errors/skips;
@@ -1091,5 +1096,7 @@ passes with exact persisted snapshots unchanged.215 offline controls pass on
 Windows/pinned Linux. Final dedicated native/network/alert/ingress and full
 source/dependency repetitions now also PASS, including current expiry metadata.
 Clean-committed security/preflight must be generated after the candidate commit;
-GitHub-hosted execution has not occurred on the
-unpublished branch. See the linked dated reports, not historical approvals.
+At that checkpoint GitHub-hosted execution had not occurred on the unpublished
+branch. This historical checkpoint is superseded by clean43ae0f3 security and
+successful hosted run39110490452. Phase8 is now DONE/FROZEN in the selected lab
+scope; see the exit audit for acceptance and separate external-release limits.

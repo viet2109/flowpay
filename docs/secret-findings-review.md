@@ -1,5 +1,18 @@
 # P8-T18 source secret-finding review
 
+## Final accepted checkpoint (2026-10-18)
+
+Clean43ae0f3 full source security PASSes with235 components, zero SAST/advisory
+matches and10 total/10 exactly accepted/zero unreviewed detector rows. Canonical
+LF/strict-span controls pass natively;228 offline controls pass on Windows and
+pinned Linux. Both hosted jobs pass in
+[run39110490452](https://github.com/viet2109/flowpay/actions/runs/39110490452).
+The [exit audit](production-exit-audit.md) closes Phase8 in the selected lab
+scope, not public deployment. The chronological review checkpoints below retain
+their original restrictions and rejected attempts. Approval scope, all five
+whole-file identities, scanner/config and exclusive2026-11-16T18:22:02Z expiry
+remain unchanged; no new finding, `.env` or image-secret waiver is accepted.
+
 ## Decision and authority
 
 2026-10-18: the owner authorized continuing the individual finding review after

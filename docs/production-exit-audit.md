@@ -2,6 +2,57 @@
 
 ## Decision and scope
 
+**2026-10-18: Phase8 DONE/FROZEN for the selected disposable Linux/container
+simulator baseline.** All required implementation, operational and hosted gates
+pass. The accepted executable/CI source is
+`43ae0f3f26ecb36f5bead93133752e2b683b05e8`;
+[GitHub run39110490452](https://github.com/viet2109/flowpay/actions/runs/39110490452)
+completed SUCCESS with both `verify` and `supply-chain` successful.
+Its full verification, exact-artifact image build, native runtime/recovery,
+fresh/Phase7 staging and image inventory/secret/vulnerability steps all pass.
+
+| Final evidence group | Accepted scope |
+|---|---|
+| Java/architecture/migrations/financial compatibility | Local clean1,407 tests/196 required suites, zero failures/errors/skips; unchanged build/test input identity; hosted full verification also passes |
+| Gate regressions and privacy/portability |228 controls on Windows/pinned Linux; UID1001 native scanner/cache controls and canonical LF/strict exact spans pass |
+| Source security | Clean43ae0f3,235 Maven components, zero SAST/advisory matches;10 total/10 exactly reviewed/zero unreviewed findings, current exclusive expiry and all canary/DB controls pass |
+| Application image | Exact local build/runtime/scan passes;301 components, zero HIGH/CRITICAL/UNKNOWN and application-secret findings;94 MEDIUM/41 LOW/9 NEGLIGIBLE retained |
+| Staging/egress/monitoring/ingress | Both local fresh/Phase7 cases, dedicated DNS/dual-stack/TLS/bypass, alert fixtures/dashboard/trace/outage/recovery and real-app ingress pass; hosted runtime/staging also pass |
+| Performance | Independent declared/calibrated/approved full30-minute soak; regular route budgets and zero regular drops/429; stress13 drops/96 limits retained, no maximum-capacity claim |
+| Two-instance failures | All eight cases and whole-project invariants pass; rolling270 successful reads/7 transients, no zero-downtime claim |
+| Restore/runbooks | Matched/mismatch101.40/110.38s against900s lab RTO; full DB/schema/sequence/key/history/HMAC and unchanged read-only rehearsal pass |
+| Cleanup/protected paths | Owned lab/scanner resources removed; no dev state or `.env` adopted; phase/index/agent/env paths absent from outgoing history |
+
+The measured local JAR remains
+`3212f15b52fb36ef9c967cb05e49b8bf897b822c0fa19b7424225f1c657be0d7`;
+image `sha256:951f5e3b2cc9124eb35af64c9969a8a3999884a9b05484e9c79e533ab6bbb993`.
+Build/test input identity is
+`8d0e1567010aef79ad156cbb953fc542219d49c361877cff016c5257c10d0e11`.
+The hosted rebuild has its own runner-generated artifact/report identities:
+its passing CI is not a transfer of the local exact performance approval.
+Prior declarations and rejected/interrupted reports stay historical, never
+joined, relabeled or rewritten to manufacture acceptance.
+
+Clean43ae0f3 source report SHA-256 is
+`85d272b421c921460c50c8454a32b20278005ac28056e31a1bd43a41c86079a1`;
+the corrected UID1001 image scan is
+`b3644d463eddfd82ab0e57161ee39b07383627c63d1b5d458faff6142c2b719f`.
+Local preflight passes. The final documentation-only freeze changes no Java,
+POM, wrapper, Dockerfile, CI/scanner, migration, runtime config or workload input.
+After its commit, regenerate the full source security report and read-only
+preflight for actual clean HEAD; generated reports, not prospective wording,
+record that post-commit outcome. A final hosted status report separately records
+any automatic documentation-commit run. Do not hand-edit acceptance metadata.
+
+Owner authority includes only phase-branch publication and CI observation, plus
+the specifically approved existing remediation/exact false-positive metadata.
+It does **not** include merge into main, image publication, cloud deployment,
+purchases, real money, next-phase work or real queue/data repair. Retained/public
+release remains **NO-GO** for the unprovisioned conditions below. Source reviews
+expire exclusively2026-11-16T18:22:02Z and are not automatically renewed.
+
+### Earlier hosted and local checkpoints (history, superseded above)
+
 Hosted continuation: the owner subsequently approved publishing only the phase
 branch. Commit4fa6d30 is published, not merged. Run39105546749 passes full Java,
 build/runtime and staging but fails both source/image scan steps. Local passes
@@ -55,7 +106,7 @@ no provider selected. This audit does not authorize push/merge, retained/public
 deployment, purchases, real-money processing or a new phase. The independent
 [release checklist](release-checklist.md) remains NO-GO.
 
-## Current source checkpoint and post-commit procedure
+## Earlier source checkpoint and post-commit procedure
 
 The real full security invocation at2026-10-18T03:17:45.482371Z passes all
 controls/severity policy over851 tracked/intent-to-add files. Its report hash is
@@ -214,7 +265,7 @@ it is not a fresh T18 operational pass.
 
 | Criteria | Source / evidence and disposition |
 |---|---|
-| Phase7 frozen, remote baseline, branch and outgoing paths | Fetch confirms0 behind/17 ahead of `origin/main`; V001–V011 match merged `0b96400` after LF normalization; protected outgoing paths0 |
+| Phase7 frozen, remote baseline, branch and outgoing paths | Current phase branch retains merged Phase7 baseline; V001–V011 match `0b96400` after LF normalization; protected outgoing paths0; later task commits are audited separately |
 | Safe prod startup, private management, live/ready outage semantics | Current full production configuration/management tests pass; final-image native runtime/staging results remain separate gates |
 | Financial/Idempotency/async metrics, after-commit accounting, bounded labels | Current business/operational integration/catalog tests cover rollback, replay, provider UNKNOWN and telemetry failure; metrics are not financial truth |
 | Shared DB gauges and telemetry cardinality/context isolation | Current sampler/catalog/tracing regressions preserve stale/unknown semantics, no cross-replica sum or sensitive labels |
@@ -223,15 +274,15 @@ it is not a fresh T18 operational pass.
 | Monitoring reproducibility and alert firing/resolution | Final verified-JAR/reviewed-JRE native config/rule/dashboard/trace/outage/recovery repetition passes; external notification delivery is not rehearsed |
 | Effective destinations, DNS rebinding, TLS, redirects and bypass | Final dedicated verified-JAR/matching-test-class real-network fixture passes all unchanged DNS/dual-stack/TLS/ACL/bypass controls; staging/image evidence remains independently bound |
 | Auth/tenant/CSRF/CORS/abuse review | T10 approved marker/closed auth preflight/TCP-peer budgets remain implemented and covered by the current full suite; no cross-origin FE or global quota is added |
-| Tracked CI and required infrastructure | Workflow/actionlint and local mandatory coverage pass; no GitHub-hosted workflow, required-check setting or branch-protection acceptance has run on this unpublished phase |
-| Source/dependency/secrets/image scanning and SBOM | Initial failures below remain historical; approved remediation/bounded source review pass scans. New complete source-expiry metadata and clean-commit attestation remain required |
+| Tracked CI and required infrastructure | Both hosted jobs and every required step PASS in run39110490452 at43ae0f3; workflow/actionlint/local mandatory coverage pass; owner-side required-check/branch-protection configuration is not modified |
+| Source/dependency/secrets/image scanning and SBOM | Canonical LF/exact approved spans, full source/dependency and application-image gates, canaries/DB controls and clean-source/preflight PASS; no real-secret waiver or policy relaxation |
 | Non-root runtime, graceful worker/key recovery | Current build/runtime/application-resource scan and application-image severity gate pass. Vendor-binary/history secret-freedom is not claimed |
 | Isolated Linux staging, private persistence, bindings/DLQs, upgrade/rollback | Both current final-image fresh/Phase7 cases pass with complete owned cleanup; no schema downgrade, historical-binary rollback, production firewall or capacity claim |
 | Declared load/soak targets | New independent declared/calibrated/approved candidate acceptance passes full30-minute soak and financial/HMAC/cleanup audits;13 stress drops/96 limits remain explicit, no maximum-capacity claim |
 | Two-instance failure/concurrency/restart | New candidate passes all eight cases and cleanup;270 rolling reads succeed/7 transients, not zero downtime |
 | DB/broker/key restore, mismatch fencing, measured RPO/RTO | New candidate matched/mismatch restores pass101.40/110.38s with all19-table/sequence/schema/key/replay audits; off-host operating RPO still unprovisioned |
 | Actionable runbooks, read-only rehearsal and mutation authority | New candidate native read-only/409/unchanged-history/HMAC/cleanup rehearsal passes. No new DEAD exhaustion, real DLQ replay, key rotation or repair is authorized |
-| Accurate docs, target/residual limits, protected files, final phase decision | Stale pending-task wording is corrected; financial/domain/database/API contracts need no change. Final acceptance/freeze remains BLOCKED; local-only plans/index/agent/env stay out of history |
+| Accurate docs, target/residual limits, protected files, final phase decision | DONE/FROZEN for Linux/container simulator lab after all required gates PASS; financial/domain/database/API contracts need no change. External release remains NO-GO; local-only phase/index/agent/env stay out of history |
 
 ## Measured limits and remaining operator conditions
 
@@ -257,24 +308,14 @@ runtime/migration DB least-privilege acceptance. Infrastructure-image security
 is not established by scanning only the application image. No service/account
 or frontend is provisioned, and real-money processing remains out of scope.
 
-## Required continuation
+## Closure and future changes
 
-1. The owner subsequently approved scoped dependency/base-image remediation;
-   see the [review and new candidate status](dependency-security-review.md).
-   The preceding gate ledger remains historical pre-remediation evidence.
-   Review the public
-   advisory matches and compatibility of dependency/base-image fixes without
-   assuming an exception or changing correct fixtures to hide detection.
-   Review the two unclassified initial native rejections as test-stability
-   evidence; successful repetitions do not by themselves diagnose them.
-2. Verify the reviewed candidate with fresh full/source/image gates; commit
-   only task-scoped source/docs. A dirty or different committed candidate needs
-   its own security evidence. Never include local phase/index/agent/env files.
-3. New artifact/host declarations, calibration/approval, full30-minute load,
-   two-instance failures and actual DB/broker/key restores now pass as recorded
-   above. Preserve their history and real report hash chain; any future changed
-   artifact/host/workload requires its own review, not weaker targets.
-4. Dedicated native network/alert/ingress and runbook repetitions also pass.
-   Run the real clean-committed source/preflight checkpoint, then observe hosted
-   required CI after separately approved branch publication. Only all required
-   accepted evidence can allow Phase8 DONE/FROZEN. Release needs separate authority.
+All required Phase8 implementation outcomes are accepted above. Preserve the
+actual hash chain, owner approvals and rejected/interrupted history. Initial
+unclassified native startup/Grafana rejections remain stability limitations;
+later success is not a diagnosis of their causes. Any future changed executable,
+artifact/host/workload or expired security evidence needs proportionate new
+verification/review, not copied approvals or weaker targets. Documentation-only
+freeze uses unchanged application/CI inputs and its own actual clean-source
+attestation. Real/public deployment needs the independent checklist and new
+authority; no new phase is started by this freeze.

@@ -325,8 +325,11 @@ candidate with those historical proofs and independently required gates. The
 failure cases, matched/mismatch restores and read-only runbook rehearsal with
 passing financial/HMAC/cleanup audits. Stress drops/429 and rolling transients
 remain explicit. Final native/source/clean-commit and hosted-CI evidence are
-separate, not inferred from these operational passes. The audit
-records no security waiver, public deployment or phase freeze.
+separate, not inferred from these operational passes. Both hosted CI jobs and
+clean-committed source/preflight now pass. Phase8 is DONE/FROZEN as of2026-10-18
+for the Linux/container simulator baseline. Exact expiring source false-positive
+reviews are not real-secret waivers. The audit authorizes no public deployment,
+main merge, image publication, paid service or new business phase.
 
 Completion is evidence-bound to the selected staging target. It does not imply
 real-money readiness, an unspecified cloud deployment, exactly-once HTTP or

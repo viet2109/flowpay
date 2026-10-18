@@ -6,17 +6,18 @@ double-entry accounting, and reliable event delivery. It uses controllable
 Payment/Refund provider simulators; it does not process real money or store card
 data.
 
-Phases 0–7 are complete; Phase 7 Webhooks is DONE/FROZEN as of 2026-10-04 after
-its clean quality gate. The functional simulator MVP is complete. Phase 8
+Phases 0–8 are complete. Phase 8 is **DONE/FROZEN as of2026-10-18** for the
+selected Linux/container simulator baseline. Phase 7 remains frozen as of
+2026-10-04. The functional simulator MVP is complete. Phase 8
 production engineering has completed P8-T01's baseline/design, P8-T02's
 production configuration/management/probes, P8-T03's business metrics and
 P8-T04's asynchronous operational metrics, P8-T05's synchronous tracing and
 P8-T06's durable Outbox trace context and P8-T07's consumer/delayed-worker tracing,
 P8-T08's monitoring lab, P8-T09's Webhook egress and P8-T10's approved auth/ingress
 protections. T11–T17 also provide image/staging gates, measured load/recovery
-evidence and operational runbooks. P8-T18 final acceptance is in progress;
-the final committed-source/hosted-CI gates remain separate and Phase 8 is not
-DONE/FROZEN. See the dated exit audit for current versus historical evidence.
+evidence and operational runbooks. P8-T18's artifact-bound local gates and
+[hosted CI](https://github.com/viet2109/flowpay/actions/runs/39110490452) pass.
+This freeze does not provision public hosting or authorize merge/deployment.
 
 P8-T11 adds [CI verification and supply-chain gates](docs/ci-supply-chain.md).
 The initial security gates blocked baseline findings. The owner later approved
@@ -24,7 +25,7 @@ dependency/base-image remediation and seven exact, expiring source false-positiv
 reviews, not a real-secret waiver. Source/image scans passed; final source
 re-attestation includes current review-expiry metadata; require the post-commit
 generated security/preflight reports to match clean HEAD.
-CI adoption does not publish/deploy anything or complete Phase 8.
+CI does not publish images or deploy the application.
 
 P8-T12 adds a [verified-artifact runtime image](docs/container-runtime.md) and
 isolated restart/API-to-Ledger/Webhook gates. Runtime success is separate from
@@ -37,8 +38,9 @@ external keys and fresh/Phase7 upgrade/recovery checks. It does not provision
 hosting or override blocked release security gates.
 
 P8-T14's [load/stress/soak harness](docs/load-testing.md) passes independent
-warmup/steady/peak/stress/30-minute soak acceptance on the frozen T13 artifact
-and host, with unchanged owner-delegated targets and financial/identity audits.
+warmup/steady/peak/stress/30-minute soak acceptance, including a new independent
+run on the final remediated artifact/declared host, with unchanged owner-delegated
+targets and financial/identity audits. Stress13 drops/96 policy limits remain explicit.
 This is bounded simulator evidence, not a production capacity SLO or release
 security clearance.
 
@@ -46,7 +48,7 @@ P8-T15's [two-replica failure/recovery drills](docs/operational-drills.md) pass
 broker/DB interruption, worker kill and stale-result fencing, real slow-receiver
 retry, monitoring outage/fresh scrape recovery and graceful rolling restart.
 Financial/history/HMAC audits pass; observed rolling GET transients remain
-explicit, not a zero-downtime or multi-host HA claim. Security release stays blocked.
+explicit, not a zero-downtime or multi-host HA claim. External release remains NO-GO.
 
 P8-T16's [backup/restore lab](docs/backup-restore.md) encrypts consistent DB/cold
 broker data and key material separately, restores into new empty projects, and
@@ -62,8 +64,8 @@ approval boundaries. Native diagnosis/rejected-retry checks preserve persisted
 history; no automatic repair/replay or deployment authorization is added.
 
 P8-T18's [exit audit](docs/production-exit-audit.md) records the fresh final
-verification and independently artifact-bound acceptance. Phase8 remains
-IN PROGRESS; a passing Java suite is not a release or documentation freeze.
+verification and independently artifact-bound acceptance. Phase8 is DONE/FROZEN
+for the stated lab scope; public/retained deployment remains a separate NO-GO.
 The owner subsequently approved [dependency/base-image security remediation](docs/dependency-security-review.md),
 without exceptions or fixture suppression; acceptance of that new candidate is
 separate from the earlier evidence.
@@ -71,9 +73,11 @@ After individual review, the owner also approved
 [bounded source false-positive acceptance](docs/secret-findings-review.md#approved-bounded-false-positive-acceptance)
 for seven exact test/doc locations only, with content/scanner binding and expiry.
 The full security gate now passes with10 total/10 accepted/zero unreviewed
-source findings;203 control tests pass on Windows/Linux.
-Real/new findings and image secrets remain blocking; Phase8 final acceptance
-is still separate and incomplete.
+source findings;228 control tests pass on Windows/Linux. Canonical LF snapshots
+bind both exact approved detector spans without discarding findings or changing
+the seven reviewed positions, file identities or expiry.
+Real/new findings and image secrets remain blocking. The source reviews expire
+exclusively2026-11-16T18:22:02Z; phase completion is not perpetual security clearance.
 
 ## Implemented flow
 
@@ -348,8 +352,8 @@ P8-T15 verifies bounded two-instance operational failure drills. P8-T16 implemen
 isolated encrypted backup/restore and approved original-event mismatch recovery.
 P8-T17 verifies operational runbooks/read-only rehearsal. T18 final exit gates
 include fresh passing local source/image/runtime/staging/load/failure/restore/
-runbook and network/monitoring checks. Clean-committed attestation and hosted CI
-must be verified separately; external operational prerequisites still block deployment.
+runbook and network/monitoring checks. Clean-committed source/preflight and hosted
+CI also pass independently; external operational prerequisites still block deployment.
 The functional simulator MVP is not a claim of
 production readiness, real payment processing, guaranteed cross-event ordering,
 or exactly-once external HTTP delivery. Endpoint re-enable, dual-secret grace,

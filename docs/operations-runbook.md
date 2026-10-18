@@ -12,8 +12,9 @@ a retained deployment. Retained/public release remains **NO-GO**; this runbook
 cannot authorize deployment or waive independent gates. P8-T18's reviewed
 source/image security gates currently pass with the bounded
 [source false-positive acceptance](secret-findings-review.md#approved-bounded-false-positive-acceptance),
-not a real-secret waiver. Final operational repetitions now pass; committed-source
-and hosted-CI checkpoints remain separate. See the [exit audit](production-exit-audit.md). The dated T17
+not a real-secret waiver. Final operational, clean-committed source/preflight
+and hosted-CI checkpoints now pass independently; Phase8 is DONE/FROZEN for the
+lab, not externally deployed. See the [exit audit](production-exit-audit.md). The dated T17
 rehearsal below is historical; the current candidate repetition is recorded next.
 
 ### P8-T18 final-candidate rehearsal — PASS (2026-10-18)

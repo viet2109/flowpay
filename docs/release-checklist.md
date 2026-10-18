@@ -7,8 +7,9 @@ passing operational checks is not a public API deployment, real-money readiness
 or phase completion. The repository owner must name the exact environment,
 incident/release approver, access route and rollback/cutover authority before
 approving any release. No provider/domain/registry/paid account is provisioned;
-no frontend or admin console is implied. T18's final gates are in progress;
-no final acceptance or documentation freeze is declared.
+no frontend or admin console is implied. P8-T18 is DONE/FROZEN as of2026-10-18
+for the disposable Linux/container simulator scope after final local and hosted
+gates pass. This is not satisfaction of the independent external-release gates below.
 
 See the [T18 exit audit](production-exit-audit.md) for the current candidate,
 clean committed-source requirement and final-artifact operational results. The
@@ -25,6 +26,11 @@ mutations. Keep source/image evidence current and attributable to the actual
 candidate. Never tick a box because an older report exists or a tool was absent.
 
 ## Mandatory go or no-go gates
+
+The unchecked decisions below apply to a future retained/external target and
+its then-current artifact/evidence, not outstanding Phase8 lab tasks. Final
+accepted lab evidence is recorded in the exit audit; it does not select a
+production environment or authorize deployment.
 
 - [ ] Owner selects/provisions the retained target, trusted TLS/DNS/ingress and
   restricted operator access. No public management/DB/broker listeners or
@@ -121,7 +127,7 @@ safe artifacts; reports in `target/ci-safe` are not committed secret archives.
 | T18 [failure repetition](operational-drills.md) | All eight two-instance cases; worker/stale recovery39.69/39.66s; rolling270 successes/7 transients | Single host, no zero-error rollout or provider crash reconciliation |
 | T18 [restore repetition](backup-restore.md) | Cold/mismatch101.40/110.38s;19-table/sequence/schema/key/HMAC/trace/history audits | RPO target24h/RTO lab15m; no off-host schedule/retention/PITR or standing real-queue replay approval |
 | T18 [runbook repetition](operations-runbook.md) |215 Windows/Linux controls;25 links/source-contract checks; native read-only SQL/queue/health/metrics/dashboard history/409; exact snapshots unchanged; preflight records BLOCKED | No newly rehearsed DEAD202/exhaustion, real remediation/rotation/DLQ replay or deployment authority |
-| T18 [exit audit](production-exit-audit.md) | Exact final-image build/runtime/both fresh-Phase7 staging, load/failure/restore/runbook plus dedicated native network/alert/ingress and current full source passes; rejected attempts retained | Clean-commit security/preflight is a generated post-commit checkpoint; hosted CI has not run on this unpublished branch; phase not frozen |
+| T18 [exit audit](production-exit-audit.md) | Exact local artifact gates, clean canonical source/preflight and both hosted CI jobs PASS at43ae0f3;228 Windows/Linux controls; rejected attempts retained | DONE/FROZEN lab scope only; hosted rebuild is not a reapproval of performance-artifact identity; retained/public release stays NO-GO |
 
 The T17 command/link/privacy rehearsal is separate evidence of actionable
 diagnosis, not completion of these release gates. Phase8 is not declared DONE
@@ -135,15 +141,17 @@ python -B ops/runbooks/runbooks.py check
 python -B ops/runbooks/runbooks.py rehearse
 ```
 
-The T17 native rehearsal is deliberately bound to the historical T13 image via
-the recovery policy. After T18's new clean build it refuses that different image
-at entry; `check` still validates links/source/SQL/privacy contracts. Rebind and
-rehearse only through a reviewed real final-evidence chain, never by copying
-old passes or replacing the historical approval. See the exit audit above.
+The native rehearsal is bound to the active reviewed recovery policy, not a
+floating image. T18 preserved the original T13/T16 declarations and honestly
+rebound the active policy through the new accepted load/failure/restore report
+chain. Its new-image rehearsal now passes with full persisted snapshots unchanged.
+Future image changes still require their own reviewed real evidence chain, never
+copied passes or rewritten historical approvals. See the exit audit above.
 
 Follow [rehearsal scope and evidence](operations-runbook.md#rehearsal-and-evidence).
 These commands never deploy or bypass security. The final native rehearsal
-passed on2026-10-17 with owned cleanup; its artifact/command/report hashes and
-limits are recorded in the linked runbook. Unperformed hosted/external steps
-and T18 final acceptance remain open; security and deployment prerequisites
-are still NO-GO.
+passed again on2026-10-18 with owned cleanup; the earlier2026-10-17 result stays
+historical. Artifact/command/report hashes and limits are in the linked runbook.
+Hosted gates remain separately observable by run/commit, not inferred from this
+rehearsal. External deployment prerequisites and authority remain NO-GO even
+after a successful phase freeze.

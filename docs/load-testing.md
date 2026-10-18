@@ -131,8 +131,11 @@ Full Java verification is not rerun for unchanged application/build/test inputs:
 the remediated1,407-test/196-suite artifact remains exact.215 offline controls
 pass on Windows and pinned Linux, including18 fake-Docker preflight negatives.
 New two-instance failure, restore, runbook, dedicated native and full source
-repetitions also pass; their dated reports are separate. Require post-commit
-source attestation/release preflight and hosted CI; no phase freeze or push.
+repetitions also pass; their dated reports are separate. Clean43ae0f3 source
+attestation/release preflight and hosted run39110490452 subsequently PASS.
+Phase8 is DONE/FROZEN in the selected lab scope; see the
+[exit audit](production-exit-audit.md). No local performance approval transfers
+to an independently rebuilt hosted artifact, public deployment or different host.
 
 ## Scope and approval boundary
 

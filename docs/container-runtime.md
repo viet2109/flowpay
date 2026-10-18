@@ -52,8 +52,10 @@ on10 secret-format findings. Following owner-approved bounded source review,
 the full source/dependency gate now PASSes with10 total/10 accepted/zero
 unreviewed rows; image scanning does not use that acceptance mechanism. See the
 review for fingerprints and the preserved initial Grafana staging rejection.
-Clean committed release/final operational gates remain open; no phase freeze
-or deployment is authorized.
+The corrected canonical source scanner and reviewed LF metadata are tracked in
+[CI supply chain](ci-supply-chain.md); current artifact-bound operational passes
+and final hosted/freeze disposition are in the [exit audit](production-exit-audit.md).
+No deployment or image publication is authorized by these gates.
 
 ## Runtime contract
 

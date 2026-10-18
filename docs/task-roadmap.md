@@ -293,8 +293,15 @@ acceptance criteria, and the mandatory implementation order.
 
 ## Phase 8 — Production Engineering
 
-Status: `IN PROGRESS` as of 2026-10-17. Gate implementation and security
-acceptance are separate: P8-T11 is implemented, but its security gate is BLOCKED.
+Status: **`DONE/FROZEN` as of2026-10-18**, scoped to the selected disposable
+Linux/container simulator baseline. Final local/operational/clean-source gates
+and both jobs in [hosted run39110490452](https://github.com/viet2109/flowpay/actions/runs/39110490452)
+pass on implementation commit43ae0f3.228 controls pass on Windows/Linux;
+the1,407-test/196-suite Java artifact and all real DB/broker/migration/architecture
+gates remain verified. External deployment remains NO-GO and is not provisioned.
+
+The following task-checkpoint narrative is historical; the final table and
+exit audit supersede its old source/image-blocked statuses.
 
 Completed: P8-T01 baseline/design, P8-T02 production configuration, health and
 management security, P8-T03 Payment/Refund/Idempotency metrics, P8-T04
@@ -356,14 +363,14 @@ only with the user's explicit P8-T11 approval.
 | P8-T08 | Monitoring Stack, Dashboards and Alerts | P8-T02, P8-T03, P8-T04, P8-T05, P8-T06, P8-T07 | DONE |
 | P8-T09 | Webhook SSRF, DNS-Rebinding and Egress Protection | P8-T01, P8-T02 | DONE |
 | P8-T10 | API and Authentication Security Review | P8-T01, P8-T02 | DONE |
-| P8-T11 | CI Verification and Supply-Chain Gates | P8-T01, P8-T10 | DONE (gates); security BLOCKED |
-| P8-T12 | Production Container Image | P8-T02, P8-T11 | IMPLEMENTED/runtime verified; security BLOCKED (not fully accepted) |
-| P8-T13 | Isolated Linux Staging Deployment | P8-T08, P8-T09, P8-T10, P8-T11, P8-T12 | IMPLEMENTED/runtime verified; security BLOCKED (not fully accepted) |
-| P8-T14 | Load, Stress and Soak Verification | P8-T13 | DONE: independent steady/peak/stress/30-minute soak accepted on frozen host/artifact; security release remains BLOCKED |
-| P8-T15 | Multi-Instance and Operational Failure Drills | P8-T13, P8-T14 | DONE: eight owned two-replica failure/recovery drills and financial/history audits pass; release security remains BLOCKED |
-| P8-T16 | Backup, Restore and Disaster-Recovery Drill | P8-T13, P8-T15 | DONE: encrypted isolated cold/mismatch restores, key/history/invariant audits and fixed lab recovery targets pass; off-host schedule unprovisioned, release security BLOCKED |
-| P8-T17 | Operational Runbooks and Release Checklist | P8-T08, P8-T13, P8-T14, P8-T15, P8-T16 | DONE: actionable approval-bound runbooks, NO-GO checklist and owned read-only command rehearsal; release security BLOCKED |
-| P8-T18 | Production Engineering Quality Gate and Documentation Freeze | P8-T01 through P8-T17 | IN PROGRESS: security PASS with owner-approved bounded source reviews; final-artifact operational/clean-commit gates pending; not DONE/FROZEN |
+| P8-T11 | CI Verification and Supply-Chain Gates | P8-T01, P8-T10 | DONE: canonical source/dependency gate and hosted CI PASS; exact expiring source reviews, no real-secret waiver |
+| P8-T12 | Production Container Image | P8-T02, P8-T11 | DONE: exact verified artifact, runtime/recovery, SBOM/image security PASS |
+| P8-T13 | Isolated Linux Staging Deployment | P8-T08, P8-T09, P8-T10, P8-T11, P8-T12 | DONE: final local and hosted fresh/Phase7 staging PASS; not public hosting |
+| P8-T14 | Load, Stress and Soak Verification | P8-T13 | DONE: final-artifact independent30-minute soak; stress13 drops/96 limits explicitly retained |
+| P8-T15 | Multi-Instance and Operational Failure Drills | P8-T13, P8-T14 | DONE: all eight cases, financial/history/HMAC audits PASS; rolling270 successes/7 transients, single host |
+| P8-T16 | Backup, Restore and Disaster-Recovery Drill | P8-T13, P8-T15 | DONE: final matched/mismatch restores101.40/110.38s, key/history/HMAC audits PASS; off-host schedule unprovisioned |
+| P8-T17 | Operational Runbooks and Release Checklist | P8-T08, P8-T13, P8-T14, P8-T15, P8-T16 | DONE: final native read-only/unchanged-history rehearsal and explicit external-release NO-GO |
+| P8-T18 | Production Engineering Quality Gate and Documentation Freeze | P8-T01 through P8-T17 | DONE/FROZEN: required local, operational, clean-source and hosted gates PASS; lab scope/residual risks explicit |
 
 See the tracked [production-engineering design record](production-engineering.md)
 for frozen scope and implementation gates, and the local
@@ -972,8 +979,11 @@ severity policy. Native LF reproduction isolates the unchanged test setting's
 two detector spans28–28/28–29. The owner approved canonical LF snapshots and
 exact span metadata, retaining all ten rows/seven source positions/five file
 identities, scanner/config and the original exclusive expiry. No row is
-deduplicated and no finding is accepted by tolerance.228 Windows controls pass;
-canonical native/Linux and new hosted acceptance remain required.
+deduplicated and no finding is accepted by tolerance.228 controls now pass on
+Windows and pinned Linux; canonical native scans, clean43ae0f3 security/preflight
+and hosted run39110490452 PASS. These supersede the historical pending
+checkpoints above. Phase8 is DONE/FROZEN for the selected lab scope; branch
+publication is not main merge, image publication or deployment.
 
 ## Agent task template
 

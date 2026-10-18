@@ -1,5 +1,19 @@
 # CI verification and supply-chain gates
 
+## Final Phase 8 checkpoint (2026-10-18)
+
+Phase8 is DONE/FROZEN for the disposable Linux/container simulator scope.
+Accepted executable/CI commit43ae0f3 passes both jobs in
+[run39110490452](https://github.com/viet2109/flowpay/actions/runs/39110490452).
+228 offline controls pass on Windows and pinned Linux; full native UID1001
+canonical source and image scans pass. Clean committed-source security and
+read-only release preflight pass independently. See the
+[exit audit](production-exit-audit.md) for artifact identities, operational
+evidence and retained/public-release NO-GO conditions. Subsequent documentation
+freeze runs are recorded separately in generated evidence. The chronological
+checkpoints below retain their original failures/pending decisions; they are
+not the current completion status. No merge, deployment or image publication.
+
 ## Authority and scope
 
 P8-T11 adopts the sole pre-existing user-owned `.github/workflows/ci.yml` with
@@ -123,7 +137,9 @@ five unchanged approved files, ten rows, detector identity and the original
 exclusive expiry. Only `source-fp-07` declares the two exact spans28–28 and28–29,
 one row each; both are required, not alternatives. No coordinate folding,
 deduplication, count tolerance, shifted location or additional finding is accepted.
-228 offline controls pass on Windows; canonical Linux/native validation follows.
+228 offline controls now pass on Windows and pinned Linux. Canonical native
+scans, clean committed-source attestation and the hosted run above also pass;
+the earlier portability/count failures are retained as historical evidence.
 
 Requirements: JDK 21, Python 3.11+, Git, Bash (Git Bash on Windows), Linux Docker daemon and outbound access
 to Maven Central, official release/image endpoints and the Grype database.
