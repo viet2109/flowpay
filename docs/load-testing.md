@@ -1,5 +1,139 @@
 # Load, stress and soak verification (P8-T14)
 
+## P8-T18 candidate reacceptance
+
+The original T14 manifest, proposal and owner approval are preserved verbatim
+(apart from checkout line endings) in `ops/load/history/t14/`. The historical
+measurements below apply only to that original artifact; they are not acceptance
+of the security-remediated candidate. Its reports were also preserved in an
+external local evidence backup before starting the new measurement chain.
+
+The active manifest now binds the remediated JAR/image and reviewed Dockerfile.
+The Docker VM currently reports 3,920,220,160 bytes RAM. A strict preflight
+rejected its 4,096-byte change after bootstrap cleanup; the active exact-host
+declaration was reviewed before a new calibration, not bypassed. Neither host
+differences nor artifact changes are
+silently accepted. All rates, routes, timeouts, retry/jitter, resource limits,
+numeric targets and the independent 30-minute soak are unchanged. Fresh
+calibration passed; the old approval was not used to start acceptance. Following
+the owner's delegated unchanged-target selection and request to continue, a new
+post-calibration binding was recorded before the new empty acceptance project.
+Do not reuse or edit historical result hashes.
+
+Earlier source and image scans passed with the separately documented bounded
+false-positive review; later release-time expiry metadata requires a fresh
+source scan. That does not establish performance, recovery, a clean
+committed release, external deployment, or a production SLO. Historical blocked
+security statements below describe T14, not the current security gate.
+
+### Fresh calibration and unchanged-target decision
+
+The remediated calibration ran 2026-10-17T18:48:45.039501Z through
+18:57:32.488864Z. Report SHA-256:
+`5e18faccf2c5362cd6bd8a357a221dddcb9119b5d07de7ad5a958f2238a111b7`;
+workload SHA-256:
+`5d25e9752a27b59a8dbf274c83d9d989a66a71481c96b422959c957151eb6ff8`.
+
+| Probe | Completed/started workflows | List queries | Policy429 | API aggregate p99(ms) | Outbox p99(s) | Webhook p99(s) | Drain(s) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| sanity | 2/2 | 4 | 0 | 160.47 | 0.97 | 20.06 | 16.20 |
+| calibration | 7/7 | 121 | 0 | 61.57 | 0.96 | 17.23 | 18.05 |
+| peak_probe | 16/16 | 226 | 0 | 55.55 | 10.79 | 35.15 | 29.13 |
+| stress_probe | 11/61 | 600 | 50 | 78.32 | 29.09 | 123.10 | 109.69 |
+
+All four probes have zero unexpected/contract errors and dropped iterations;
+financial/HMAC/identity/retry audits and owned cleanup pass. Sampled heap maximum
+is12.29%, pool pending0. These exploratory results are not acceptance or a new
+capacity/SLO claim. At18:57:47Z, after this completed calibration and before
+acceptance, the agent recorded the unchanged targets under the owner's existing
+delegation and continuation request. At that calibration checkpoint the
+independent acceptance was pending; no final load pass was inferred from probes.
+
+Rejected attempts are retained separately: bootstrap failed before workload;
+another diagnostic repetition identified RabbitMQ exit1 with OOMKilled=false,
+and an exact-host preflight rejected a4,096-byte MemTotal change. The final
+calibration's observational wrapper made no workload/timeout/resource change;
+it captured no broker failure because bootstrap succeeded. Neither the later
+pass nor a read-only projection racing final cleanup establishes the cause of
+the earlier broker exit. Retain this startup-stability limitation.
+
+### Interrupted acceptance and independent restart (2026-10-18)
+
+The first remediated acceptance reached soak but was interrupted without its
+final report. On continuation, its benchmark process was absent and all eleven
+owned containers were stopped: the completed one-shot topology exited0; ten
+services exited255 with OOMKilled=false. Their clustered final timestamps do
+not establish an application defect, OOM or the cause of interruption. No
+completed soak, capacity result or acceptance is inferred from partial output.
+
+Safe interruption report SHA-256:
+`a30e33b5b22e1ccf606cf3986f0938710dfbd0999f33e2e2ee28c7b75c4ffc13`
+(`target/ci-safe/load-acceptance-interrupted.json`). Exact UUID/image/labels and
+stopped state were revalidated before removing its11 containers,7 networks,
+5 volumes and one external synthetic-key/fixture directory. Absence was
+verified. That disposable fake data/keys cannot be recovered; bounded evidence,
+historical backups and the user's unread root `.env` remain untouched.
+
+The host still matches the existing calibrated exact declaration, so no host,
+approval timestamp or target was changed. A new canonical acceptance invocation
+starts from a different empty project and repeats every profile, including the
+full1,800-second soak; no time or samples are joined across attempts.212 gate
+controls passed separately on Windows and pinned Linux before subsequent
+native-script controls. At restart no final load pass was claimed;
+failure/restore/native/clean-committed gates remain separate.
+
+### Independent final-candidate acceptance — PASS (2026-10-18)
+
+The new empty-project run completed2026-10-18T01:57:42.811487Z through
+02:43:52.210688Z (about46m09s), including bootstrap, real retry/drain and owned
+cleanup. No time/samples from the interrupted attempt are reused. The unchanged
+thresholds and workload hash above still match the post-calibration approval.
+Safe report SHA-256:
+`1bcff0e7ea8ae5f461e2b4ccd421f438f4826ab375cf7c5538ad9248b09ff0bc`.
+
+| Profile | Complete/started workflows | List queries | Requests | Policy429 | Drops | Aggregate p95/p99(ms) | Outbox p99(s) | Webhook p99(s) | Drain(s) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| warmup | 4/4 | 30 | 66 | 0 | 0 | 136.25/164.25 | 0.78 | 17.54 | 18.27 |
+| steady | 13/13 | 241 | 358 | 0 | 0 | 79.00/144.15 | 1.01 | 17.38 | 17.60 |
+| peak | 41/41 | 601 | 970 | 0 | 0 | 100.55/167.62 | 24.93 | 87.13 | 61.60 |
+| stress | 24/120 | 1189 | 1956 | 96 | 13 | 70.00/331.10 | 40.77 | 253.59 | 221.06 |
+| soak | 181/181 | 3601 | 5230 | 0 | 0 | 27.00/47.00 | 2.58 | 17.18 | 18.13 |
+
+All profiles have zero unexpected/contract errors and pass financial/HMAC/
+identity/attempt audits. Every regular measured route meets its500ms p95/
+1000ms p99 budget: worst regular p95 is177.60ms (steady refund), worst p99
+263.80ms (peak confirm), not the query-dominated aggregate. Provider p99 upper
+bucket bounds remain10ms, not exact real-provider latency.
+
+Stress is explicitly **not normal-load capacity acceptance**:13 offered
+iterations were dropped and96 workflows stopped at the unchanged edge policy.
+Only24 of120 started financial workflows completed. All started/limited/dropped
+work reconciles, including duration-boundary arrivals; partial persisted work
+is audited, not erased or counted as a complete workflow. Existing approval
+already keeps stress drops/limits separate; no post-failure waiver, VU/resource/
+rate-limit increase, lowered offered rate, retry change or hidden call retry is
+used. The generator did not sustain every stress iteration, and backend maximum
+capacity is still not established. Do not advertise2 financial workflows/s.
+
+Soak generation lasted1801.90s with121 fifteen-second telemetry samples.
+Heap first-/last-third means74,119,650.4/74,388,509.6 bytes grew268,859.2 bytes
+(0.256MiB), below128MiB; this is not proof of no long-term leak. Sampled heap
+max12.45% across acceptance and pool pending0. The new soak's shared Webhook
+overdue gauge max is3.00s, but generation-window summaries do not establish
+that no alert fired during the complete stress/drain window; no notification
+timeline was collected. Operational alert thresholds are unchanged.
+
+Final audit:360 payments,349 successful confirmations,282 refunds,631 unique
+balanced postings,1,262 immutable events and3,786 delivered subscriptions.
+All owned project resources and temporary synthetic keys were removed and
+absence checked. Only bounded evidence remains; fake lab data is not recoverable.
+Full Java verification is not rerun for unchanged application/build/test inputs:
+the remediated1,407-test/196-suite artifact remains exact.215 offline controls
+pass on Windows and pinned Linux, including18 fake-Docker preflight negatives.
+New two-instance failure, restore, runbook, dedicated native and full source
+repetitions also pass; their dated reports are separate. Require post-commit
+source attestation/release preflight and hosted CI; no phase freeze or push.
+
 ## Scope and approval boundary
 
 This is a synthetic-only operational harness, not an external deployment,

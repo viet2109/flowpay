@@ -3,6 +3,7 @@ import base64
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import ssl
 import sys
@@ -12,6 +13,33 @@ import urllib.request
 
 TLS = ssl.create_default_context(cafile='/run/secrets/edge-cert.pem')
 EVENTS = ['payment.processing', 'payment.succeeded', 'payment.failed', 'refund.processing', 'refund.succeeded', 'refund.failed']
+
+
+def failure_label(error):
+    """Classify only fixed assertions; never publish inherited raw diagnostics."""
+    message = str(error)
+    fixed_owned = {'owned secure cookie policy failed', 'owned duplicate changed delivery state', 'owned unsupported phase'}
+    if message in fixed_owned or re.fullmatch(r'owned status expected [0-9]{3}, got [0-9]{3}', message) or re.fullmatch(
+            r'owned deadline: (readiness|success fanout|replica scrapes|duplicate broker drain)', message):
+        return message
+    fixed_monitoring = {
+        'Grafana failed', 'Grafana dashboard provisioning did not become ready',
+        'Dashboard provisioning differs from versioned JSON',
+        'Grafana datasource provisioning did not become ready', 'Datasource not provisioned',
+        'Required scrape targets unavailable', 'PromQL failed',
+        'Operational alert provisioning incomplete', 'Rule evaluation failed',
+        'Controlled business trace not retrievable', 'End-to-end trace ancestry is not yet exported',
+        'Sensitive fixture reached trace storage', 'Grafana trace proxy not ready',
+    }
+    if message in fixed_monitoring:
+        return 'owned monitoring: ' + message.lower()
+    for prefix, label in (
+            ('Expected metric not ingested: ', 'owned monitoring expected metric not ingested'),
+            ('Dashboard query not ready: ', 'owned monitoring dashboard query failed'),
+            ('Unexpected HTTP status on ', 'owned monitoring HTTP status mismatch')):
+        if message.startswith(prefix):
+            return label  # Do not echo expression/title/host/response/credential suffixes.
+    return 'owned staging assertion failed'
 
 
 def http(url, method='GET', body=None, headers=None, expected=200):
@@ -151,8 +179,7 @@ if __name__ == '__main__':
         main(sys.argv[1])
         print('PASS: owned staging phase ' + sys.argv[1])
     except AssertionError as error:
-        message = str(error)
-        print('FAIL: ' + (message if message.startswith('owned ') else 'owned staging assertion failed'))
+        print('FAIL: ' + failure_label(error))
         sys.exit(1)
     except Exception:
         print('FAIL: owned staging probe; raw body/credential/exception diagnostics withheld')

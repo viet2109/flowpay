@@ -34,7 +34,7 @@ services:
     mem_limit: 512m
     cpus: 1
   certificates:
-    image: eclipse-temurin:21.0.12.1_1-jre-jammy@sha256:8c2dddf1bb2a8455160f4e23080059de5003eddc5cb839130b177c6be0c2cfe0
+    image: eclipse-temurin:21.0.12.1_1-jre-jammy@sha256:8ecbec1f32912979c15b86aaf98f7082a77d318a7f92af3d9fe2c0fd2723df10
     entrypoint: [sh, /checks/init-tls.sh]
     volumes:
       - ../../egress/tests/init-tls.sh:/checks/init-tls.sh:ro

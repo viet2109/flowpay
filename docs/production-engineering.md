@@ -12,8 +12,15 @@ findings. P8-T12 adds the verified-artifact image and isolated runtime/recovery
 gates; its acceptance is recorded in [container runtime](container-runtime.md).
 P8-T13–T16 staging/load/failure/restore evidence and P8-T17 verified operational
 runbooks are now recorded below. Phase8 remains IN PROGRESS; T18 final gates
-are unstarted and security remains BLOCKED. Phase7 remains DONE/FROZEN; the
+are in progress. Approved dependency/image remediation and bounded source review
+pass their scans; final current-source/committed attestation remains open.
+Phase7 remains DONE/FROZEN; the
 simulator functional MVP remains complete.
+
+The [T18 exit audit](production-exit-audit.md) separates the fresh final
+verification/security results from historical operational proofs and the new
+artifact's rejected workload preflights. This is an incomplete exit gate,
+not a documentation freeze or an authorization to deploy.
 
 This tracked document records shared scope and decision gates. The detailed
 `phase-8-production-engineering.md` assignment plan is a local-only companion,
@@ -1022,3 +1029,67 @@ history. Existing dev volumes and pre-existing files remain untouched.
 Phase 8 is DONE/FROZEN only after T18 verifies all required outcomes and residual
 risks for the selected lab. That does not authorize cloud deployment, guarantee
 exactly-once/ordered delivery, imply real-money readiness or permit a next phase.
+
+### T18 current exit attempt (2026-10-17)
+
+The [exit audit](production-exit-audit.md) is BLOCKED, not a freeze. Fresh final
+verification passes1,407 tests/196 required suites without failures/errors/skips;
+focused controls and exact-image build/runtime pass. The staging probe adds only
+fixed privacy-safe diagnostic labels/four offline regressions after the first
+legacy monitoring rejection; no assertion or timeout is weakened. Both final-image
+fresh/Phase7 staging cases pass on repetition, with full native/financial/key/
+trace/restart and owned cleanup checks. The initial rejections remain recorded
+and their causes are not inferred from later success. Fresh complete
+source/dependency and application-image scans reach policy and fail with no
+exceptions. No scanner outage, fixture rewrite or security clearance is implied.
+Unchanged build inputs/uncompressed JAR contents do not override different ZIP/
+image hashes: load/failure/restore preflights reject the new artifact and no new
+long acceptance is claimed. Prior T13–T17 evidence stays separately attributable.
+Owner-reviewed security remediation and a real final-artifact evidence chain
+remain necessary. No runtime/API/schema/dependency/financial contract changed
+in this verification/probe-diagnostic/documentation checkpoint; no new phase or
+release authority.
+
+The owner subsequently approved existing dependency/base-image remediation,
+without exceptions or fixture suppression. See the [version/advisory review](dependency-security-review.md)
+for the Boot4.1.1 candidate, scoped component overrides, refreshed Java21/Jammy
+digest and new verification status. Earlier T18 gate outcomes above remain
+attributable to their pre-remediation artifact; no old operational approval is
+transferred to the changed candidate. Phase completion remains blocked.
+
+Reviewed-candidate checkpoint: full1,407 Java tests/196 required suites with no
+failure/error/skip;183 offline controls Windows/Linux; exact-image build, image
+security, native runtime and canonical Phase7/fresh staging PASS. Maven235
+components yield zero advisory matches; image301 components retain94 MEDIUM/
+41 LOW/9 NEGLIGIBLE with zero blocking severity. Source gate still FAILS on10
+secret-format findings. A first Grafana staging rejection is preserved; later
+diagnostic/canonical passes do not diagnose its cause. No deadlines, resource
+caps, retry schedules, security policy or historical operational approvals are
+changed. Final long load/failure/restore/runbook acceptance and clean committed
+release evidence remain open; there is no task-DONE commit, push or merge.
+
+On2026-10-18 the owner separately authorized bounded acceptance of the seven
+source false-positive locations after individual review. The
+[source review](secret-findings-review.md#approved-bounded-false-positive-acceptance)
+defines exact content/location/count/scanner binding, owner evidence and30-day
+exclusive expiry, without rewriting fixtures, weakening detector regexes,
+accepting real/new findings or extending the policy to image secrets. It records
+the current full security/control result; the preceding source rejection is
+historical. The new full source/dependency security gate PASSes with10 total/
+10 accepted/zero unreviewed findings, zero SAST/advisory matches and all native
+controls passed;203 offline controls pass on Windows/Linux. Actual release
+preflight now rejects dirty/uncommitted source. This CI-only acceptance does not rebind long operational evidence
+or establish a clean committed release or Phase8 completion.
+
+2026-10-18 operational continuation: the new declared/calibrated/approved
+candidate passes an independent full30-minute soak and all financial/HMAC/
+cleanup audits. Regular drops/429 are zero; stress13 drops/96 limits are not a
+maximum-capacity claim. Eight two-instance failure cases pass, retaining270
+rolling read successes/7 transients. Actual matched/mismatch restores pass
+101.40/110.38s against the unchanged900s lab target. Read-only runbook rehearsal
+passes with exact persisted snapshots unchanged.215 offline controls pass on
+Windows/pinned Linux. Final dedicated native/network/alert/ingress and full
+source/dependency repetitions now also PASS, including current expiry metadata.
+Clean-committed security/preflight must be generated after the candidate commit;
+GitHub-hosted execution has not occurred on the
+unpublished branch. See the linked dated reports, not historical approvals.

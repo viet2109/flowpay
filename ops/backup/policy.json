@@ -9,9 +9,9 @@
   "storage": "Encrypted data and key bundles in separate access-controlled off-host stores; decryption private keys held separately. Lab uses separate disposable external temporary directories; no off-host service or scheduler is provisioned.",
   "replay": "original-event-facts-isolated-lab-only",
   "rabbitNode": "rabbit@flowpay-backup-node",
-  "applicationImage": "sha256:a5c4c7ecbe6d888edad4eda95db786330a7ae412c1daf38470549165241f6275",
-  "jarSha256": "32874cf74c358f37137f9c88d3d7f613f85f146a1628f9604b45fcf38a6f8dc7",
-  "priorDrillSha256": "3b9b63e2f96bc64267ea21b099e3b9daf16ace7348bab584f0a6510316465c04",
+  "applicationImage": "sha256:951f5e3b2cc9124eb35af64c9969a8a3999884a9b05484e9c79e533ab6bbb993",
+  "jarSha256": "3212f15b52fb36ef9c967cb05e49b8bf897b822c0fa19b7424225f1c657be0d7",
+  "priorDrillSha256": "13f42a23270a47595abe8a9ea0b7b797f77524096a3ebbda3cdedadcc2d0c04e",
   "rtoClock": "From restore request before bundle authentication through DB/broker restore, startup, replay if approved, API replay and full drain/invariant audit; backup creation and subsequent negative/duplicate controls measured separately",
   "rpoClock": "Age of the consistent DB snapshot at simulated loss; exact checkpoint equality, not a claim to recover commits after the snapshot. No WAL/PITR."
 }

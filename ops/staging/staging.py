@@ -84,6 +84,7 @@ def release_check(evidence):
                          all(value.get('status') == 'passed' for value in report['cases'].values()),
                          'release blocked: fresh and Phase Seven staging checks required')
     source = gate.document(gate.SAFE / 'security.json')
+    gate.require_current_source_reviews(source, dt.datetime.now(dt.timezone.utc))
     commit, _ = gate.run(['git', 'rev-parse', 'HEAD'])
     changes, _ = gate.run(['git', 'status', '--porcelain', '--untracked-files=no'])
     gate.require(not changes and not source.get('trackedWorktreeDirty') and source.get('sourceCommit') == commit.decode().strip(),

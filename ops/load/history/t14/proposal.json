@@ -1,0 +1,24 @@
+{
+  "status": "SELECTED_UNCHANGED_UNDER_OWNER_DELEGATION",
+  "calibrationSha256": "59573d12ef57c9caa33a186b4e38fccdf3e71c4c3b105b27350b6938ecdfbda7",
+  "workloadSha256": "2c182ebc8b15069f38f5e728fe493b2343bfc660878c05825f2fd1ea5f9f42b3",
+  "calibrationCompletedAt": "2026-10-17T08:09:01.416807+00:00",
+  "history": "Numeric values are unchanged from the original proposal. Owner delegated selection; a 4096-byte host MemTotal mismatch required fresh calibration and renewed report/workload binding, not threshold relaxation.",
+  "thresholds": {
+    "apiP95Ms": 500,
+    "apiP99Ms": 1000,
+    "maxProviderP99Seconds": 0.05,
+    "maxUnexpectedErrors": 0,
+    "maxContractErrors": 0,
+    "maxDroppedIterations": 0,
+    "maxPolicyLimitedRegular": 0,
+    "maxDrainSeconds": 300,
+    "maxHeapRatio": 0.85,
+    "maxPoolPending": 2,
+    "maxOutboxP99Seconds": 60,
+    "maxWebhookP99Seconds": 300,
+    "maxSoakHeapGrowthBytes": 134217728
+  },
+  "scope": "Frozen one-replica Linux simulator workload only. Warmup is not steady-state latency; stress keeps policy limits/drops. No production SLO or security waiver.",
+  "acceptancePlan": "New project: warmup30s, steady120s, peak120s, stress60s, soak1800s, real drain/audits between profiles. Approval is recorded in acceptance.json under the owner's delegated target selection."
+}

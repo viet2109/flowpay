@@ -8,7 +8,12 @@ host_path() { if command -v cygpath >/dev/null 2>&1; then cygpath -am -- "$1"; e
 test -f "$FLOWPAY_JAR"
 test -d "$FLOWPAY_TEST_CLASSES"
 project="flowpay-egress-$(date +%s)-$$"
-test -z "$(docker ps -aq --filter "label=com.docker.compose.project=$project")"
+existing=$(docker ps -aq --filter "label=com.docker.compose.project=$project")
+test -z "$existing"
+existing=$(docker network ls -q --filter "label=com.docker.compose.project=$project")
+test -z "$existing"
+existing=$(docker volume ls -q --filter "label=com.docker.compose.project=$project")
+test -z "$existing"
 compose() { docker compose --env-file "$(host_path /dev/null)" -p "$project" -f "$(host_path "$root/ops/egress/tests/compose.yaml")" "$@"; }
 cleanup() {
   result=$?

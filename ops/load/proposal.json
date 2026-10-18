@@ -1,9 +1,9 @@
 {
   "status": "SELECTED_UNCHANGED_UNDER_OWNER_DELEGATION",
-  "calibrationSha256": "59573d12ef57c9caa33a186b4e38fccdf3e71c4c3b105b27350b6938ecdfbda7",
-  "workloadSha256": "2c182ebc8b15069f38f5e728fe493b2343bfc660878c05825f2fd1ea5f9f42b3",
-  "calibrationCompletedAt": "2026-10-17T08:09:01.416807+00:00",
-  "history": "Numeric values are unchanged from the original proposal. Owner delegated selection; a 4096-byte host MemTotal mismatch required fresh calibration and renewed report/workload binding, not threshold relaxation.",
+  "calibrationSha256": "5e18faccf2c5362cd6bd8a357a221dddcb9119b5d07de7ad5a958f2238a111b7",
+  "workloadSha256": "5d25e9752a27b59a8dbf274c83d9d989a66a71481c96b422959c957151eb6ff8",
+  "calibrationCompletedAt": "2026-10-17T18:57:32.488864+00:00",
+  "history": "Original T14 declarations are preserved in history/t14. Numeric targets and workload schedules are unchanged. Owner delegated target selection and asked to continue final acceptance. Fresh calibration binds the remediated candidate, reviewed Dockerfile and actual exact host after retained rejected bootstrap/host preflights; no threshold relaxation.",
   "thresholds": {
     "apiP95Ms": 500,
     "apiP99Ms": 1000,

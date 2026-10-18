@@ -186,12 +186,25 @@ The approval retains these implementation and verification constraints:
   HMAC/bypass gate on the final artifact and affected monitoring smoke. Only then
   accept/pin the transport/proxy, synchronize tracked design and commit T09.
 
-Selected Client **5.6.4** and Core/HTTP2 **5.4.4**, overriding Boot 4.1.0's
+Selected Client **5.6.4** and Core/HTTP2 **5.4.4**, originally overriding Boot 4.1.0's
 5.6.1/5.4.2 properties. Client includes the async SSL-parameter application fix;
 Core includes the stable async producer/reset fixes. Maven resolves exactly one
 Client/Core pair. No optional compression/auth/observability dependency is added
 or enabled. Auth, compression and wire logging are disabled; source/release
 review and negative TLS tests do not replace T11's repository-wide scanner gate.
+P8-T18's approved [security remediation](dependency-security-review.md) advances
+Boot to4.1.1: it now inherits the same Client5.6.4 and retains Core5.4.4 explicitly.
+The T09 evidence below remains historical, not a new native-network acceptance.
+T18 also aligns existing network-probe/certificate and monitoring Java helpers
+with the reviewed application Java21.0.12.1/Jammy base. Networks, proxy ACLs,
+DNS/TLS/IP-SAN/HMAC/bypass assertions and timeouts are unchanged; final native
+repetition was not implied by the image update. It now PASSes on2026-10-18
+using the verified candidate JAR/matching test classes and reviewed pinned JRE,
+with the unchanged DNS/dual-stack/effective-destination/TLS/HMAC/proxy/bypass and
+invalid-ACL controls. Owned fixture resources were removed and absence verified.
+This is a real dedicated network repetition, not an application-image scan or
+public firewall deployment. Aggregate native report SHA-256:
+`82c290dabdf6f40695c7bc4a59db15bef68784ecdf8ed469f421fda98822b262`.
 Future-dated 5.6.5 and alpha/beta branches were not selected. Java 21 is unchanged.
 T09 is verified and eligible for its task-scoped commit. No push/merge or T10
 implementation is authorized as part of this continuation.

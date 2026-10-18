@@ -1,5 +1,45 @@
 # Backup, restore and disaster-recovery lab (P8-T16)
 
+## P8-T18 final-candidate repetition — PASS (2026-10-18)
+
+The original policy is preserved at `ops/backup/history/t16/policy.json`.
+The active policy now binds the remediated image/JAR and the new real eight-case
+failure report `13f42a23270a47595abe8a9ea0b7b797f77524096a3ebbda3cdedadcc2d0c04e`.
+Original delegated targets, cadence/retention, separate encrypted data/key
+bundles, stable broker node, trusted catalog and isolated original-event-only
+replay scope are unchanged. This repetition uses new empty owned destinations;
+no dev/retained database, production queue, DLQ replay or source-state repair is
+authorized. Both fresh destinations pass; dated T16 measurements below remain
+historical, separate from this remediated candidate. No cloud/off-host store
+or operating backup scheduler/retention service is provisioned by this lab.
+
+New invocation:2026-10-18T03:01:07.102796Z–03:11:00.535237Z.
+
+| Destination | Measured RTO(s) | Snapshot age at recovery(s) | Checkpoint handling |
+|---|---:|---:|---|
+| Matching DB/cold broker/keys | 101.40 | 121.66 | Resume original durable work |
+| DB/definitions-only broker | 110.38 | 390.70 | Block first, then approved original-envelope replay |
+
+Both pass exact19-table/sequence/schema/constraint/index checkpoints, retained
+source trace identity, pre-backup JWT/API replay, HMAC and balanced unique
+postings. Each initial drain has3 payments/refunds,6 postings,12 events and6
+deliveries/attempts. Republishing12 originals preserves history and produces no
+extra delivery; queues including DLQs are empty. Missing-key startup, wrong-key
+no-HTTP rejection, original-key recovery with retained attempts, new workflow
+and restart controls pass. Wrong archive recipient/tamper is rejected before
+restore. Owned lab resources, synthetic archives and keys were removed and
+absence verified; this discarded fake data cannot be recovered. No dev/retained
+state or root `.env` was used. Snapshot age is not evidence of recovering writes
+after a snapshot, meeting an operating daily/off-host RPO or providing PITR.
+
+- Report SHA-256: `ffc7fb72836cb09b98ca9b416b4cf735c34fb9e4c28d53195a8b7ccbc4b6208b`.
+- Executable workload SHA-256: `ee2d30b789e1867ef17234b8f4edffd9c4c5f86ce5bda5053f6a5f68726fdb84`.
+- Policy SHA-256: `195dbcb89715db85c4197be1729d35ce442118a66bb898eb2884537437ba772e`.
+
+Image/JAR match the current [candidate](dependency-security-review.md).
+Final native/source/clean-commit gates remain independent; this is not release
+authorization or approval for replay against a real queue.
+
 ## Predeclared policy and authority
 
 On 2026-10-17 the owner delegated the proposed recovery-target and controlled

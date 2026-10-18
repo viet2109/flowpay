@@ -9,6 +9,45 @@ local until publication is separately requested. No runtime dependency upgrade,
 API/schema change, deployment, merge or release is added. T12 extends the local
 image build/scan checks as described below; registry publication remains absent.
 
+P8-T18 later received explicit owner approval to remediate existing runtime
+dependencies and the application base image. The version/advisory rationale and
+fresh verification status are in the [security review](dependency-security-review.md).
+This does not change the policies below: no exceptions, source-fixture
+suppression, scanner downgrade or automatic release follows from that approval.
+The pre-acceptance candidate's fresh full Maven scan finds zero advisory matches in235
+components; source security then failed on10 secret-format findings, with zero
+main-Java SAST findings and native controls passed. Its301-component image scan
+passes the unchanged severity policy, retaining94 MEDIUM/41 LOW/9 NEGLIGIBLE.
+Neither result is a clean committed release attestation or Phase8 completion.
+
+2026-10-18: [individual source-finding review](secret-findings-review.md)
+reproduces10 `generic-api-key` findings at seven locations in five files and
+documents their test/example/public-prefix roles. That initial review did not
+change the no-exception decision or detector: classification alone was not an
+executable waiver. Later on the same local date, the owner explicitly authorized
+the [bounded acceptance](secret-findings-review.md#approved-bounded-false-positive-acceptance)
+of exactly those source false positives. Verification results are recorded in
+that review, not inferred from approval. Real/new/unreviewed findings still block.
+The subsequent full security invocation PASSes with10 total/10 accepted/zero
+unreviewed detector rows, zero SAST/advisory matches and235 Maven components;
+native canaries/clean/vulnerable/unavailable-DB controls pass.203 offline controls
+pass on Windows/Linux. This working-tree result is not a clean committed release
+attestation: that checkpoint's release preflight rejected the dirty candidate, and
+final artifact-bound operational acceptance remains open.
+
+Later release-time expiry enforcement requires fresh source evidence containing
+the earliest accepted-review deadline; the current preflight rejects the older
+report missing that metadata.212 controls passed on Windows and pinned Linux
+before native-script preflight additions. The latest215 controls now pass on
+both Windows and pinned Linux, including18 fake-Docker rejection cases and
+both actual read-only release-preflight outcomes without deployment authority.
+A new full native source/dependency scan now PASSes with complete counts and
+exclusive earliest expiry;851 tracked files,235 Maven components, zero SAST/
+advisory matches,10 total/10 accepted/zero unreviewed rows and all native controls.
+It records the dirty source checkpoint at2026-10-18T03:17:45.482371Z, not a clean
+release. After commit, require another real full scan naming actual clean HEAD
+and the independent release preflight. No earlier report is patched into acceptance.
+
 CI runs on pull requests, pushes to main/phase branches and explicit manual
 dispatch. Both `verify` and `supply-chain` must succeed. Repository branch
 protection/required-check configuration is an owner-side setting, not changed
@@ -19,7 +58,7 @@ or security-events-write permission is required.
 
 ## Reproduce
 
-Requirements: JDK 21, Python 3.11+, Git, Linux Docker daemon and outbound access
+Requirements: JDK 21, Python 3.11+, Git, Bash (Git Bash on Windows), Linux Docker daemon and outbound access
 to Maven Central, official release/image endpoints and the Grype database.
 Execute from the repository root:
 
@@ -114,10 +153,13 @@ no SaaS analysis is invoked.
   a fix is not a waiver. Findings already present before T11 are labelled baseline
   during triage, not silently suppressed or mechanically upgraded.
 - **SAST:** every finding in this deliberately security-only rule set blocks.
-- **Secrets:** every finding blocks. No checked-in secret exception mechanism:
-  remove/rotate real material; review synthetic false positives individually.
-  Do not print matches while investigating, and do not weaken a detector merely
-  to make an existing fixture green.
+- **Secrets:** every unreviewed finding blocks. Remove/rotate real material;
+  never print matches or weaken detection to make fixtures green. The owner's
+  P8-T18 approval permits only the seven individually reviewed synthetic/public
+  source locations in `ops/ci/secret-reviews.json`, not real-secret exceptions.
+  All ten detector rows remain reported; accepted/unreviewed counts and review
+  IDs are distinct. Source scans ignore inline `gitleaks:allow` instructions.
+  Image scans do not use source acceptance.
 - **Tool/report/DB failure:** blocks, never a clean scan. Missing, malformed,
   incomplete/empty-coverage reports, scanner errors/timeouts, missing Docker,
   failed downloads, invalid pin/checksum and stale/future-dated DBs cannot pass.
@@ -131,6 +173,29 @@ owner approval**, even for baseline findings. The project maintainer owns
 triage and expiry follow-up; approving exceptions/branch protection requires
 human review. This file checks recorded approval, not the reviewer's identity
 cryptographically. Never put secrets or sensitive analysis into exception text.
+
+`ops/ci/secret-reviews.json` is a separate bounded source-review manifest, not a
+Gitleaks ignore/baseline or a dependency/SAST waiver. It binds the pinned scanner
+image/config, exact rule/path/single line, whole-source-file SHA-256 after LF
+normalization, expected finding multiplicity, owner/approval/reason and existing
+review document/anchor. At most seven entries/ten rows are authorized, restricted
+to test sources or tracked documentation; main/prod/local files, globs and hidden
+paths are forbidden. The checksum is public source-file identity, not a secret
+digest. Changed files (including elsewhere in the file), changed counts, stale
+unmatched entries, duplicate entries, missing evidence, malformed/future/expired
+or over30-day approval fail closed. CRLF/LF checkout normalization alone does
+not invalidate approval. No automatic renewal or fingerprint refresh exists.
+Recorded reviewer names require actual human review; metadata is not a signature.
+The approval expires2026-11-17 01:22:02 UTC+07 exclusively. Renew/remove it through
+owner review, never by disabling a failing check or accepting future secrets.
+
+Safe source evidence also records the earliest exclusive expiry among accepted
+reviews (`acceptedSecretReviewExpiresAt`). Release preflight rechecks that
+deadline against its current clock and requires complete total/accepted/
+unreviewed accounting, independently of its72-hour scan freshness allowance.
+A fresh report cannot extend a review; missing, malformed, timezone-naive or
+expired review deadlines fail closed. Earlier source reports lacking this
+metadata must be regenerated by a real scan, not manually patched.
 
 No shared scanner DB/cache is restored in CI. Each scan uses a unique labelled
 disposable Docker volume for SQLite on Linux storage, including on Docker
@@ -159,7 +224,9 @@ Only these explicit paths may be uploaded, retained seven days:
 - `target/ci-safe/verification.json`: aggregate counts, source commit/dirty flag,
   workflow result and executable JAR SHA-256; no raw test names/logs.
 - `target/ci-safe/security.json`: tools/pins, gate/control status, DB build/schema,
-  package advisory/SAST identities/severity/exception status and secret **count**.
+  package advisory/SAST identities/severity/exception status, secret total /
+  accepted / unreviewed **counts**, source-review IDs and earliest exclusive
+  review expiry, never matched values.
 - `target/ci-safe/sbom.cdx.json`: allow-listed package coordinates and dependency
   graph, without authors, source paths, arbitrary properties or external URLs.
 

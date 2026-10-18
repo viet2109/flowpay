@@ -268,7 +268,7 @@ def scanner_database():
 def source_scans(source, output, *, negative=False):
     mounts = [(source, "/src", False), (POLICY, "/policy", False), (output, "/out", True)]
     _, leak_code = run(container("gitleaks", mounts, ["dir", "/src", "--config", "/policy/gitleaks.toml",
-                                "--no-banner", "--redact=100", "--exit-code", "17", "--report-format", "json",
+                                "--no-banner", "--redact=100", "--ignore-gitleaks-allow", "--exit-code", "17", "--report-format", "json",
                                 "--report-path", "/out/secrets.json"], env=["GITLEAKS_CONFIG=/policy/gitleaks.toml"]),
                                 allowed=(0, 17))
     leaks = document(output / "secrets.json")
@@ -296,7 +296,7 @@ def negative_scanners(work):
     output.mkdir()
     # Deliberately nonfunctional, disposable strings. Never a live credential.
     (source / "canary.txt").write_text("FLOWPAY_TEST_ONLY_" + "Z" * 24
-                                      + '\naws_access_key_id = "' + "AKIA" + "QWERTYUIOPASDFGH" + '"\n')
+                                      + '\naws_access_key_id = "' + "AKIA" + "QWERTYUIOPASDFGH" + '" # gitleaks:allow\n')
     (source / "Unsafe.java").write_text('''import java.io.*;
 import java.security.*;
 class Unsafe {
@@ -422,6 +422,123 @@ def apply_exceptions(findings, policy, today):
     return result
 
 
+def source_file_sha256_lf(path):
+    """Public source-file identity, not a digest of matched secret material."""
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
+def review_secret_findings(leaks, policy, source, now):
+    """Accept only time-bounded, owner-reviewed synthetic source false positives.
+
+    Never alter detector results or export matches. File identity binds all
+    contents, not only a line that could contain a newly substituted credential.
+    This policy applies only to tracked-source review, never image resources.
+    """
+    require(isinstance(policy, dict) and set(policy) == {
+        "schemaVersion", "gitleaksImage", "gitleaksConfigSha256Lf", "reviews"
+    } and type(policy["schemaVersion"]) is int and policy["schemaVersion"] == 1,
+            "invalid source secret-review policy")
+    require(policy["gitleaksImage"] == TOOLS["gitleaks"]
+            and policy["gitleaksConfigSha256Lf"] == source_file_sha256_lf(source / "ops/ci/gitleaks.toml"),
+            "source secret review requires unchanged scanner image and configuration")
+    require(isinstance(leaks, list) and isinstance(policy["reviews"], list) and len(policy["reviews"]) <= 7,
+            "invalid or excessive source secret reviews")
+    require(isinstance(now, dt.datetime) and now.tzinfo is not None, "timezone-aware secret-review clock required")
+    fields = {"id", "rule", "path", "startLine", "endLine", "occurrences", "sourceSha256Lf",
+              "owner", "approvedBy", "reason", "evidence", "reviewedAt", "expiresAt"}
+    identities, identifiers, deadlines = {}, set(), []
+    for entry in policy["reviews"]:
+        require(isinstance(entry, dict) and set(entry) == fields, "incomplete source secret review")
+        require(all(isinstance(entry[key], str) and entry[key].strip() for key in fields - {
+            "startLine", "endLine", "occurrences"
+        }), "empty source secret-review field")
+        require(re.fullmatch(r"source-fp-[0-9]{2}", entry["id"]) and entry["id"] not in identifiers,
+                "invalid or duplicate source secret-review identifier")
+        require(entry["rule"] == "generic-api-key", "only reviewed generic synthetic findings may be accepted")
+        relative = Path(entry["path"])
+        require(re.fullmatch(r"[A-Za-z0-9_./-]+", entry["path"]) and not relative.is_absolute()
+                and all(not part.startswith(".") for part in relative.parts) and relative.as_posix() == entry["path"]
+                and (entry["path"].startswith("src/test/") or (
+                    entry["path"].startswith("docs/") and entry["path"].endswith(".md")))
+                and entry["path"] != "docs/README.md"
+                and not re.fullmatch(r"docs/phase-.*\.md", entry["path"]),
+                "source secret review must name one test or tracked-document file")
+        candidate = source / relative
+        require(candidate.is_file() and not candidate.is_symlink()
+                and candidate.resolve().is_relative_to(source.resolve())
+                and not any((source / Path(*relative.parts[:index])).is_symlink()
+                            for index in range(1, len(relative.parts) + 1)),
+                "missing, escaping or symlink reviewed source")
+        require(re.fullmatch(r"[a-f0-9]{64}", entry["sourceSha256Lf"])
+                and source_file_sha256_lf(candidate) == entry["sourceSha256Lf"],
+                "reviewed source contents changed; new review required")
+        require(type(entry["startLine"]) is int and type(entry["endLine"]) is int
+                and 1 <= entry["startLine"] == entry["endLine"] <= len(candidate.read_bytes().splitlines())
+                and type(entry["occurrences"]) is int and 1 <= entry["occurrences"] <= 2,
+                "exact source review line and bounded occurrence count required")
+        reference = entry["evidence"].partition("#")
+        require(re.fullmatch(r"docs/[A-Za-z0-9_-]+\.md", reference[0])
+                and reference[1] == "#" and re.fullmatch(r"[a-z0-9-]+", reference[2])
+                and (source / reference[0]).is_file() and not (source / reference[0]).is_symlink(),
+                "source secret review requires tracked review evidence")
+        headings = {re.sub(r"[^a-z0-9 -]", "", title.strip().lower()).replace(" ", "-")
+                    for title in re.findall(r"^#{1,6}\s+(.+)$", (source / reference[0]).read_text(encoding="utf-8"), re.M)}
+        require(reference[2] in headings, "source secret-review evidence anchor missing")
+        try:
+            reviewed = dt.datetime.fromisoformat(entry["reviewedAt"].replace("Z", "+00:00"))
+            expires = dt.datetime.fromisoformat(entry["expiresAt"].replace("Z", "+00:00"))
+            require(reviewed.tzinfo is not None and expires.tzinfo is not None,
+                    "timezone-aware source review dates required")
+            require(reviewed <= now < expires and dt.timedelta(0) < expires - reviewed <= dt.timedelta(days=30),
+                    "expired, future or overlong source secret review")
+        except ValueError as error:
+            raise GateError("invalid source secret-review dates") from error
+        identity = (entry["rule"], entry["path"], entry["startLine"], entry["endLine"])
+        require(identity not in identities, "duplicate source secret-review location")
+        identities[identity] = entry
+        identifiers.add(entry["id"])
+        deadlines.append(expires)
+    require(sum(entry["occurrences"] for entry in identities.values()) <= 10,
+            "source secret-review approval count exceeded")
+    observed, unreviewed = {}, 0
+    for leak in leaks:
+        require(isinstance(leak, dict) and isinstance(leak.get("File"), str)
+                and isinstance(leak.get("RuleID"), str) and type(leak.get("StartLine")) is int
+                and type(leak.get("EndLine")) is int and 1 <= leak["StartLine"] <= leak["EndLine"],
+                "malformed source secret finding")
+        # No suffix/basename/case folding: only the scanner's exact source root.
+        identity = (leak["RuleID"], leak["File"].removeprefix("/src/"), leak["StartLine"], leak["EndLine"])
+        if identity in identities:
+            observed[identity] = observed.get(identity, 0) + 1
+        else:
+            unreviewed += 1
+    require(set(observed) == set(identities), "stale or unmatched source secret review; remove or re-review")
+    require(all(observed[key] == entry["occurrences"] for key, entry in identities.items()),
+            "reviewed secret-finding count changed; new review required")
+    return {"acceptedSecretFindings": sum(observed.values()), "unreviewedSecretFindings": unreviewed,
+            "acceptedSecretReviewIds": sorted(identifiers),
+            "acceptedSecretReviewExpiresAt": min(deadlines).isoformat() if deadlines else None}
+
+
+def require_current_source_reviews(report, now):
+    """A fresh scan cannot extend an accepted review's exclusive deadline."""
+    counts = [report.get(key) for key in
+              ("secretFindings", "acceptedSecretFindings", "unreviewedSecretFindings")]
+    require(all(type(value) is int and value >= 0 for value in counts)
+            and counts[0] == counts[1] and counts[2] == 0,
+            "release blocked: source secret-review accounting is incomplete")
+    if not counts[1]:
+        return
+    try:
+        value = report.get("acceptedSecretReviewExpiresAt")
+        require(isinstance(value, str), "release blocked: source secret-review expiry missing")
+        expires = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+        require(expires.tzinfo is not None and now.tzinfo is not None and now < expires,
+                "release blocked: source secret review expired or timezone missing")
+    except ValueError as error:
+        raise GateError("release blocked: invalid source secret-review expiry") from error
+
+
 def security(evidence):
     evidence["runtime"] = preflight()
     evidence["tools"] = TOOLS
@@ -488,7 +605,10 @@ def security(evidence):
         evidence["findings"] = apply_exceptions(findings, document(POLICY / "exceptions.json"),
                                                 dt.datetime.now(dt.timezone.utc).date())
         evidence["stage"] = "severity-policy"
-        require(not leaks, "secret findings block; no automatic baseline waiver")
+        reviews = review_secret_findings(leaks, document(source / "ops/ci/secret-reviews.json"), source,
+                                         dt.datetime.now(dt.timezone.utc))
+        evidence.update(reviews)
+        require(reviews["unreviewedSecretFindings"] == 0, "unreviewed secret findings block; no automatic baseline waiver")
         require(not any(item["blocking"] and not item["excepted"] for item in evidence["findings"]),
                 "unapproved blocking SAST/dependency findings; see safe evidence")
 

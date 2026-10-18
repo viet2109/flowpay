@@ -8,6 +8,10 @@ upgrade deployment. Successful runtime tests do not override blocked T11/T12
 security gates. The owner chose **no secret exceptions**, and `exceptions.json`
 remains empty. Do not upgrade application dependencies or suppress findings just
 to make packaging green. No public endpoint or frontend deployment is created.
+P8-T18 subsequently received explicit owner authority for the reviewed
+[dependency/base-image security remediation](dependency-security-review.md),
+not for exceptions or fixture suppression. Earlier T12 results below retain
+their original artifact scope.
 
 ## Artifact-first build decision
 
@@ -31,12 +35,25 @@ credentials through build arguments or modify this context policy to include
 local configuration.
 
 The runtime is official Eclipse Temurin **21.0.12.1+1 JRE/Jammy**, amd64 manifest
-`sha256:8c2dddf1bb2a8455160f4e23080059de5003eddc5cb839130b177c6be0c2cfe0`,
-resolved from official registry metadata on 2026-10-15. No `apt upgrade`,
+`sha256:8ecbec1f32912979c15b86aaf98f7082a77d318a7f92af3d9fe2c0fd2723df10`,
+reviewed from official registry metadata on 2026-10-17 for P8-T18. This replaces
+the October15 digest recorded in the historical T12 evidence. No `apt upgrade`,
 floating `latest` or startup installation is performed. Digest pinning prevents
 replacement, not vulnerabilities; review updates and rescan periodically.
 The other architecture manifests have **not** been accepted. Do not assume this
 image is suitable for an ARM free-tier host.
+
+P8-T18's reviewed candidate passes exact-image build, native runtime and both
+fresh/Phase7 staging checks. Its actual301-component image scan has zero
+HIGH/CRITICAL/UNKNOWN and zero application-resource secret findings, retaining
+94 MEDIUM/41 LOW/9 NEGLIGIBLE. This supersedes only the earlier image gate's
+candidate status, not its historical evidence. Source security was then blocked
+on10 secret-format findings. Following owner-approved bounded source review,
+the full source/dependency gate now PASSes with10 total/10 accepted/zero
+unreviewed rows; image scanning does not use that acceptance mechanism. See the
+review for fingerprints and the preserved initial Grafana staging rejection.
+Clean committed release/final operational gates remain open; no phase freeze
+or deployment is authorized.
 
 ## Runtime contract
 

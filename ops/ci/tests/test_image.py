@@ -149,6 +149,33 @@ class ImageTest(unittest.TestCase):
         self.assertNotIn('"push"', source)
         self.assertNotIn("apply_exceptions(", source)
 
+    def test_native_smokes_refuse_preexisting_networks_and_volumes_before_cleanup(self):
+        root = Path(__file__).resolve().parents[3]
+        for relative in ('ops/monitoring/tests/smoke.sh', 'ops/egress/tests/smoke.sh',
+                         'ops/ingress/tests/application-smoke.sh'):
+            before_cleanup = (root / relative).read_text().split('cleanup()', 1)[0]
+            with self.subTest(relative=relative):
+                for kind in ('network', 'volume'):
+                    self.assertIn('existing=$(docker ' + kind + ' ls -q --filter "label=com.docker.compose.project=$project")\n'
+                                  'test -z "$existing"', before_cleanup)
+                self.assertIn('existing=$(docker ps -aq --filter "label=com.docker.compose.project=$project")\n'
+                              'test -z "$existing"', before_cleanup)
+                self.assertNotIn('test -z "$(docker ', before_cleanup)
+
+    def test_native_lab_jre_helpers_match_reviewed_application_base(self):
+        root = Path(__file__).resolve().parents[3]
+        base = next(line.removeprefix('FROM ') for line in (root / 'Dockerfile').read_text().splitlines()
+                    if line.startswith('FROM '))
+        for relative, occurrences in (('ops/monitoring/tests/smoke.sh', 1),
+                                      ('ops/ingress/tests/application-smoke.sh', 1),
+                                      ('ops/monitoring/compose.yaml', 1),
+                                      ('ops/egress/tests/compose.yaml', 2),
+                                      ('ops/container/tests/compose.yaml', 1)):
+            with self.subTest(relative=relative):
+                source = (root / relative).read_text()
+                self.assertEqual(source.count(base), occurrences)
+                self.assertNotIn('21.0.10_7', source)
+
     def test_restart_only_exact_owned_container_not_compose_dependencies(self):
         state = {"Id": "a" * 64, "Config": {"Labels": {"com.docker.compose.project": "owned-project"}}}
         with patch.object(gate, "run") as invoked:

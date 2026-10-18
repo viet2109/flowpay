@@ -6,6 +6,35 @@ the [operational runbook](operations-runbook.md) and
 only to this older monitoring lab; T13 staging keeps Grafana/private management
 unpublished. Alert predicates/anchors in this document remain authoritative.
 
+P8-T18 aligns this lab's existing Java/certificate helpers with the reviewed
+Java21.0.12.1/Jammy application base from the
+[security remediation](dependency-security-review.md). No monitoring scenario,
+resource/timeout/alert threshold or network policy is changed. The historical
+measurements below remain historical until the final candidate's native
+monitoring/alert-rule rehearsal is recorded; a version-reference update alone
+is not acceptance or a scan of every monitoring service image.
+
+Final repetition on2026-10-18 now PASSes the unchanged native script using the
+verified candidate JAR and reviewed pinned JRE: Compose/policy validation,
+promtool config/rule fixtures, Collector validation, all provisioned dashboards/
+queries/metrics/stored trace, real monitoring outage/business continuation and
+fresh recovery scrapes, plus six unique balanced financial postings. The other
+egress/real-app-ingress scripts also pass in the sequential invocation
+03:13:06.323628Z–03:17:23.929491Z. Safe aggregate report SHA-256:
+`82c290dabdf6f40695c7bc4a59db15bef68784ecdf8ed469f421fda98822b262`.
+All owned resources and external synthetic temporary keys were removed, absence
+verified. The monitoring script's LF-normalized SHA-256 is
+`39f6bd1ceb6380433f81b596d06ccaf599539e0271d9886db5c30a986090a26d`.
+This uses the JAR/base helpers, not a second application-image build or scan;
+no external alert notification or public deployment is established.
+
+Native smoke preflight now rejects pre-existing project containers, networks
+and volumes, and aborts if any inventory command fails. Assignment-based checks
+preserve the command's nonzero status instead of treating failed/empty output
+as absence. Offline fake-Docker regressions exercise existing/error cases for
+all three resource kinds before any fixture creation; they are not a native
+monitoring acceptance or real Docker interaction.
+
 This is an isolated **simulator lab**, not a deployment/release gate or financial
 source of truth. Use the built and verified JAR; no new application image is built
 here. Never reuse the development Compose file, its container names or volumes.

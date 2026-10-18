@@ -16,6 +16,40 @@ IDENTITY = 'sha256:' + 'b' * 64
 
 
 class StagingTest(unittest.TestCase):
+    def probe(self):
+        spec = importlib.util.spec_from_file_location('staging_probe', staging.STAGE / 'tests/probe.py')
+        module = importlib.util.module_from_spec(spec)
+        with patch('ssl.create_default_context'):
+            spec.loader.exec_module(module)
+        return module
+
+    def test_probe_classifies_known_monitoring_assertions(self):
+        probe = self.probe()
+        for message in ('Controlled business trace not retrievable', 'Dashboard provisioning differs from versioned JSON',
+                        'Sensitive fixture reached trace storage', 'Required scrape targets unavailable'):
+            self.assertEqual(probe.failure_label(AssertionError(message)), 'owned monitoring: ' + message.lower())
+
+    def test_probe_never_echoes_unknown_or_arbitrary_owned_assertions(self):
+        probe = self.probe()
+        for message in ('private-sensitive-value', 'owned private-sensitive-value', 'Grafana failed private-sensitive-value'):
+            self.assertEqual(probe.failure_label(AssertionError(message)), 'owned staging assertion failed')
+
+    def test_probe_dynamic_monitoring_diagnostics_drop_all_suffix_values(self):
+        probe = self.probe()
+        for prefix, expected in (('Expected metric not ingested: ', 'owned monitoring expected metric not ingested'),
+                                 ('Dashboard query not ready: ', 'owned monitoring dashboard query failed'),
+                                 ('Unexpected HTTP status on ', 'owned monitoring HTTP status mismatch')):
+            self.assertEqual(probe.failure_label(AssertionError(prefix + 'private-sensitive-value')), expected)
+
+    def test_probe_preserves_only_bounded_status_deadline_and_owned_labels(self):
+        probe = self.probe()
+        for message in ('owned status expected 200, got 503', 'owned deadline: readiness',
+                        'owned secure cookie policy failed', 'owned duplicate changed delivery state'):
+            self.assertEqual(probe.failure_label(AssertionError(message)), message)
+        for message in ('owned status expected 200, got private-sensitive-value', 'owned deadline: private-sensitive-value',
+                        'owned status expected 200, got 503\nprivate-sensitive-value'):
+            self.assertEqual(probe.failure_label(AssertionError(message)), 'owned staging assertion failed')
+
     def config(self):
         memberships = {'app': ['ingress', 'data', 'observe', 'webhook'], 'edge': ['front', 'ingress'],
                        'postgres': ['data'], 'rabbitmq': ['data', 'observe'], 'topology': ['data'],
@@ -114,6 +148,7 @@ class StagingTest(unittest.TestCase):
     def reports(self):
         return {name: {'status': 'passed', 'imageId': IDENTITY, 'timestamp': dt.datetime.now(dt.timezone.utc).isoformat(),
                        'sourceCommit': 'abc123', 'trackedWorktreeDirty': False,
+                       'secretFindings': 0, 'acceptedSecretFindings': 0, 'unreviewedSecretFindings': 0,
                        'cases': {'fresh': {'status': 'passed'}, 'phase7': {'status': 'passed'}}}
                 for name in ('security', 'image-scan', 'image-runtime', 'staging')}
 
@@ -125,6 +160,17 @@ class StagingTest(unittest.TestCase):
 
     def test_only_matching_fresh_clean_release_gates_accepted(self):
         self.release(self.reports())
+
+    def test_fresh_security_report_cannot_release_expired_or_missing_source_review_deadline(self):
+        reports = self.reports()
+        source = reports['security']
+        source.update(secretFindings=1, acceptedSecretFindings=1, unreviewedSecretFindings=0)
+        for expiry in (None, (dt.datetime.now(dt.timezone.utc) - dt.timedelta(seconds=1)).isoformat()):
+            source['acceptedSecretReviewExpiresAt'] = expiry
+            with self.subTest(expiry=expiry), self.assertRaises(gate.GateError):
+                self.release(reports)
+        source['acceptedSecretReviewExpiresAt'] = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1)).isoformat()
+        self.release(reports)
 
     def test_blocked_source_or_image_cannot_be_overridden(self):
         for name in ('security', 'image-scan', 'image-runtime', 'staging'):

@@ -64,6 +64,14 @@ class BackupTest(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(gate.GateError):
                 backup.validate_policy({**policy, **change})
 
+    def test_candidate_rebinding_preserves_delegated_recovery_and_replay_scope(self):
+        current = gate.document(backup.HERE / 'policy.json')
+        historical = gate.document(backup.HERE / 'history/t16/policy.json')
+        for key in ('version', 'approvedOn', 'approval', 'rpoSeconds', 'rtoSeconds',
+                    'cadenceHours', 'retention', 'storage', 'replay', 'rabbitNode',
+                    'rtoClock', 'rpoClock'):
+            self.assertEqual(current[key], historical[key], key)
+
     def test_repo_and_relative_plaintext_paths_rejected(self):
         for path in (backup.ROOT, backup.ROOT / 'target', Path('relative')):
             with self.subTest(path=path), self.assertRaises(gate.GateError):

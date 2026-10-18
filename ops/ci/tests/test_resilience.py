@@ -1,7 +1,9 @@
 """Offline fault-injection ownership, invariant and privacy controls."""
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -75,14 +77,33 @@ class ResilienceTest(unittest.TestCase):
             with self.subTest(mutation=mutation), self.assertRaises(gate.GateError):
                 drills.validate_manifest({**value, **mutation})
 
+    def test_candidate_rebinding_keeps_original_failure_scenarios_and_bounds(self):
+        current = gate.document(drills.DRILLS / 'manifest.json')
+        historical = gate.document(drills.DRILLS / 'history/t15/manifest.json')
+        for key in ('replicas', 'host', 'readinessSeconds', 'recoverySeconds',
+                    'outageSeconds', 'cases', 'policy'):
+            self.assertEqual(current[key], historical[key], key)
+
     def test_host_envelope_records_page_variation_without_rewriting_t14(self):
         value = gate.document(drills.DRILLS / 'manifest.json')
         host = dict(value['host'], MemTotal=3920216064)
-        drills.validate_host(host, value['host']['composeVersion'], value)
-        drills.validate_host({**host, 'MemTotal': 3920220160}, value['host']['composeVersion'], value)
-        for change in ({'MemTotal': 2 * 1024 ** 3}, {'MemTotal': 8 * 1024 ** 3}, {'NCPU': 2}, {'OSType': 'windows'}):
-            with self.subTest(change=change), self.assertRaises(gate.GateError):
-                drills.validate_host({**host, **change}, value['host']['composeVersion'], value)
+        # Keep the historical production manifest unchanged. Exercise matching
+        # and changed configuration bytes in a disposable unit-test fixture.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = b'reviewed runtime fixture\n'
+            (root / 'Dockerfile').write_bytes(fixture)
+            gate.write_json(root / 'manifest.json', {
+                'configSha256Lf': {'Dockerfile': hashlib.sha256(fixture).hexdigest()}})
+            with patch.object(drills, 'ROOT', root), patch.object(drills.baseline, 'LOAD', root):
+                drills.validate_host(host, value['host']['composeVersion'], value)
+                drills.validate_host({**host, 'MemTotal': 3920220160}, value['host']['composeVersion'], value)
+                for change in ({'MemTotal': 2 * 1024 ** 3}, {'MemTotal': 8 * 1024 ** 3}, {'NCPU': 2}, {'OSType': 'windows'}):
+                    with self.subTest(change=change), self.assertRaises(gate.GateError):
+                        drills.validate_host({**host, **change}, value['host']['composeVersion'], value)
+                (root / 'Dockerfile').write_bytes(b'changed runtime fixture\n')
+                with self.assertRaisesRegex(gate.GateError, 'runtime configuration changed'):
+                    drills.validate_host(host, value['host']['composeVersion'], value)
 
     def test_metrics_projection_aggregates_known_numeric_counter_only(self):
         raw = b'jvm_memory_used_bytes 1\nflowpay_webhook_http_outcomes_total{outcome="HTTP_2XX"} 2.0\nflowpay_webhook_http_outcomes_total{outcome="REQUEST_TIMEOUT"} 1.0\n'

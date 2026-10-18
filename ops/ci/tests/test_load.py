@@ -1,9 +1,11 @@
 """P8-T14 offline controls; real k6/TLS/PG/broker runs are separate evidence."""
 import copy
 import datetime as dt
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -16,13 +18,48 @@ gate = benchmark.gate
 class LoadTest(unittest.TestCase):
     def setUp(self):
         self.manifest = gate.document(benchmark.LOAD / 'manifest.json')
+        # Unit controls validate a synthetic approved configuration, not whether
+        # today's checkout is still the historical T13 performance artifact.
+        # The real CLI retains that exact-artifact/configuration rejection.
+        work = tempfile.TemporaryDirectory()
+        self.addCleanup(work.cleanup)
+        self.root = Path(work.name)
+        fixture = b'reviewed runtime fixture\n'
+        (self.root / 'Dockerfile').write_bytes(fixture)
+        self.manifest['configSha256Lf'] = {'Dockerfile': hashlib.sha256(fixture).hexdigest()}
+        context = patch.object(benchmark, 'ROOT', self.root)
+        context.start()
+        self.addCleanup(context.stop)
 
     def valid_manifest(self, manifest=None):
         manifest = manifest or self.manifest
         benchmark.validate_manifest(manifest, self.manifest['target'], self.manifest['target']['composeVersion'])
 
-    def test_frozen_current_manifest_valid(self):
+    def test_matching_approved_configuration_valid(self):
         self.valid_manifest()
+
+    def test_reacceptance_preserves_historical_targets_and_workload(self):
+        historical = gate.document(benchmark.LOAD / 'history/t14/manifest.json')
+        current = gate.document(benchmark.LOAD / 'manifest.json')
+        for key in ('workflow', 'profiles', 'retryPolicy', 'calibrationProfiles',
+                    'acceptanceProfiles', 'hardDrainSeconds', 'requestTimeoutSeconds',
+                    'preAllocatedVUs', 'workflowMaxVUs', 'queryMaxVUs',
+                    'gracefulStopSeconds', 'generatorImage', 'generatorMemoryMiB', 'generatorCpu'):
+            self.assertEqual(current[key], historical[key], key)
+        self.assertNotEqual(current['applicationImage'], historical['applicationImage'])
+        self.assertNotEqual(current['jarSha256'], historical['jarSha256'])
+        original = gate.document(benchmark.LOAD / 'history/t14/acceptance.json')
+        active = gate.document(benchmark.LOAD / 'acceptance.json')
+        proposal = gate.document(benchmark.LOAD / 'proposal.json')
+        self.assertEqual(original['status'], 'APPROVED')
+        self.assertEqual(active['thresholds'], original['thresholds'])
+        self.assertEqual(proposal['thresholds'], original['thresholds'])
+        self.assertNotEqual(benchmark.workload_digest(), original['workloadSha256'])
+
+    def test_changed_configuration_bytes_require_new_review(self):
+        (self.root / 'Dockerfile').write_bytes(b'changed runtime fixture\n')
+        with self.assertRaisesRegex(gate.GateError, 'configuration changed'):
+            self.valid_manifest()
 
     def test_host_cpu_memory_kernel_platform_or_version_mismatch_rejected(self):
         for key in ('NCPU', 'MemTotal', 'KernelVersion', 'Architecture', 'ServerVersion', 'OSType'):

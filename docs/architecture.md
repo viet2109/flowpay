@@ -1056,8 +1056,10 @@ does not remove durable source + Outbox acceptance; aggregate health still
 reflects dependency failure. Startup validates required production configuration
 before bean binding, rejects dev/test conveniences, and loads matching persistent
 RSA keys with sanitized failures. Bounded HTTP graceful shutdown is tested on
-real listeners; image/worker lifecycle and private staging network enforcement
-remain T12-T15 work. See section 6 of `production-engineering.md` for the exact
+real listeners; T12–T15 separately verify image/worker lifecycle and private
+staging network enforcement on their recorded artifacts. These are bounded
+single-host proofs, not a retained deployment or host-HA guarantee.
+See section 6 of `production-engineering.md` for the exact
 configuration and probe contract. No schema or business contract changed.
 
 T09 implements effective-destination protection with a fixed enforcing CONNECT

@@ -293,7 +293,7 @@ acceptance criteria, and the mandatory implementation order.
 
 ## Phase 8 — Production Engineering
 
-Status: `IN PROGRESS` as of 2026-10-15. Gate implementation and security
+Status: `IN PROGRESS` as of 2026-10-17. Gate implementation and security
 acceptance are separate: P8-T11 is implemented, but its security gate is BLOCKED.
 
 Completed: P8-T01 baseline/design, P8-T02 production configuration, health and
@@ -363,7 +363,7 @@ only with the user's explicit P8-T11 approval.
 | P8-T15 | Multi-Instance and Operational Failure Drills | P8-T13, P8-T14 | DONE: eight owned two-replica failure/recovery drills and financial/history audits pass; release security remains BLOCKED |
 | P8-T16 | Backup, Restore and Disaster-Recovery Drill | P8-T13, P8-T15 | DONE: encrypted isolated cold/mismatch restores, key/history/invariant audits and fixed lab recovery targets pass; off-host schedule unprovisioned, release security BLOCKED |
 | P8-T17 | Operational Runbooks and Release Checklist | P8-T08, P8-T13, P8-T14, P8-T15, P8-T16 | DONE: actionable approval-bound runbooks, NO-GO checklist and owned read-only command rehearsal; release security BLOCKED |
-| P8-T18 | Production Engineering Quality Gate and Documentation Freeze | P8-T01 through P8-T17 | PLANNED |
+| P8-T18 | Production Engineering Quality Gate and Documentation Freeze | P8-T01 through P8-T17 | IN PROGRESS: security PASS with owner-approved bounded source reviews; final-artifact operational/clean-commit gates pending; not DONE/FROZEN |
 
 See the tracked [production-engineering design record](production-engineering.md)
 for frozen scope and implementation gates, and the local
@@ -787,6 +787,174 @@ No cloud/public deployment, key rotation/live remediation, real DLQ replay,
 hosted-CI acceptance, push/merge or T18 implementation. Security, independent
 backups/paging/least-privilege and final exit gates remain explicit NO-GO items.
 Local phase/index corrections stay unstaged.
+
+### P8-T18 final gate attempt — BLOCKED (2026-10-17)
+
+The [exit audit](production-exit-audit.md) reconciles all phase acceptance groups,
+new candidate identities and historical operational evidence. Fresh JDK21
+`clean verify` passes1,407 tests/196 required suites,0 failures/errors/skips,
+with real PostgreSQL/RabbitMQ and actionlint.182 focused controls pass on
+Windows/pinned Linux, including four new fixed-label/privacy staging-probe
+regressions; no assertion or timeout is weakened.
+Exact non-root final-image build/runtime pass, including
+active-worker SIGTERM, broker-outage source/restart, replay/HMAC/key continuity
+and owned cleanup. A first generic startup rejection is retained separately;
+no fixture, resource or acceptance policy was changed to pass its repetition.
+Initial legacy staging proves upgrade/checksum/ciphertext preservation, then
+rejects a monitoring assertion with owned cleanup. Repetition passes both
+complete fresh/Phase7 cases: private TLS/dual-stack/proxy boundaries, two-replica
+telemetry, financial/UNKNOWN/duplicate/HMAC/key and rollback/restart checks.
+Both rejected attempts are retained; a pass does not establish their root cause
+or waive test-stability review. All owned resources are cleaned.
+
+Fresh valid GrypeDBv6.1.10 built2026-10-17 scans and native canaries run fully:
+source10 secret-format/0 SAST findings plus17 HIGH/CRITICAL Maven matches;
+image0 application-resource secret findings plus18 HIGH/CRITICAL matches.
+Scopes overlap and candidate matches are not proof of exploitability.
+Exceptions stay empty and both security gates correctly fail; the real release
+preflight stays blocked. No dependency upgrade or fixture suppression is inferred.
+Post-diagnostic source-only scanning retains10 secret-format/0 SAST findings;
+it does not replace the full Maven security gate or attest a clean final commit.
+
+Clean build inputs and uncompressed JAR entry contents remain unchanged, but
+688 ZIP timestamps and the actual JAR/image hashes differ from T13. Unmodified
+load/failure/restore preflights refuse the new image before creating resources;
+no new30-minute soak, two-instance drill or recovery measurement is claimed.
+Old safe reports are preserved separately, never relabeled as new acceptance.
+Security remediation requires owner review; the resulting candidate then needs
+honestly bound final operational evidence, not rewritten old approvals.
+
+Stale pending-task/lifecycle descriptions are corrected in tracked docs; correct
+business/domain/database/API contracts are preserved. No phase freeze, task-DONE
+commit, push/merge or external deployment is claimed. Local phase/index edits
+remain ignored/unstaged; pre-existing `.env` remains unread and untracked.
+
+### P8-T18 dependency remediation (before bounded source approval)
+
+The owner has now approved reviewing/fixing existing
+dependencies and the base image, retaining the no-exception policy and correct
+source fixtures. The [security remediation review](dependency-security-review.md)
+records the selected candidate and fresh gate status. The preceding T18 evidence
+is the pre-remediation attempt, not acceptance of changed dependencies. No old
+load/failure/restore approvals are rewritten. Phase8 is still not DONE/FROZEN.
+Fresh reviewed-candidate results: full1,407 Java tests/196 suites with zero
+failure/error/skip;183 controls on Windows/pinned Linux; exact-image build PASS.
+Maven235-component inventory has zero advisory matches. Actual301-component
+image scan PASS with zero HIGH/CRITICAL/UNKNOWN, retaining94 MEDIUM/41 LOW/
+9 NEGLIGIBLE. Main-Java SAST has zero findings; native adversarial/clean and
+vulnerable/unavailable-DB controls pass. Source gate still FAILS on10 secret-format
+findings without exceptions. Native runtime PASS with SIGTERM, broker outage/
+restart, Ledger/Webhook replay/HMAC, persistent keys and owned cleanup. The first
+canonical Phase7 staging attempt passed
+legacy data/checksum/key preservation, then failed the Grafana health check;
+owned cleanup passed and the rejected report is retained. A read-only diagnostic
+repetition passed without reproducing the Grafana failure. The subsequent
+unmodified canonical invocation PASSes both Phase7 and fresh: legacy preservation,
+TLS/private dual-stack/proxy boundaries, two-replica telemetry, financial/UNKNOWN/
+duplicates/HMAC/keys and configuration rollback/restart; both cleanups pass,
+no running containers remain. No root cause or fix is inferred for the initial
+Grafana rejection, and no resource/assertion/deadline changed.
+Unmodified load/failure/restore/runbook entry
+points reject the new artifact before workload creation; actual release preflight
+FAILS on source security. No old approval or threshold is changed;
+this dirty working-tree evidence is not a clean release or task-DONE attestation.
+
+### P8-T18 source secret-finding review (2026-10-18)
+
+The owner authorized continuing individual review, not scanner exceptions.
+The [review](secret-findings-review.md) reproduces10 `generic-api-key` report rows
+at seven locations in five files. They are test-only synthetic AES settings,
+public API-key lookup prefix and an Idempotency-Key example, not production
+credentials at those reviewed locations. Main-Java SAST/required coverage and
+native adversarial/clean scanner controls pass. No match/secret is exported,
+`.env` stays unread, and no fixture, detector or exception is changed. Existing
+zero-exception policy still blocks the gate; narrowly accepting these false
+positives would require a separate explicit policy decision. No new full Java,
+Maven/image scan or long operational acceptance is claimed for this docs-only
+review; Phase8 is not DONE/FROZEN and no commit/push/merge is performed.
+
+### P8-T18 owner-approved bounded source review acceptance (2026-10-18)
+
+After the individual review, the owner explicitly authorized exact false-positive
+acceptance. `ops/ci/secret-reviews.json` binds only seven test/doc locations and
+ten detector rows, rule/path/line/count and LF-normalized whole-file identities,
+pinned Gitleaks image/config, review evidence/owner/approval and exclusive30-day
+expiry. Expired/future/stale/unmatched/changed/duplicate/malformed reviews fail;
+new findings remain blocking. Source scans also reject inline suppression.
+No fixture, Java/application configuration, public contract or image-secret gate
+changed. Dependency/SAST exceptions stay empty. See the
+[approved scope and verification](secret-findings-review.md#approved-bounded-false-positive-acceptance).
+
+203 offline controls pass on Windows and pinned Linux, including20 new
+policy regressions. Native scanner controls prove exact synthetic
+acceptance and rejection of new inline-suppressed findings, changed contents and
+exclusive expiry. The full source/dependency security invocation PASSes:
+10 total detector rows,10 accepted under the seven exact reviews, zero unreviewed,
+zero SAST/advisory matches,235 Maven components and all native source/dependency/
+unavailable-DB controls passed. The real release preflight now rejects dirty
+uncommitted source, not source findings. No unchanged full Java suite,
+runtime/staging/load/failure/restore rerun, task-DONE commit, push or phase freeze
+is claimed by this CI-only change. Historical application evidence remains bound
+to the same unchanged verified image; final operational/clean-commit gates remain.
+
+### P8-T18 final-artifact operational reacceptance (in progress)
+
+Original T14 manifest/proposal/approval and T15/T16 prerequisite declarations
+are preserved under the respective `ops/*/history/` directories, verified
+against the committed baseline after LF normalization. Existing safe reports
+were copied to an external local evidence backup before canonical reruns.
+The active load manifest binds the security-remediated artifact, not the old
+T13 image; proposal/approval now bind fresh completed calibration. Numeric targets,
+rates, retries/jitter, resources and the independent 30-minute soak are unchanged.
+204 focused controls pass. A calibration bootstrap failed before workload
+(RabbitMQ exit1, OOMKilled=false in a later diagnostic repetition); a separate
+strict host preflight rejected a 4,096-byte MemTotal change. Both failures are
+retained. Fresh exact-host calibration PASSes: zero unexpected/contract/drop
+errors, every financial/HMAC/retry audit and cleanup pass. Unchanged numeric
+targets were selected after completion under the owner's prior delegation;
+an independent acceptance with a full30-minute soak is running. A release-time
+expiry gap was hardened: the current clock must precede the earliest accepted
+review expiry even when the source scan is fresh; complete finding counts are
+required.212 offline controls pass on Windows. The real preflight rejects the
+old report lacking expiry metadata; no report is patched, and a fresh full
+source scan/clean committed attestation is still needed. No new load pass,
+failure/restore acceptance, completed task, commit, push or freeze is claimed.
+
+Continuation on2026-10-18 found the first remediated acceptance interrupted
+without a final report. Its process was absent;11 exact-owned stopped services
+(one topology exit0, ten exit255, none OOMKilled) were inventoried. Bounded
+interruption evidence is retained;11 containers,7 networks,5 volumes and one
+external synthetic directory were safely removed and absence checked. A new
+empty acceptance invocation repeats all profiles/full1,800-second soak; it does
+not join samples or time across attempts. The host/calibration/approval still
+match unchanged.212 controls pass on both Windows and pinned Linux; current
+full native source scan and final acceptance remain open.
+
+### P8-T18 continuation: final-artifact measurements (2026-10-18)
+
+The new independent load invocation PASSes all profiles and the full30-minute
+soak, without joining interrupted samples. Regular load has zero drops/429;
+stress retains13 drops and96 policy limits, not a maximum-capacity claim.
+All financial/HMAC audits and owned cleanup pass. Report SHA-256:
+`1bcff0e7ea8ae5f461e2b4ccd421f438f4826ab375cf7c5538ad9248b09ff0bc`.
+The new two-replica failure invocation PASSes all eight unchanged cases and
+cleanup; rolling reads retain270 successes/7 transients, not zero downtime.
+Report SHA-256:
+`13f42a23270a47595abe8a9ea0b7b797f77524096a3ebbda3cdedadcc2d0c04e`.
+The matched/mismatch restore repetition PASSes at101.40/110.38s with exact
+checkpoint/key/replay/HMAC/financial checks and owned cleanup. Its report hash:
+`ffc7fb72836cb09b98ca9b416b4cf735c34fb9e4c28d53195a8b7ccbc4b6208b`.
+Native runbook rehearsal PASSes with full persisted snapshots unchanged. All
+three dedicated egress/monitoring-alert/real-app-ingress scripts PASS on the
+verified JAR/reviewed JRE; resource absence/synthetic-key cleanup is verified.
+215 controls pass on Windows and pinned Linux. The new full source/dependency
+scan PASSes with complete10/10/0 finding accounting, current exclusive expiry,
+zero SAST/advisory matches and all native controls. That report is a dated dirty
+source checkpoint, not clean attestation. After the verified candidate commit,
+rerun the actual full source gate and release preflight against clean HEAD.
+Hosted GitHub CI remains unobserved; owner approval for branch publication was
+requested separately, not inferred. Phase remains IN PROGRESS, no task DONE,
+freeze, push, merge or deployment is claimed by this documentation checkpoint.
 
 ## Agent task template
 

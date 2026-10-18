@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "workloadVersion": "P8-T14-v1",
-  "applicationImage": "sha256:a5c4c7ecbe6d888edad4eda95db786330a7ae412c1daf38470549165241f6275",
-  "jarSha256": "32874cf74c358f37137f9c88d3d7f613f85f146a1628f9604b45fcf38a6f8dc7",
+  "workloadVersion": "P8-T18-v1-security-remediation-reacceptance",
+  "applicationImage": "sha256:951f5e3b2cc9124eb35af64c9969a8a3999884a9b05484e9c79e533ab6bbb993",
+  "jarSha256": "3212f15b52fb36ef9c967cb05e49b8bf897b822c0fa19b7424225f1c657be0d7",
   "generatorImage": "grafana/k6:2.0.0@sha256:a33a0cfdc4d2483d6b7a3a22e726a499ff2831a671a49239104cd34a9937523c",
   "generatorMemoryMiB": 256,
   "generatorCpu": 1,
-  "target": {"OSType": "linux", "Architecture": "x86_64", "NCPU": 4, "MemTotal": 3920216064, "KernelVersion": "6.18.33.2-microsoft-standard-WSL2", "ServerVersion": "29.6.2", "composeVersion": "5.3.1", "appReplicas": 1},
+  "target": {"OSType": "linux", "Architecture": "x86_64", "NCPU": 4, "MemTotal": 3920220160, "KernelVersion": "6.18.33.2-microsoft-standard-WSL2", "ServerVersion": "29.6.2", "composeVersion": "5.3.1", "appReplicas": 1},
   "configSha256Lf": {
     "ops/staging/compose.yaml": "525cc8a36c50d1deb02e3526c4b5479e8e8bb3983a951448d58254d94fad4d26",
     "ops/staging/nginx.conf": "fdc7866a7d0969b39be54390a92c99da4cb061c4493607abc35fd545e9bfbeaa",
@@ -15,7 +15,7 @@
     "ops/staging/prometheus.yaml": "4f3beebe4e737042f3209f50c91a150c269a3acce1fe82bb061f83f29d229f1f",
     "ops/monitoring/collector.yaml": "d1145456a7c3768315b7ee99fe8bfb4c3df75fda8a4b291c4dec5a219bb91860",
     "ops/monitoring/tempo.yaml": "88269a0f59d96a206f2b332353d8f7e5d9e8aa402721ab157770082f88fb4f8d",
-    "Dockerfile": "3e2590b14db2c52c164e427ea9032ef560dfd9d19b34e0d9501f405d81aeb606"
+    "Dockerfile": "58539250c18b6ed71695e91460cf0e422e7fa36de1a7dfec2e32b18eeb4385d4"
   },
   "workflow": {"amountMinor": 100000, "refundMinor": 1000, "currency": "VND", "requestsPerCompletedWorkflow": 9, "subscriberFanout": 3, "slowReceiverSeconds": 0.75, "flakyFailuresPerDelivery": 1},
   "retryPolicy": "unchanged: 10s,30s,2m,10m,1h; jitter max 0.20; HTTP timeout 5s; lease 30s",

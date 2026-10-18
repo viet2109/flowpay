@@ -1,10 +1,10 @@
 {
   "status": "APPROVED",
   "approvedBy": "owner",
-  "approvedAt": "2026-10-17T08:09:12+00:00",
-  "approvalBasis": "Owner delegated selection of the recommended calibrated targets. Agent selected the unchanged numeric proposal, including independent acceptance and a 30-minute soak. After strict preflight rejected a 4096-byte host MemTotal difference, a new accurately frozen host calibration passed; this renewed binding changes no numeric target. No security waiver or production SLO approval.",
-  "calibrationSha256": "59573d12ef57c9caa33a186b4e38fccdf3e71c4c3b105b27350b6938ecdfbda7",
-  "workloadSha256": "2c182ebc8b15069f38f5e728fe493b2343bfc660878c05825f2fd1ea5f9f42b3",
+  "approvedAt": "2026-10-17T18:57:47+00:00",
+  "approvalBasis": "Under the owner's prior delegated selection of the recommended targets and subsequent request to continue final acceptance, the agent selects the unchanged numeric targets after successful fresh calibration of the security-remediated candidate and actual exact host. Original T14 declarations are preserved in history/t14; failed bootstrap/host preflights are retained. This is a new post-calibration binding before an independent acceptance project and full 30-minute soak, not a rewritten historical approval, relaxed threshold, security waiver or production SLO.",
+  "calibrationSha256": "5e18faccf2c5362cd6bd8a357a221dddcb9119b5d07de7ad5a958f2238a111b7",
+  "workloadSha256": "5d25e9752a27b59a8dbf274c83d9d989a66a71481c96b422959c957151eb6ff8",
   "thresholds": {
     "apiP95Ms": 500,
     "apiP99Ms": 1000,

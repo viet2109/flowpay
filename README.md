@@ -13,13 +13,18 @@ production configuration/management/probes, P8-T03's business metrics and
 P8-T04's asynchronous operational metrics, P8-T05's synchronous tracing and
 P8-T06's durable Outbox trace context and P8-T07's consumer/delayed-worker tracing,
 P8-T08's monitoring lab, P8-T09's Webhook egress and P8-T10's approved auth/ingress
-protections. Remaining security acceptance and operational-recovery
-tasks are pending.
+protections. T11–T17 also provide image/staging gates, measured load/recovery
+evidence and operational runbooks. P8-T18 final acceptance is in progress;
+the final committed-source/hosted-CI gates remain separate and Phase 8 is not
+DONE/FROZEN. See the dated exit audit for current versus historical evidence.
 
 P8-T11 adds [CI verification and supply-chain gates](docs/ci-supply-chain.md).
-Security acceptance is currently **blocked**, not clean: the owner explicitly
-chose to retain baseline secret-format findings without exceptions for later
-review. CI adoption does not publish/deploy anything or complete Phase 8.
+The initial security gates blocked baseline findings. The owner later approved
+dependency/base-image remediation and seven exact, expiring source false-positive
+reviews, not a real-secret waiver. Source/image scans passed; final source
+re-attestation includes current review-expiry metadata; require the post-commit
+generated security/preflight reports to match clean HEAD.
+CI adoption does not publish/deploy anything or complete Phase 8.
 
 P8-T12 adds a [verified-artifact runtime image](docs/container-runtime.md) and
 isolated restart/API-to-Ledger/Webhook gates. Runtime success is separate from
@@ -55,6 +60,20 @@ P8-T17 adds [operational runbooks](docs/operations-runbook.md), an explicit
 triage. UNKNOWN, DEAD/DLQ, key exposure and rollout/restore actions have distinct
 approval boundaries. Native diagnosis/rejected-retry checks preserve persisted
 history; no automatic repair/replay or deployment authorization is added.
+
+P8-T18's [exit audit](docs/production-exit-audit.md) records the fresh final
+verification and independently artifact-bound acceptance. Phase8 remains
+IN PROGRESS; a passing Java suite is not a release or documentation freeze.
+The owner subsequently approved [dependency/base-image security remediation](docs/dependency-security-review.md),
+without exceptions or fixture suppression; acceptance of that new candidate is
+separate from the earlier evidence.
+After individual review, the owner also approved
+[bounded source false-positive acceptance](docs/secret-findings-review.md#approved-bounded-false-positive-acceptance)
+for seven exact test/doc locations only, with content/scanner binding and expiry.
+The full security gate now passes with10 total/10 accepted/zero unreviewed
+source findings;203 control tests pass on Windows/Linux.
+Real/new findings and image secrets remain blocking; Phase8 final acceptance
+is still separate and incomplete.
 
 ## Implemented flow
 
@@ -160,11 +179,13 @@ DB outage returns readiness 503; broker outage makes aggregate internal health
 `MANAGEMENT_SERVER_ADDRESS` only for an explicitly private interface/container
 network; never publish or proxy the management port to public ingress. There
 is no management credential flow: loopback/private network is its trust boundary.
-Actual Linux staging network enforcement is still P8-T13 work.
+Linux staging network enforcement is verified separately in
+[the T13 staging lab](docs/staging-deployment.md), not inferred from this binding.
 
 Graceful HTTP shutdown is enabled with a prod limit of 30s **per lifecycle phase**,
-not a whole-process deadline. Container signal/grace periods, worker shutdown
-and CPU/memory/JVM limits remain packaging/staging tasks. See the
+not a whole-process deadline. T12–T15 separately verify container signal handling,
+the 120s container stop allowance, worker recovery and finite CPU/memory/JVM
+budgets; they do not establish a universal shutdown or availability SLO. See the
 [configuration, listener and lifecycle contract](docs/production-engineering.md#6-production-configuration-and-management-t02).
 
 ## Business metrics
@@ -326,7 +347,9 @@ staging and P8-T14 verifies the declared load/stress/30-minute soak workload.
 P8-T15 verifies bounded two-instance operational failure drills. P8-T16 implements
 isolated encrypted backup/restore and approved original-event mismatch recovery.
 P8-T17 verifies operational runbooks/read-only rehearsal. T18 final exit gates
-remain pending; release security and external operational prerequisites still block.
+include fresh passing local source/image/runtime/staging/load/failure/restore/
+runbook and network/monitoring checks. Clean-committed attestation and hosted CI
+must be verified separately; external operational prerequisites still block deployment.
 The functional simulator MVP is not a claim of
 production readiness, real payment processing, guaranteed cross-event ordering,
 or exactly-once external HTTP delivery. Endpoint re-enable, dual-secret grace,

@@ -8,7 +8,31 @@ there is no staffed on-call team, external paging destination or hosted frontend
 An operator needs explicit access to the selected staging environment. Docker
 administrator access and its private networks are trusted, not a tenant boundary.
 Never use development Compose, root `.env`, foreign volumes or fixture keys for
-a retained deployment. Security remains **BLOCKED**; this runbook cannot waive it.
+a retained deployment. Retained/public release remains **NO-GO**; this runbook
+cannot authorize deployment or waive independent gates. P8-T18's reviewed
+source/image security gates currently pass with the bounded
+[source false-positive acceptance](secret-findings-review.md#approved-bounded-false-positive-acceptance),
+not a real-secret waiver. Final operational repetitions now pass; committed-source
+and hosted-CI checkpoints remain separate. See the [exit audit](production-exit-audit.md). The dated T17
+rehearsal below is historical; the current candidate repetition is recorded next.
+
+### P8-T18 final-candidate rehearsal — PASS (2026-10-18)
+
+The current image/JAR repetition ran03:11:14.315445Z–03:12:40.728610Z.
+All25 local link/source-contract checks and native read-only SQL/queue/health/
+metrics/dashboard200/DELIVERED-retry409 controls pass. Exact19-table, sequence
+and schema snapshots are unchanged; no changed table names. One payment/refund,
+two unique balanced postings, four events, two deliveries, HMAC/source trace
+and empty queues including DLQs pass. Owned resources/temporary keys were removed.
+The preflight correctly records BLOCKED on the older source report lacking
+required expiry metadata; a passing rehearsal is not release clearance.
+
+Safe report SHA-256:
+`8128d08f11d1cf20d03168a674455e6a57a1eacecf574bfd0614ae0cacb13eb5`;
+executable workload SHA-256:
+`a39609aee1945bf635f0c1cfbc03279ea36ce3dff369610f0e4170720306c2bd`.
+215 offline controls pass on Windows and pinned Linux. No new DEAD exhaustion,
+real DLQ replay, production mutation/key rotation or deployment is authorized.
 
 | Class | Action | Required decision |
 |---|---|---|
@@ -283,18 +307,23 @@ python -B ops/runbooks/runbooks.py check
 python -B ops/runbooks/runbooks.py rehearse
 ```
 
-The last command requires the unchanged verified T13 image and idle Docker host.
+The last command requires the exact verified image pinned in
+`ops/backup/policy.json` and an idle Docker host; a different artifact is rejected.
 It creates a new synthetic UUID lab with private receiver/secrets, performs one
 normal API payment/refund fixture, then executes the documented read-only triage
 and dashboard history/invalid-retry commands. Complete DB/schema/sequence
 snapshots must remain unchanged; financial/HMAC/trace audits pass. It also requires
-the real release preflight to remain blocked. No operational retry/repair is
+the real independent release-preflight outcome to be recorded. Blocked evidence
+remains blocked; a passed preflight is not deployment/release authority and does
+not invalidate an otherwise successful read-only rehearsal. T17's earlier
+blocked outcome is historical, not a requirement to keep gates red forever.
+No operational retry/repair is
 automated. Only its disposable lab is removed; temporary keys/data are deleted
 and cannot be recovered. Safe report is `target/ci-safe/runbooks.json`.
 The contract check is also discovered by existing CI unit checks; the owned
 native rehearsal is manual, not a hosted-CI/deployment result.
 
-Final unchanged rehearsal passed on2026-10-17,20:49:24–20:50:49 Asia/Saigon
+The historical final T17 rehearsal passed on2026-10-17,20:49:24–20:50:49 Asia/Saigon
 (safe JSON stores UTC). Both dashboard list/detail returned200, DELIVERED retry
 returned409, and the DEAD list was empty. All19 tables, sequences and schema
 were exactly unchanged across triage and these API checks. The one synthetic
@@ -329,5 +358,7 @@ retry202 is in `WebhookDeliveryApiTest.retryReturns202AndOnlySchedulesWithoutRes
 
 Prior T13–T16 results are linked above and in
 [the release evidence ledger](release-checklist.md#evidence-and-residual-risk).
-T18 remains unstarted; source/image security stays BLOCKED. No push/merge is
-included. Local phase/index references are corrected separately, never committed.
+At that T17 checkpoint, T18 was unstarted and source/image security remained
+BLOCKED. Current T18 status is stated at the top; no new-image rehearsal is
+claimed until its native result is recorded. No push/merge is included.
+Local phase/index references are corrected separately, never committed.

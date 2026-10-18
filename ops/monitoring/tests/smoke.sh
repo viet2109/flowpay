@@ -11,6 +11,10 @@ test -f "$FLOWPAY_JAR"
 project="flowpay-monitoring-$(date +%s)-$$"
 existing=$(docker ps -aq --filter "label=com.docker.compose.project=$project")
 test -z "$existing"
+existing=$(docker network ls -q --filter "label=com.docker.compose.project=$project")
+test -z "$existing"
+existing=$(docker volume ls -q --filter "label=com.docker.compose.project=$project")
+test -z "$existing"
 LAB_SECRETS_DIR=$(host_path "$(mktemp -d "${TMPDIR:-/tmp}/flowpay-monitoring.XXXXXX")")
 export LAB_SECRETS_DIR
 compose() { docker compose --env-file "$(host_path /dev/null)" -p "$project" -f "$(host_path "$root/ops/monitoring/compose.yaml")" "$@"; }
@@ -29,7 +33,7 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 docker run --rm --mount "type=bind,source=$LAB_SECRETS_DIR,target=/secrets" \
   --mount "type=bind,source=$(host_path "$root/ops/monitoring/tests"),target=/checks,readonly" \
-  --entrypoint /bin/sh eclipse-temurin:21.0.10_7-jre-jammy@sha256:fa4854e6057665066cb79953616671c20f32b96a85d6dd8b78db0762203924c4 /checks/init-secrets.sh /secrets
+  --entrypoint /bin/sh eclipse-temurin:21.0.12.1_1-jre-jammy@sha256:8ecbec1f32912979c15b86aaf98f7082a77d318a7f92af3d9fe2c0fd2723df10 /checks/init-secrets.sh /secrets
 compose config --quiet
 compose --profile checks config --format json | compose run --rm --no-deps -T --entrypoint python probe -B /checks/validate.py
 compose run --rm --no-deps --entrypoint /bin/promtool prometheus check config /etc/prometheus/prometheus.yaml

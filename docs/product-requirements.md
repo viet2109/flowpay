@@ -213,12 +213,14 @@ these boundaries. Phase 6 remains DONE/FROZEN; Phase 8 hardening is not included
 
 ### Phase 8 — Production engineering
 
-Status: `IN PROGRESS` as of 2026-10-15; P8-T01 baseline/design, P8-T02
+Status: `IN PROGRESS` as of 2026-10-17; P8-T01 baseline/design, P8-T02
 production configuration/management, P8-T03 business metrics, P8-T04
 asynchronous operational metrics, P8-T05 synchronous tracing and P8-T06 durable
 Outbox trace context, P8-T07 consumer/delayed-worker tracing, P8-T08 monitoring
 lab/dashboards/alerts, P8-T09 Webhook egress protection and P8-T10 reviewed auth/
-ingress security controls complete.
+ingress security controls complete. T11–T17 gate implementations and bounded
+staging/load/failure/restore/runbook evidence are recorded below. T18 final
+acceptance is in progress, not phase completion or security clearance.
 
 Target selected by the user: reproducible staging on Linux/container, without
 a chosen provider or external deployment. The Phase 7 release is merged into
@@ -305,12 +307,26 @@ persistence/broker/telemetry, external key continuity, topology-before-producers
 and fresh/Phase7 upgrade/recovery verification. This local simulator environment
 does not grant release clearance while T11/T12 security gates remain blocked.
 
-The remaining five implementation tasks cover declared load and
-multi-instance failure drills, actual DB/broker/key restore and runbooks.
+T14's [declared load/30-minute soak](load-testing.md), T15's
+[two-instance failure drills](operational-drills.md), T16's
+[DB/broker/key restore](backup-restore.md) and T17's
+[operational runbooks](operations-runbook.md) have bounded lab acceptance on
+their recorded T13 artifact. They do not transfer automatically to a different
+final image or host, waive source/image findings, provision off-host backups or
+provide public hosting. T18 must reconcile all required final-artifact gates.
 Specific tool versions, trace DDL/security contract changes and measured
 performance/recovery targets have explicit owner/review gates in
 `production-engineering.md`; they are not silently preimplemented or fabricated.
 Public financial/event contracts and Phase 7 reliability semantics remain frozen.
+
+The [P8-T18 exit audit](production-exit-audit.md) reconciles the current final
+candidate with those historical proofs and independently required gates. The
+2026-10-18 candidate repeats full30-minute load/soak, all eight two-instance
+failure cases, matched/mismatch restores and read-only runbook rehearsal with
+passing financial/HMAC/cleanup audits. Stress drops/429 and rolling transients
+remain explicit. Final native/source/clean-commit and hosted-CI evidence are
+separate, not inferred from these operational passes. The audit
+records no security waiver, public deployment or phase freeze.
 
 Completion is evidence-bound to the selected staging target. It does not imply
 real-money readiness, an unspecified cloud deployment, exactly-once HTTP or

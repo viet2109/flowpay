@@ -1,5 +1,43 @@
 # Two-instance operational failure drills (P8-T15)
 
+## P8-T18 candidate repetition — PASS (2026-10-18)
+
+The original T15 declaration is preserved at
+`ops/resilience/history/t15/manifest.json`. The active declaration now binds the
+security-remediated image/JAR and real new load-acceptance report
+`1bcff0e7ea8ae5f461e2b4ccd421f438f4826ab375cf7c5538ad9248b09ff0bc`.
+All eight cases, two replicas, host envelope, recovery/readiness deadlines,
+outage dwell, production resources, TLS, ingress and retry/lease policies remain
+unchanged. The new invocation passed; the dated T15 measurements below
+remain historical, not the new result. No retained
+deployment, financial SQL repair, real DLQ replay or security waiver is authorized.
+
+New run:2026-10-18T02:45:43.254663Z–02:57:54.556326Z (about12m11s).
+Report SHA-256:
+`13f42a23270a47595abe8a9ea0b7b797f77524096a3ebbda3cdedadcc2d0c04e`;
+executable workload SHA-256:
+`736ae50b53ec68fde9894425aefdd14a30bcee162d6ef12fb3c8d43fc2309281`.
+
+| Case | Total(s) | Current candidate observations |
+|---|---:|---|
+| multi_instance | 41.77 | Both replicas served business HTTP with fresh scrapes;4 original-envelope duplicates preserved all history and sent no extra HTTP |
+| broker_outage | 94.39 | Source201/200/201 with4 facts unpublished while broker stopped;67.01s durable drain after restart |
+| database_outage | 67.99 | App readiness503, edge504, liveness200; no financial writes offered while down; exact retained snapshot unchanged |
+| worker_kill | 132.10 | Survivor recovery39.69s; unknown abandoned attempt retained, original process restarted and replay checked |
+| stale_result | 75.45 | Survivor recovery39.66s; resumed old owner processed its late result without overwriting the abandoned attempt |
+| slow_receiver | 29.08 | REQUEST_TIMEOUT retained, real scheduled retry delivered;14.87s drain |
+| monitoring_outage | 52.61 | Four telemetry listeners unavailable while business/consumers continued; two fresh post-probe scrapes after restart |
+| rolling_restart | 101.88 | Both exits143 without OOM/forced kill; survivor query200 before each restart;270 successful reads and7 explicit transients |
+
+All eight cases pass their whole-project financial/identity/HMAC/attempt audits.
+Final totals:9 payments/refunds,18 unique balanced postings,36 public events,
+18 delivered subscriptions,21 retained attempts and2 expired-lease recoveries.
+Owned resources/temporary keys were removed and absence verified. No timeout,
+lease, jitter, retry, ingress or resource bound was changed. Case wall time is
+not outage duration or a production RTO. Seven rolling transients preclude a
+zero-downtime claim; one shared VM is not independent-host HA. Restore, final
+native/source/clean-committed gates and public deployment remain separate.
+
 ## Scope and fixed expectations
 
 Synthetic Linux/container staging only, not a public deployment, capacity/HA

@@ -13,6 +13,19 @@ PROJECT = 'flowpay-stage-' + 'a' * 32
 
 
 class RunbooksTest(unittest.TestCase):
+    def test_rehearsal_records_preflight_without_deploy_authority_or_private_errors(self):
+        spec = importlib.util.spec_from_file_location('rehearsal', ops.HERE / 'rehearse.py')
+        rehearsal = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(rehearsal)
+        with patch.object(rehearsal.recovery.staging, 'release_check') as check:
+            self.assertEqual(rehearsal.release_preflight_status(),
+                             'PASSED; preflight only, no deployment or release authorization')
+            check.assert_called_once_with({})
+        with patch.object(rehearsal.recovery.staging, 'release_check',
+                          side_effect=rehearsal.gate.GateError('private-diagnostic-marker')):
+            self.assertEqual(rehearsal.release_preflight_status(),
+                             'BLOCKED; required security/current evidence not passed')
+
     def test_rehearsal_keeps_inherited_queue_probe_contract(self):
         spec = importlib.util.spec_from_file_location('operator_probe', ops.HERE / 'probe.py')
         probe = importlib.util.module_from_spec(spec)

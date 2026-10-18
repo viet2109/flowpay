@@ -39,7 +39,7 @@ services:
     cpus: 1
 
   app:
-    image: eclipse-temurin:21.0.10_7-jre-jammy@sha256:fa4854e6057665066cb79953616671c20f32b96a85d6dd8b78db0762203924c4
+    image: eclipse-temurin:21.0.12.1_1-jre-jammy@sha256:8ecbec1f32912979c15b86aaf98f7082a77d318a7f92af3d9fe2c0fd2723df10
     user: '10001:10001'
     read_only: true
     tmpfs: ['/tmp:size=128m,mode=1777']

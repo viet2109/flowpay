@@ -1,4 +1,4 @@
-# FlowPay release checklist (P8-T17)
+# FlowPay release checklist (P8-T17; P8-T18 exit audit)
 
 ## Decision and ownership
 
@@ -7,7 +7,18 @@ passing operational checks is not a public API deployment, real-money readiness
 or phase completion. The repository owner must name the exact environment,
 incident/release approver, access route and rollback/cutover authority before
 approving any release. No provider/domain/registry/paid account is provisioned;
-no frontend or admin console is implied. T18's final gates remain unstarted.
+no frontend or admin console is implied. T18's final gates are in progress;
+no final acceptance or documentation freeze is declared.
+
+See the [T18 exit audit](production-exit-audit.md) for the current candidate,
+clean committed-source requirement and final-artifact operational results. The
+owner-approved [dependency/base-image review](dependency-security-review.md)
+records the new full Java/build/image-security/runtime passes, zero Maven
+advisory matches. Later owner-approved bounded source review yields a full
+security PASS with10 total/10 accepted/zero unreviewed findings, not a real-secret
+waiver or clean committed release attestation. It
+also retains the rejected Grafana staging check and separate diagnostic result;
+no old operational acceptance or clean release is inferred.
 
 This checklist records required decisions, not blanket authorization to execute
 mutations. Keep source/image evidence current and attributable to the actual
@@ -26,7 +37,11 @@ candidate. Never tick a box because an older report exists or a tool was absent.
 - [ ] Independent source security and application-image gates pass:
   `python -B ops/ci/gate.py security` and
   `python -B ops/container/image.py scan`. Currently blocked findings are not
-  waived. Exceptions remain empty; no fixture rewrite/suppression is authorized.
+  waived. Dependency/SAST exceptions remain empty; source false-positive
+  acceptance requires the owner's exact, unexpired
+  [review manifest](secret-findings-review.md#approved-bounded-false-positive-acceptance).
+  No real-secret waiver, fixture rewrite, detector or image-secret suppression
+  is authorized. Recheck expiry on the actual release candidate.
 - [ ] Runtime and staging pass on that exact image:
   `python -B ops/container/image.py runtime` and
   `python -B ops/staging/staging.py smoke`. Require both fresh and Phase7 upgrade,
@@ -100,12 +115,13 @@ safe artifacts; reports in `target/ci-safe` are not committed secret archives.
 | Gate | Actual evidence | Limit or unresolved gate |
 |---|---|---|
 | T08/T13 monitoring/staging | Private dashboards, rules, TLS/dual-stack/proxy and fresh/legacy V013 gates | No external operator route/paging, full-host HA or least-privilege runtime role acceptance |
-| T11/T12 security |10 source secret-format findings; app-image6 CRITICAL/12 HIGH remain unwaived | NO-GO; historical counts are not a new scan of the current release or all infrastructure |
-| T13 artifact | JAR `32874cf74c358f37137f9c88d3d7f613f85f146a1628f9604b45fcf38a6f8dc7`; image `sha256:a5c4c7ecbe6d888edad4eda95db786330a7ae412c1daf38470549165241f6275`;1,407 tests/196 suites | Reused unchanged artifact, not T18's final source/security gate |
-| T14 [load](load-testing.md) |30-minute soak; regular route tails meet500/1000ms; stress112 policy429 | Frozen simulator/host; no universal throughput, alert-notification timeline or production SLO |
-| T15 [failure](operational-drills.md) | Eight two-instance cases; worker/stale recovery41.20/39.18s; rolling230 successes/6 transients | Single host, no zero-error rollout or provider crash reconciliation |
-| T16 [restore](backup-restore.md) | Cold/mismatch101.28/109.23s;19-table/sequence/schema/key/HMAC/trace/history audits | RPO target24h/RTO lab15m; no off-host schedule/retention/PITR or standing real-queue replay approval |
-| T17 [runbooks](operations-runbook.md#rehearsal-and-evidence) |178 Windows/Linux controls;19 final links/anchors/source-config checks; native read-only SQL/queue/health/metrics and dashboard history/409; exact persisted snapshots unchanged; preflight BLOCKED | No newly rehearsed DEAD202/exhaustion, real remediation/rotation/DLQ replay or deployment authority |
+| T18 source/image security | Approved remediation:235 Maven components/zero advisories;301 image components/zero HIGH/CRITICAL/UNKNOWN;10 exact source false positives accepted with exclusive expiry | Final source-expiry metadata/clean-commit attestation required; not a scan of all infrastructure or waiver for real secrets |
+| T18 candidate artifact | JAR `3212f15b52fb36ef9c967cb05e49b8bf897b822c0fa19b7424225f1c657be0d7`; image `sha256:951f5e3b2cc9124eb35af64c9969a8a3999884a9b05484e9c79e533ab6bbb993`; fresh1,407 tests/196 suites | Build/test inputs remain exact; prior T13 artifact/results stay historical |
+| T18 [load repetition](load-testing.md) | Independent30-minute soak; regular route tails meet500/1000ms, zero regular drops/429; stress13 drops/96 policy429 | Declared simulator/host only; no maximum throughput, alert-notification timeline or production SLO |
+| T18 [failure repetition](operational-drills.md) | All eight two-instance cases; worker/stale recovery39.69/39.66s; rolling270 successes/7 transients | Single host, no zero-error rollout or provider crash reconciliation |
+| T18 [restore repetition](backup-restore.md) | Cold/mismatch101.40/110.38s;19-table/sequence/schema/key/HMAC/trace/history audits | RPO target24h/RTO lab15m; no off-host schedule/retention/PITR or standing real-queue replay approval |
+| T18 [runbook repetition](operations-runbook.md) |215 Windows/Linux controls;25 links/source-contract checks; native read-only SQL/queue/health/metrics/dashboard history/409; exact snapshots unchanged; preflight records BLOCKED | No newly rehearsed DEAD202/exhaustion, real remediation/rotation/DLQ replay or deployment authority |
+| T18 [exit audit](production-exit-audit.md) | Exact final-image build/runtime/both fresh-Phase7 staging, load/failure/restore/runbook plus dedicated native network/alert/ingress and current full source passes; rejected attempts retained | Clean-commit security/preflight is a generated post-commit checkpoint; hosted CI has not run on this unpublished branch; phase not frozen |
 
 The T17 command/link/privacy rehearsal is separate evidence of actionable
 diagnosis, not completion of these release gates. Phase8 is not declared DONE
@@ -119,8 +135,15 @@ python -B ops/runbooks/runbooks.py check
 python -B ops/runbooks/runbooks.py rehearse
 ```
 
+The T17 native rehearsal is deliberately bound to the historical T13 image via
+the recovery policy. After T18's new clean build it refuses that different image
+at entry; `check` still validates links/source/SQL/privacy contracts. Rebind and
+rehearse only through a reviewed real final-evidence chain, never by copying
+old passes or replacing the historical approval. See the exit audit above.
+
 Follow [rehearsal scope and evidence](operations-runbook.md#rehearsal-and-evidence).
 These commands never deploy or bypass security. The final native rehearsal
 passed on2026-10-17 with owned cleanup; its artifact/command/report hashes and
 limits are recorded in the linked runbook. Unperformed hosted/external steps
-and T18 remain open; security and deployment prerequisites are still NO-GO.
+and T18 final acceptance remain open; security and deployment prerequisites
+are still NO-GO.
