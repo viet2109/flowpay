@@ -11,7 +11,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.net.http.HttpClient;
+import org.apache.hc.client5.http.impl.async.CloseableHttpAsyncClient;
+import org.apache.hc.core5.io.CloseMode;
+import org.springframework.mock.env.MockEnvironment;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.*;
@@ -26,7 +28,7 @@ import static com.flowpay.backend.webhook.application.WebhookHttpDeliveryResult.
 class WebhookHttpClientIntegrationTest {
     private HttpServer server;
     private ExecutorService handlers;
-    private HttpClient client;
+    private CloseableHttpAsyncClient client;
     private WebhookHttpClientPort adapter;
     private final AtomicInteger calls = new AtomicInteger();
     private final AtomicReference<byte[]> received = new AtomicReference<>();
@@ -46,7 +48,7 @@ class WebhookHttpClientIntegrationTest {
     void stop() {
         server.stop(0);
         handlers.shutdownNow();
-        client.shutdownNow();
+        client.close(CloseMode.IMMEDIATE);
     }
 
     @ParameterizedTest
@@ -172,12 +174,59 @@ class WebhookHttpClientIntegrationTest {
         assertThat(result.toString()).doesNotContain("whsec_fixture", "127.0.0.1", "Hoàn tiền");
     }
 
-    private void configure(Duration connect, Duration request) {
-        if (client != null) client.shutdownNow();
-        client = HttpClient.newBuilder().connectTimeout(connect).followRedirects(HttpClient.Redirect.NEVER).build();
+    @Test
+    void cancelledUnreadBodiesReleaseMoreConnectionsThanThePerRoutePoolLimit() throws Exception {
+        var release = new CountDownLatch(1);
+        server.createContext("/stream-pool", exchange -> {
+            calls.incrementAndGet();
+            exchange.getRequestBody().readAllBytes();
+            exchange.sendResponseHeaders(200, 0);
+            exchange.getResponseBody().write(1);
+            exchange.getResponseBody().flush();
+            waitFor(release);
+            exchange.close();
+        });
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            var sends = executor.submit(() -> {
+                for (int attempt = 0; attempt < 12; attempt++) {
+                    assertThat(adapter.send(request(url("/stream-pool"))).successful()).isTrue();
+                }
+            });
+            try {
+                sends.get(5, TimeUnit.SECONDS); // Pool has eight slots, none may remain leased by stalled bodies.
+                assertThat(calls).hasValue(12);
+                assertThat(release.getCount()).isEqualTo(1);
+            } finally { release.countDown(); }
+        }
+    }
+
+    @Test
+    void authChallengesDoNotRetryAndCookiesCompressionOrTraceHeadersAreNotAdded() throws Exception {
+        server.createContext("/challenge", exchange -> {
+            calls.incrementAndGet();
+            exchange.getRequestBody().readAllBytes();
+            for (String name : new String[]{"Cookie", "Authorization", "Proxy-Authorization", "Accept-Encoding", "traceparent", "baggage"}) {
+                assertThat(exchange.getRequestHeaders().getFirst(name)).isNull();
+            }
+            exchange.getResponseHeaders().set("Set-Cookie", "merchant-state=private; Path=/");
+            exchange.getResponseHeaders().set("WWW-Authenticate", "Basic realm=merchant");
+            exchange.sendResponseHeaders(401, -1);
+            exchange.close();
+        });
+        for (int request = 0; request < 2; request++) {
+            assertThat(adapter.send(request(url("/challenge"))).httpStatus()).isEqualTo(401);
+        }
+        assertThat(calls).hasValue(2);
+    }
+
+    private void configure(Duration connect, Duration request) throws Exception {
+        if (client != null) client.close(CloseMode.IMMEDIATE);
+        client = new WebhookHttpConfiguration().webhookHttpClient(new WebhookHttpProperties(connect, request),
+                new WebhookEgressProperties(null, null), new MockEnvironment());
         // Controlled loopback fixture. Production uses the separately verified DefaultWebhookUrlPolicy.
-        adapter = new JdkWebhookHttpClientAdapter(client, new HmacSha256WebhookSigner(), url -> url,
-                new WebhookHttpProperties(connect, request));
+        adapter = new ApacheWebhookHttpClientAdapter(client, new HmacSha256WebhookSigner(), url -> url,
+                new WebhookHttpProperties(connect, request),
+                new com.flowpay.backend.common.observability.ExternalCallTracing(io.micrometer.tracing.Tracer.NOOP));
     }
 
     private WebhookHttpDeliveryRequest request(String url) {

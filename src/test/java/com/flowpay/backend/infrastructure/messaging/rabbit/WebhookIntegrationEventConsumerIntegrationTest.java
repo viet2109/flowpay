@@ -1,5 +1,7 @@
 package com.flowpay.backend.infrastructure.messaging.rabbit;
 
+import com.flowpay.backend.common.observability.MetricsRecorder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.flowpay.backend.infrastructure.messaging.FlowPayMessagingProperties;
 import com.flowpay.backend.infrastructure.messaging.WebhookMessagingProperties;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventTransportPublisher;
@@ -37,7 +39,9 @@ import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-@SpringBootTest
+@SpringBootTest(properties = {"management.opentelemetry.tracing.sampler=parent-based-always-on",
+        "management.opentelemetry.tracing.export.schedule-delay=100ms"})
+@org.springframework.context.annotation.Import(com.flowpay.backend.testing.TraceCaptureConfiguration.class)
 @ActiveProfiles("test")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class WebhookIntegrationEventConsumerIntegrationTest extends PostgresIntegrationTest {
@@ -57,6 +61,8 @@ class WebhookIntegrationEventConsumerIntegrationTest extends PostgresIntegration
     @Autowired private WebhookDeliveryRepository deliveries;
     @Autowired private WebhookDeliveryAttemptRepository attempts;
     @Autowired private WebhookDeliveryExecutionService execution;
+    @Autowired private com.flowpay.backend.testing.CapturingSpanExporter spans;
+    @Autowired private io.opentelemetry.sdk.trace.SdkTracerProvider traceProvider;
     @MockitoBean private WebhookHttpClientPort http;
     @MockitoBean private Clock clock;
     private final AtomicReference<Instant> now = new AtomicReference<>(OCCURRED);
@@ -100,7 +106,8 @@ class WebhookIntegrationEventConsumerIntegrationTest extends PostgresIntegration
         for (var type : WebhookEventType.values()) {
             var event = envelope(type, 10000);
             assertThat(publisher.publish(event).confirmed()).isTrue();
-            assertThat(publisher.publish(event).confirmed()).isTrue();
+            assertThat(publisher.publish(event,
+                    "00-" + "a".repeat(32) + "-" + "b".repeat(16) + "-01").confirmed()).isTrue();
         }
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
             assertThat(count("webhook_events")).isEqualTo(6);
@@ -113,7 +120,8 @@ class WebhookIntegrationEventConsumerIntegrationTest extends PostgresIntegration
         for (var type : WebhookEventType.values()) {
             var saved = events.findBySourceEventId("ievt_" + type.name()).orElseThrow();
             assertThat(saved.occurredAt()).isEqualTo(OCCURRED);
-            assertThat(saved.payload()).doesNotContain("merchantInternalId", "orderId", "ievt_");
+            assertThat(saved.payload()).doesNotContain("merchantInternalId", "orderId", "ievt_",
+                    "traceparent", "tracestate", "baggage");
         }
         assertThat(queueSize(webhook.topology().webhookDeadLetterQueue())).isZero();
         assertThat(queueSize(messaging.topology().ledgerDeadLetterQueue())).isZero();
@@ -122,9 +130,15 @@ class WebhookIntegrationEventConsumerIntegrationTest extends PostgresIntegration
     @Test
     void equivalentRedeliveryIsAckedWithoutIncludingAnEndpointConfiguredLater() {
         var source = envelope(WebhookEventType.PAYMENT_PROCESSING, 10000);
-        assertThat(publisher.publish(source).confirmed()).isTrue();
+        String parent = "00-" + "a".repeat(32) + "-" + "b".repeat(16) + "-01";
+        String differentParent = "00-" + "c".repeat(32) + "-" + "d".repeat(16) + "-01";
+        assertThat(publisher.publish(source, parent).confirmed()).isTrue();
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(count("webhook_events")).isOne());
         var original = events.findBySourceEventId(source.eventId()).orElseThrow();
+        String savedContext = jdbc.queryForObject("SELECT traceparent FROM webhook_events WHERE id = ?",
+                String.class, original.internalId());
+        assertThat(savedContext).startsWith("00-" + "a".repeat(32) + "-");
+        assertThat(savedContext).isNotEqualTo(parent);
         endpoint("late");
         // Different JSON order/spacing and normalized currency are still equivalent facts.
         var payload = mapper.readTree("""
@@ -132,7 +146,7 @@ class WebhookIntegrationEventConsumerIntegrationTest extends PostgresIntegration
                  "occurredAt":"%s","merchantInternalId":%d}
                 """.formatted(OCCURRED, merchant));
         publisher.publish(new IntegrationEventEnvelope(source.eventId(), source.eventType(), source.aggregateType(),
-                source.aggregateId(), source.occurredAt(), payload));
+                source.aggregateId(), source.occurredAt(), payload), differentParent);
         // FIFO marker proves the preceding redelivery finished, not merely that DB counts stayed unchanged.
         publisher.publish(envelope(WebhookEventType.REFUND_PROCESSING, 10000));
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
@@ -143,6 +157,55 @@ class WebhookIntegrationEventConsumerIntegrationTest extends PostgresIntegration
         assertThat(jdbc.queryForObject("SELECT count(*) FROM webhook_deliveries WHERE webhook_event_id = ?",
                 Long.class, original.internalId())).isZero();
         assertThat(queueSize(webhook.topology().webhookDeadLetterQueue())).isZero();
+        assertThat(jdbc.queryForObject("SELECT traceparent FROM webhook_events WHERE id = ?",
+                String.class, original.internalId())).isEqualTo(savedContext);
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+            traceProvider.forceFlush().join(2, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(spans.spans().stream().filter(s -> s.getName().equals("webhook.materialize")))
+                    .anySatisfy(s -> {
+                        assertThat(s.getTraceId()).isEqualTo("a".repeat(32));
+                        assertThat(s.getParentSpanId()).isEqualTo("b".repeat(16));
+                        assertThat(s.getSpanId()).isEqualTo(savedContext.substring(36, 52));
+                    }).anySatisfy(s -> {
+                        assertThat(s.getTraceId()).isEqualTo("c".repeat(32));
+                        assertThat(s.getParentSpanId()).isEqualTo("d".repeat(16));
+                    });
+        });
+    }
+
+    @Test
+    void malformedNonStringAndOversizedHeadersAreIgnoredWithoutChangingMaterialization() {
+        endpoint("headers");
+        Object[] parents = {42, "bad", "a".repeat(10000)};
+        traceProvider.forceFlush().join(5, java.util.concurrent.TimeUnit.SECONDS);
+        spans.clear();
+        for (int i = 0; i < parents.length; i++) {
+            var base = envelope(WebhookEventType.PAYMENT_PROCESSING, 10000);
+            var source = new IntegrationEventEnvelope("ievt_header_" + i, base.eventType(), base.aggregateType(),
+                    base.aggregateId(), base.occurredAt(), base.payload());
+            var metadata = new MessageProperties();
+            metadata.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+            metadata.setMessageId(source.eventId());
+            metadata.setHeader("traceparent", parents[i]);
+            metadata.setHeader("baggage", "private=synthetic-private");
+            metadata.setHeader("tracestate", "private=synthetic-private");
+            rabbit.send(messaging.topology().exchange(), source.eventType(),
+                    new Message(mapper.writeValueAsBytes(source), metadata));
+        }
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            assertThat(count("webhook_events")).isEqualTo(3);
+            assertThat(count("webhook_deliveries")).isEqualTo(3);
+            traceProvider.forceFlush().join(2, java.util.concurrent.TimeUnit.SECONDS);
+            var consumed = spans.spans().stream().filter(s -> s.getName().equals("webhook.materialize")).toList();
+            assertThat(consumed).hasSize(3).allSatisfy(s -> {
+                assertThat(s.getParentSpanContext().isValid()).isFalse();
+                assertThat(s.getEvents()).isEmpty();
+                assertThat(s.getSpanContext().getTraceState().isEmpty()).isTrue();
+            });
+            assertThat(consumed.stream().map(s -> s.getTraceId()).distinct()).hasSize(3);
+        });
+        assertThat(queueSize(webhook.topology().webhookDeadLetterQueue())).isZero();
+        assertThat(count("ledger_transactions")).isZero();
     }
 
     @Test
@@ -180,7 +243,9 @@ class WebhookIntegrationEventConsumerIntegrationTest extends PostgresIntegration
         long deliveryId = jdbc.queryForObject("SELECT id FROM webhook_deliveries", Long.class);
         when(http.send(any())).thenReturn(WebhookHttpDeliveryResult.http(500, 1));
         var worker = new WebhookDeliveryWorker(execution, http, cipher,
-                new WebhookDeliveryWorkerProperties(true, Duration.ofSeconds(1), 100, Duration.ofSeconds(30)), clock);
+                new WebhookDeliveryWorkerProperties(true, Duration.ofSeconds(1), 100, Duration.ofSeconds(30)), clock,
+                new WebhookMetrics(new MetricsRecorder(new SimpleMeterRegistry())),
+                new com.flowpay.backend.testing.UnobservedWebhookWorkerTracing());
         for (int no = 1; no <= 6; no++) {
             worker.deliverBatch();
             var delivery = deliveries.findByInternalId(deliveryId).orElseThrow();

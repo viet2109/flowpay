@@ -492,6 +492,7 @@ published_at        TIMESTAMPTZ NULL
 retry_count         INTEGER NOT NULL DEFAULT 0
 last_error          TEXT NULL
 created_at          TIMESTAMPTZ NOT NULL
+traceparent         VARCHAR(55) NULL
 ```
 
 Status:
@@ -517,6 +518,14 @@ CHECK (
 `event_id`; `PUBLISHED` is terminal for normal relay selection. Aggregate IDs
 are source public IDs and have no polymorphic foreign key. V009 creates no
 historical Payment, Refund, or Ledger backfill rows.
+
+P8-T06 / V012 adds nullable `traceparent` only; no default, backfill, index,
+business constraint or modification to V001-V011. Legacy inserts omit it.
+Infrastructure accepts canonical W3C version 00, nonzero trace/span IDs and
+flags 00/01; absent/malformed stored values are ignored without failing events.
+Capture shares the source transaction; publication/failure updates preserve it.
+No tracestate/baggage/request ID is stored. It is transport metadata, not part
+of payload JSON, business identity, dedupe or the signed public Webhook body.
 
 Worker index:
 
@@ -583,11 +592,22 @@ event_type          VARCHAR NOT NULL
 resource_type       VARCHAR NOT NULL
 resource_id         VARCHAR NOT NULL
 payload             JSONB NOT NULL
+traceparent         VARCHAR(55) NULL
 occurred_at         TIMESTAMPTZ NOT NULL
 created_at          TIMESTAMPTZ NOT NULL
 ```
 
 Webhook events are immutable.
+
+P8-T07 / V013 adds only nullable technical `traceparent`, with no backfill,
+default, index or business constraint. The first successful INSERT captures
+materialization context; ON CONFLICT does not replace it on equal redelivery.
+It is not a domain/public/dedupe fact, never part of signed JSON or merchant
+headers. Webhook infrastructure reads it by delivery/event IDs outside claim,
+HTTP and finalize transactions, with a two-second statement timeout. Invalid,
+absent or unavailable metadata is ignored. Delayed attempts/recovery have fresh
+spans parented to this immutable context, including after restart. Existing
+writers can omit it; existing rich domain readers ignore it. V001-V012 are unchanged.
 
 `event_type` is restricted to the six public Webhook event names and
 `resource_type` to `PAYMENT_INTENT` or `REFUND`. Source-event identity provides
@@ -772,6 +792,13 @@ V010__webhook_configuration.sql
 V011__webhook_delivery.sql
 ```
 
+Phase 8:
+
+```text
+V012__outbox_trace_context.sql
+V013__webhook_trace_context.sql
+```
+
 Migration numbering may be extended, but an already-applied shared migration is never edited to retrofit a later design change.
 
 ## 11. MVP table inventory
@@ -796,3 +823,21 @@ Target functional MVP tables:
 16. webhook_events
 17. webhook_deliveries
 18. webhook_delivery_attempts
+
+## 12. Operational read-only projections (P8-T04)
+
+No migration or index change. Outbox's owning projection aggregates only
+PENDING/FAILED count and oldest created_at. Webhook's owning projection counts
+PENDING/RETRYING/DELIVERING/DEAD and the earliest due PENDING/RETRYING schedule,
+including disabled endpoints. Each uses one SELECT/one row, no payload/entity
+loading, cross-module join or explicit row lock. DB statement time produces
+non-negative ages. The existing status/schedule indexes can filter but exact
+counts/minima may still scan retained history depending on the plan.
+
+Projections feed cadence-limited per-instance caches; gauges represent shared DB
+snapshots and must not be summed across replicas. Scraping never queries DB.
+Statement timeout is 2s, separate from existing pool acquisition timeout;
+failed sampling retains stale values rather than fabricated zeros. See the
+tracked production-engineering catalog for cadence/freshness/aggregation and
+query-cost limits. T14/T15 own measured staging cost; any proposed index requires
+a separately reviewed forward migration, never edits to V009/V011.

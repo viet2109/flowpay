@@ -1,0 +1,11 @@
+# Test-only third overlay. Never use it for retained staging or production.
+# Paths are relative to ops/staging/compose.yaml; no app/runtime overrides.
+services:
+  receiver:
+    entrypoint: [python, -B, /drills/receiver.py]
+    volumes: [../resilience/receiver.py:/drills/receiver.py:ro]
+    secrets: !override [cert.pem, key.pem]
+  probe:
+    entrypoint: [python, -B, /drills/probe.py]
+    volumes: [../resilience/probe.py:/drills/probe.py:ro]
+    secrets: !override [edge-cert.pem, RABBITMQ_ADMIN_PASSWORD]

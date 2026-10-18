@@ -1,0 +1,13 @@
+{
+  "version": "P8-T15-v1",
+  "replicas": 2,
+  "host": {"OSType": "linux", "Architecture": "x86_64", "NCPU": 4, "minimumMemoryBytes": 3221225472, "maximumMemoryBytes": 4294967296, "KernelVersion": "6.18.33.2-microsoft-standard-WSL2", "ServerVersion": "29.6.2", "composeVersion": "5.3.1"},
+  "applicationImage": "sha256:951f5e3b2cc9124eb35af64c9969a8a3999884a9b05484e9c79e533ab6bbb993",
+  "jarSha256": "3212f15b52fb36ef9c967cb05e49b8bf897b822c0fa19b7424225f1c657be0d7",
+  "loadAcceptanceSha256": "1bcff0e7ea8ae5f461e2b4ccd421f438f4826ab375cf7c5538ad9248b09ff0bc",
+  "readinessSeconds": 180,
+  "recoverySeconds": 180,
+  "outageSeconds": 8,
+  "cases": ["multi_instance", "broker_outage", "database_outage", "worker_kill", "stale_result", "slow_receiver", "monitoring_outage", "rolling_restart"],
+  "policy": "Unchanged production resources, TLS, ingress budgets, 5s HTTP timeout, 30s lease and jittered retry. Bounds are lab timeouts, not recovery SLOs. No source-state repair or automatic DLQ replay."
+}

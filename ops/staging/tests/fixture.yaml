@@ -1,0 +1,90 @@
+# Only the smoke runner loads this overlay, always with fresh synthetic secrets.
+services:
+  app:
+    environment:
+      JAVA_TOOL_OPTIONS: '-Djavax.net.ssl.trustStore=/run/secrets/trust.p12 -Djavax.net.ssl.trustStorePassword=fixture-only'
+      PAYMENT_SIMULATOR_DEFAULT_OUTCOME: '${STAGING_TEST_OUTCOME:-SUCCESS}'
+      REFUND_SIMULATOR_DEFAULT_OUTCOME: '${STAGING_TEST_OUTCOME:-SUCCESS}'
+      JWT_PRIVATE_KEY_LOCATION: '${STAGING_TEST_JWT_LOCATION:-file:/run/secrets/jwt-private.pem}'
+      OUTBOX_RELAY_ENABLED: '${STAGING_TEST_WORKERS:-true}'
+      WEBHOOK_DELIVERY_WORKER_ENABLED: '${STAGING_TEST_WORKERS:-true}'
+      LEDGER_EVENT_CONSUMER_ENABLED: '${STAGING_TEST_WORKERS:-true}'
+      WEBHOOK_EVENT_CONSUMER_ENABLED: '${STAGING_TEST_WORKERS:-true}'
+    secrets: [trust.p12]
+  egress:
+    networks:
+      destinations: {ipv4_address: 11.203.0.3, ipv6_address: '2606:4700:ffff::3'}
+  receiver:
+    image: python:3.13.12-slim@sha256:f1927c75e81efd1e091dbd64b6c0ecaa5630b38635a3d1c04034ac636e1f94c8
+    user: '10001:10001'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    entrypoint: [python, -B, /checks/receiver.py]
+    volumes: [./tests/receiver.py:/checks/receiver.py:ro]
+    secrets: [cert.pem, key.pem, LEGACY_WEBHOOK_SECRET]
+    networks:
+      webhook: {}
+      destinations: {ipv4_address: 11.203.0.10, ipv6_address: '2606:4700:ffff::10'}
+    mem_limit: 64m
+    cpus: 0.5
+  seed:
+    profiles: [checks]
+    image: ${FLOWPAY_IMAGE}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:rw,nosuid,nodev,size=32m,mode=1777']
+    entrypoint: [java, '-Xmx128m', '-Dloader.path=/fixture', '-Dloader.main=com.flowpay.backend.webhook.infrastructure.security.StagingPhaseSevenFixture', -cp, /opt/flowpay/app.jar, org.springframework.boot.loader.launch.PropertiesLauncher]
+    environment:
+      FLOWPAY_STAGE_DISPOSABLE: synthetic-only
+      DB_URL: jdbc:postgresql://postgres:5432/flowpay_stage
+    volumes: ['${FLOWPAY_TEST_CLASSES:?Compiled current test fixture}:/fixture:ro']
+    secrets: [DB_PASSWORD, WEBHOOK_SECRET_ENCRYPTION_KEY, LEGACY_WEBHOOK_SECRET]
+    networks: [data]
+    mem_limit: 256m
+    cpus: 1
+  probe:
+    profiles: [checks]
+    image: python:3.13.12-slim@sha256:f1927c75e81efd1e091dbd64b6c0ecaa5630b38635a3d1c04034ac636e1f94c8
+    user: '10001:10001'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    entrypoint: [python, -B, /checks/probe.py]
+    volumes:
+      - ./tests/probe.py:/checks/probe.py:ro
+      - ../monitoring/tests/smoke.py:/monitoring/smoke.py:ro
+      - ../monitoring/grafana/dashboards:/dashboards:ro
+      - '${STAGING_FIXTURE_DIR:?Owned external fixture directory}:/fixtures:ro'
+    secrets: [edge-cert.pem, GRAFANA_ADMIN_PASSWORD, RABBITMQ_ADMIN_PASSWORD]
+    networks: [ingress, data, observe, webhook]
+    mem_limit: 128m
+    cpus: 1
+  public:
+    profiles: [checks]
+    image: python:3.13.12-slim@sha256:f1927c75e81efd1e091dbd64b6c0ecaa5630b38635a3d1c04034ac636e1f94c8
+    user: '10001:10001'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    entrypoint: [python, -B, /checks/network.py, public]
+    volumes: [./tests/network.py:/checks/network.py:ro]
+    secrets: [edge-cert.pem, cert.pem]
+    environment:
+      PROTECTED_TARGETS: '${STAGING_PROTECTED_TARGETS:-[]}'
+    networks: [front]
+    mem_limit: 64m
+    cpus: 0.5
+secrets:
+  cert.pem: {file: '${STAGING_SECRETS_DIR}/cert.pem'}
+  key.pem: {file: '${STAGING_SECRETS_DIR}/key.pem'}
+  trust.p12: {file: '${STAGING_SECRETS_DIR}/trust.p12'}
+  LEGACY_WEBHOOK_SECRET: {file: '${STAGING_SECRETS_DIR}/LEGACY_WEBHOOK_SECRET'}
+networks:
+  outbound: {internal: true}
+  destinations:
+    internal: true
+    enable_ipv6: true
+    ipam:
+      config: [{subnet: 11.203.0.0/24}, {subnet: '2606:4700:ffff::/64'}]

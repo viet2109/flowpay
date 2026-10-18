@@ -5,6 +5,9 @@ import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationR
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationStatus;
 import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvelope;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageDeliveryMode;
@@ -31,6 +34,33 @@ class ConfirmedRabbitIntegrationEventPublisherTest {
 
     private final RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
     private final ObjectMapper objectMapper = mock(ObjectMapper.class);
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"malformed", "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01",
+            "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-00"})
+    void shouldOnlyAddValidTransportContextWithoutChangingSerializedEnvelope(String parent) throws Exception {
+        IntegrationEventEnvelope envelope = envelope("ievt_metadata", "payment.succeeded.v1");
+        byte[] bytes = new byte[]{1, 2, 3};
+        when(objectMapper.writeValueAsBytes(envelope)).thenReturn(bytes);
+        AtomicReference<Message> sent = new AtomicReference<>();
+        doAnswer(invocation -> {
+            sent.set(invocation.getArgument(2));
+            CorrelationData correlation = invocation.getArgument(3);
+            correlation.getFuture().complete(new CorrelationData.Confirm(true, null));
+            return null;
+        }).when(rabbitTemplate).send(anyString(), anyString(), any(Message.class), any(CorrelationData.class));
+
+        assertThat(publisher(Duration.ofSeconds(1)).publish(envelope, parent).confirmed()).isTrue();
+        assertThat(sent.get().getBody()).isEqualTo(bytes);
+        var headers = sent.get().getMessageProperties().getHeaders();
+        if (parent != null && parent.startsWith("00-")) {
+            assertThat(headers).containsEntry("traceparent", parent).hasSize(4);
+        } else {
+            assertThat(headers).doesNotContainKey("traceparent").hasSize(3);
+        }
+        assertThat(headers).doesNotContainKeys("tracestate", "baggage", "X-Request-Id");
+    }
 
     @Test
     void shouldPublishPersistentJsonAndReturnConfirmedAfterPositiveAck() throws Exception {

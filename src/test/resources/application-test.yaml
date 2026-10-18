@@ -18,6 +18,9 @@ management:
       sampler: always-off
 
 flowpay:
+  metrics:
+    sampling:
+      enabled: false
   webhook:
     delivery-worker:
       enabled: false

@@ -14,6 +14,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RequestCorrelationFilterTest {
 
     @Test
+    void shouldRestoreOuterContextEvenWhenChainThrows() {
+        MDC.put(RequestCorrelationFilter.MDC_KEY, "outer-request");
+        try {
+            var failure = new jakarta.servlet.ServletException("synthetic-private-message");
+            var filter = new RequestCorrelationFilter(new RequestIdGenerator());
+            var request = new MockHttpServletRequest();
+            request.addHeader(RequestCorrelationFilter.HEADER_NAME, "nested-request");
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> filter.doFilter(request,
+                    new MockHttpServletResponse(), (req, res) -> {
+                        assertThat(MDC.get(RequestCorrelationFilter.MDC_KEY)).isEqualTo("nested-request");
+                        throw failure;
+                    })).isSameAs(failure);
+            assertThat(MDC.get(RequestCorrelationFilter.MDC_KEY)).isEqualTo("outer-request");
+        } finally {
+            MDC.remove(RequestCorrelationFilter.MDC_KEY);
+        }
+    }
+
+    @Test
     void shouldPropagateSafeClientRequestIdAndClearMdc() throws Exception {
         RequestCorrelationFilter filter = new RequestCorrelationFilter(new RequestIdGenerator());
         MockHttpServletRequest request = new MockHttpServletRequest();

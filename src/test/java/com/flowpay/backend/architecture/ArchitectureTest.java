@@ -45,6 +45,23 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule domainMustRemainFreeOfObservability = noClasses()
+            .that().resideInAPackage("..domain..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "io.micrometer..", "io.opentelemetry..", "com.flowpay.backend.common.observability.."
+            )
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule sharedObservabilityMustNotReadModulePersistence = noClasses()
+            .that().resideInAnyPackage("com.flowpay.backend.common.observability..", "com.flowpay.backend.infrastructure.observability..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "..persistence..", "org.springframework.jdbc..", "jakarta.persistence..",
+                    "com.flowpay.backend.webhook.application..", "com.flowpay.backend.ledger.application..",
+                    "com.flowpay.backend.infrastructure.messaging.outbox.."
+            );
+
+    @ArchTest
     static final ArchRule businessCoreMustNotDependOnBusinessInfrastructure = noClasses()
             .that().resideInAnyPackage(BUSINESS_MODULES)
             .and().resideOutsideOfPackage("..infrastructure..")
@@ -55,7 +72,7 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule commonMustNotDependOnInfrastructure = noClasses()
             .that().resideInAPackage("com.flowpay.backend.common..")
-            .should().dependOnClassesThat().resideInAPackage("com.flowpay.infrastructure..")
+            .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.infrastructure..")
             .allowEmptyShould(true);
 
     @ArchTest
@@ -176,7 +193,7 @@ class ArchitectureTest {
             .that().resideInAPackage("com.flowpay.backend.webhook.domain..")
             .should().dependOnClassesThat().resideInAnyPackage(
                     "org.springframework..", "jakarta.persistence..", "org.hibernate..",
-                    "tools.jackson..", "com.fasterxml.jackson..", "java.net.http..");
+                    "tools.jackson..", "com.fasterxml.jackson..", "java.net.http..", "org.apache.hc..");
 
     @ArchTest
     static final ArchRule webhookDomainMustNotImportSourceBusinessModules = noClasses()
@@ -200,7 +217,7 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule webhookBusinessCoreMustNotUseHttpClientTechnology = noClasses()
             .that().resideInAnyPackage("com.flowpay.backend.webhook.application..", "com.flowpay.backend.webhook.domain..")
-            .should().dependOnClassesThat().resideInAnyPackage("java.net.http..", "org.springframework.web.client..");
+            .should().dependOnClassesThat().resideInAnyPackage("java.net.http..", "org.springframework.web.client..", "org.apache.hc..");
 
     @ArchTest
     static final ArchRule merchantMustNotDependOnIdentityInfrastructure = noClasses()

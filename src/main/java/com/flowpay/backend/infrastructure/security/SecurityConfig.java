@@ -6,6 +6,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -67,11 +69,14 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             FlowPaySecurityProperties properties,
+            Environment environment,
             DashboardJwtAuthenticationConverter jwtAuthenticationConverter,
             SecurityProblemHandler securityProblemHandler
     ) {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                // Chain-local instance: no duplicate servlet registration and no business/TX work.
+                .addFilterBefore(new AuthRequestMarkerFilter(securityProblemHandler), BearerTokenAuthenticationFilter.class)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .oauth2ResourceServer(oauth2 -> oauth2
@@ -82,8 +87,15 @@ public class SecurityConfig {
                         .accessDeniedHandler(securityProblemHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> {
-                    authorize.requestMatchers("/actuator/health/**", "/actuator/info").permitAll();
-                    if (properties.prometheusPublic()) {
+                    boolean production = environment.acceptsProfiles(Profiles.of("prod"));
+                    if (production) {
+                        authorize.requestMatchers(HttpMethod.GET, "/livez", "/readyz").permitAll();
+                        authorize.requestMatchers(HttpMethod.HEAD, "/livez", "/readyz").permitAll();
+                        authorize.requestMatchers("/actuator/**").denyAll();
+                    } else {
+                        authorize.requestMatchers("/actuator/health/**", "/actuator/info").permitAll();
+                    }
+                    if (!production && properties.prometheusPublic()) {
                         authorize.requestMatchers("/actuator/prometheus").permitAll();
                     }
                     authorize.requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll();

@@ -113,7 +113,7 @@ class PhaseOneEndToEndTest extends PostgresIntegrationTest {
         assertDashboardJwt(refreshed.accessToken(), registration);
         assertThat(refreshed.refreshToken()).isNotEqualTo(login.refreshToken());
 
-        mockMvc.perform(post("/api/v1/auth/refresh")
+        mockMvc.perform(post("/api/v1/auth/refresh").header("X-FlowPay-CSRF", "1")
                         .cookie(refreshCookie(login.refreshToken())))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_REVOKED"));
@@ -136,10 +136,10 @@ class PhaseOneEndToEndTest extends PostgresIntegrationTest {
                         org.hamcrest.Matchers.containsString(apiKey.rawKey())
                 )));
 
-        mockMvc.perform(post("/api/v1/auth/logout")
+        mockMvc.perform(post("/api/v1/auth/logout").header("X-FlowPay-CSRF", "1")
                         .cookie(refreshCookie(refreshed.refreshToken())))
                 .andExpect(status().isNoContent());
-        mockMvc.perform(post("/api/v1/auth/refresh")
+        mockMvc.perform(post("/api/v1/auth/refresh").header("X-FlowPay-CSRF", "1")
                         .cookie(refreshCookie(refreshed.refreshToken())))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_REVOKED"));
@@ -205,7 +205,7 @@ class PhaseOneEndToEndTest extends PostgresIntegrationTest {
     }
 
     private Registration register(String email, String merchantName) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/register").header("X-FlowPay-CSRF", "1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -229,7 +229,7 @@ class PhaseOneEndToEndTest extends PostgresIntegrationTest {
     }
 
     private Session login(String email) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/login").header("X-FlowPay-CSRF", "1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -248,7 +248,7 @@ class PhaseOneEndToEndTest extends PostgresIntegrationTest {
     }
 
     private Session refresh(String rawRefreshToken) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/refresh")
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/refresh").header("X-FlowPay-CSRF", "1")
                         .cookie(refreshCookie(rawRefreshToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").isString())

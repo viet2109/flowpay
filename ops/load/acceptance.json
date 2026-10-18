@@ -1,0 +1,23 @@
+{
+  "status": "APPROVED",
+  "approvedBy": "owner",
+  "approvedAt": "2026-10-17T18:57:47+00:00",
+  "approvalBasis": "Under the owner's prior delegated selection of the recommended targets and subsequent request to continue final acceptance, the agent selects the unchanged numeric targets after successful fresh calibration of the security-remediated candidate and actual exact host. Original T14 declarations are preserved in history/t14; failed bootstrap/host preflights are retained. This is a new post-calibration binding before an independent acceptance project and full 30-minute soak, not a rewritten historical approval, relaxed threshold, security waiver or production SLO.",
+  "calibrationSha256": "5e18faccf2c5362cd6bd8a357a221dddcb9119b5d07de7ad5a958f2238a111b7",
+  "workloadSha256": "5d25e9752a27b59a8dbf274c83d9d989a66a71481c96b422959c957151eb6ff8",
+  "thresholds": {
+    "apiP95Ms": 500,
+    "apiP99Ms": 1000,
+    "maxProviderP99Seconds": 0.05,
+    "maxUnexpectedErrors": 0,
+    "maxContractErrors": 0,
+    "maxDroppedIterations": 0,
+    "maxPolicyLimitedRegular": 0,
+    "maxDrainSeconds": 300,
+    "maxHeapRatio": 0.85,
+    "maxPoolPending": 2,
+    "maxOutboxP99Seconds": 60,
+    "maxWebhookP99Seconds": 300,
+    "maxSoakHeapGrowthBytes": 134217728
+  }
+}

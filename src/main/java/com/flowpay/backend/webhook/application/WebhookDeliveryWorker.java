@@ -18,6 +18,8 @@ public class WebhookDeliveryWorker {
     private final WebhookSecretCipher cipher;
     private final WebhookDeliveryWorkerProperties properties;
     private final Clock clock;
+    private final WebhookMetrics metrics;
+    private final WebhookWorkerTracing tracing;
 
     public void deliverBatch() {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
@@ -27,7 +29,8 @@ public class WebhookDeliveryWorker {
         for (var expired : execution.expiredCandidates()) {
             if (Thread.currentThread().isInterrupted()) return;
             try {
-                execution.recoverExpired(expired.internalId(), expired.webhookEndpointId(), expired.attemptCount());
+                tracing.recovery(expired.internalId(), () -> execution.recoverExpired(
+                        expired.internalId(), expired.webhookEndpointId(), expired.attemptCount()));
             } catch (RuntimeException exception) {
                 log.warn("Webhook delivery {} lease recovery could not be persisted", expired.publicId());
             }
@@ -36,7 +39,8 @@ public class WebhookDeliveryWorker {
             if (Thread.currentThread().isInterrupted()) break;
             try {
                 var claim = execution.claim(candidate.internalId(), candidate.webhookEndpointId());
-                if (claim.isPresent()) execution.finalizeResult(claim.get(), send(claim.get()));
+                if (claim.isPresent()) tracing.attempt(claim.get().deliveryId(),
+                        () -> execution.finalizeResult(claim.get(), send(claim.get())));
             } catch (RuntimeException exception) {
                 // A failed persistence step leaves a recoverable lease; never resend inline or log exception text.
                 log.warn("Webhook delivery {} could not be persisted; later recovery may be required", candidate.publicId());
@@ -45,6 +49,12 @@ public class WebhookDeliveryWorker {
     }
 
     private WebhookHttpDeliveryResult send(ClaimedWebhookDelivery claim) {
+        WebhookHttpDeliveryResult result = sendUnobserved(claim);
+        metrics.httpResult(result);
+        return result;
+    }
+
+    private WebhookHttpDeliveryResult sendUnobserved(ClaimedWebhookDelivery claim) {
         long start = System.nanoTime();
         try {
             return Objects.requireNonNull(http.send(new WebhookHttpDeliveryRequest(claim.url(), claim.eventPublicId(),

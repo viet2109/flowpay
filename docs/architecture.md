@@ -518,6 +518,36 @@ payloads are:
 | `refund.processing.v1` | `REFUND` / refund public ID | Same scalar fields as refund success V1 |
 | `refund.failed.v1` | `REFUND` / refund public ID | Refund identity/Money/time fields plus normalized `failureCode`, `failureMessage` |
 
+P8-T06 stores optional source `traceparent` in the Outbox transaction (V012,
+nullable VARCHAR(55)), separately from all six payloads and the JSON envelope.
+Relay snapshots preserve it across retries/restarts; the publisher validates and
+adds only a Rabbit `traceparent` header. Legacy/invalid metadata is absent, never
+a business failure. No ambient relay-thread context is propagated or retained.
+No baggage/tracestate/request IDs, source-domain tracing dependencies, new
+transaction boundaries or changes to confirms/backoff/dedupe. T06 added no spans;
+T07 adds bounded attempt spans with the explicit parent policy below.
+
+P8-T07 wraps each relay publication and listener invocation with a fresh span
+under the validated stored/transport source creation context. Publish/processing
+attempts are siblings, not a mutable last-send parent. Listeners scope parsing
+and application dispatch independently, close before broker backoff, propagate
+the original exception and preserve AUTO ACK-after-commit/retry/DLQ behavior.
+No ambient thread parent, baggage or tracestate is inherited. Missing/malformed/
+non-string metadata starts an independent root, never rejects valid facts.
+
+Webhook-owned V013 nullable `webhook_events.traceparent` stores only the first
+successful materialization context; equal redelivery cannot replace it. A small
+application tracing port is implemented in Webhook infrastructure, reading its
+own technical context outside transactions. Each claimed delivery and expired
+lease recovery has a distinct bounded span; existing HTTP CLIENT spans nest
+under delivery spans. Attempts after restart remain siblings under first
+materialization, not hours-long spans. Domain aggregates/public JSON/signatures/
+merchant headers are unchanged. Guarded APPLIED/STALE observation is diagnostic,
+not a business result. No links are exported (the zero-link limit is unchanged).
+Shared trace helpers do not query repositories/DB. SDK/exporter failure cannot
+repeat work or replace its result/failure. No new SDK, dependency, lock, financial
+transaction boundary or retry/lease budget is introduced.
+
 P7-T05 completes production source publication for all six types. Preparation
 persists processing events in the source transaction; known terminal failures
 persist failed events in finalization. UNKNOWN produces no terminal event.
@@ -897,8 +927,9 @@ migration verification; Compose health alone does not verify schema/application
 behavior. Only the disposable gate project's resources are eligible for cleanup.
 
 The gate does not claim exactly-once HTTP, ordered delivery, real-money
-processing, or production readiness. Phase 8 network/operations/security/load
-hardening remains unstarted and requires a separate assignment.
+processing, or production readiness. At that gate, Phase 8 network/operations/
+security/load hardening had not started. Its subsequently assigned design and
+task boundaries are recorded in `production-engineering.md`.
 
 ## 17. Logging and observability
 
@@ -917,7 +948,77 @@ already carried in MDC.
 
 Actuator and Micrometer provide health/metrics foundation.
 
-OpenTelemetry support may be configured for tracing, but business-specific metrics/traces are added when corresponding features exist.
+P8-T03 adds owning-application metrics for committed Payment/Refund normalized
+outcomes, per-call provider duration and Idempotency decisions/reservations.
+Outcome/reservation counters run only after the existing transaction commits;
+diagnostic decisions include replay/conflict even when an outer TX rolls back.
+UNKNOWN stays non-terminal; repeat Refund UNKNOWN observations use existing
+persisted metadata/row locking to avoid inflating logical counts. Equivalent
+HTTP replay invokes no provider or new logical outcome. No observation adds
+locks, transactions, schema, financial states or event fields.
+
+The common recorder contains technical recording/afterCommit failure isolation,
+not repository queries or business orchestration. Domain aggregates remain free
+of Micrometer/OpenTelemetry (ArchUnit enforced). Provider timing preserves the
+original result/exception and runs outside DB transactions. Bounded enum-only
+labels and fixed SLO buckets are frozen in `production-engineering.md`; there
+are no identity, money, URL, credential, failure-message or payload labels.
+Counters are best-effort process-local observations, not durable accounting;
+registry/export failure cannot change financial results. Actual OTLP HTTP 503
+and throwing-registry fixtures verify failure isolation.
+
+P8-T04 adds Outbox-owned and Webhook-owned read-only projection ports/adapters.
+Each region returns one aggregate SQL row; no cross-module repository/entity
+access, payload scan/materialization, merchant endpoint or schema change. Owning
+metrics components cache the result; shared technical cache/recording code has
+no module/JDBC dependency (ArchUnit enforced). Scrapes never query the DB.
+Thirty-second sampling is cadence-limited/single-flight, skips caller TXs and
+uses a dedicated named two-thread scheduler without replacing business-worker
+scheduling. Statement timeout is 2s; pool acquisition still uses its own timeout.
+
+Shared-DB backlog/age gauges are replicated snapshots, not per-instance disjoint
+counts: choose a fresh replica or max, never sum. Initial unavailable values are
+NaN; failed sampling keeps the old snapshot with growing monotonic sample age
+and a bounded failure observation. Query cost scales with backlog and replicas;
+Java tests do not claim measured staging/load capacity.
+
+Outbox transport attempts are distinct from conditional PUBLISHED-after-commit.
+Ledger repository claim decisions separate equivalent duplicate/conflict/failure
+from newly committed posting (including reversal). Webhook OPEN-claim, delivered
+and expired-lease recovery counters follow commit/fencing; worker HTTP groups
+remain attempt diagnostics when finalization fails or a late result is fenced.
+Telemetry failures cannot mutate source/financial/delivery state. Existing
+transaction boundaries, locking, retry/lease budgets, events and APIs are intact.
+The exact scope/labels/units/aggregation limits are in production-engineering.md.
+
+P8-T05 reuses the installed Boot Micrometer/OpenTelemetry bridge and its SDK,
+servlet observations and batch processor. The server convention omits raw URL
+attributes without changing HTTP metric tags; every configured exporter is
+wrapped with a final bounded allow-list. Names/resource/scope are fixed, and
+events/links/status descriptions/arbitrary attributes/tracestate are removed.
+Incoming propagation reads W3C traceparent only, never baggage or B3. Root
+sampling/export configuration and console MDC fields are explicit. Request IDs
+remain independent of trace IDs and the public contract is unchanged.
+
+Provider application calls and the dedicated Webhook HTTP transport have scoped
+CLIENT spans outside DB transactions, with normalized outcomes only. Scope
+cleanup restores context; telemetry failure preserves results/exceptions and
+interruption. No context headers are added to signed Webhook HTTP. Domain code
+remains telemetry-free. OTLP export is opt-in, asynchronous/bounded and can lose
+telemetry during outage; third-party exporter diagnostics and unsafe request/SQL
+DEBUG defaults are disabled. Policy and operational limits are documented in
+production-engineering.md. No second SDK, Java dependency, schema, payload,
+state, financial locking/transaction or authentication change is introduced.
+
+P8-T06 implements durable Outbox source-context propagation and P8-T07 adds
+bounded publication/consumer/worker spans as described above. P8-T08 adds the
+isolated monitoring lab, versioned dashboards and operational alert/runbook
+fixtures without changing application defaults, Java wiring or financial
+semantics. Exact image digests, external-secret/private-listener boundaries,
+cached-gauge freshness/max aggregation and retention limits are recorded in
+production-engineering.md and monitoring-runbook.md. Monitoring outage is outside
+the financial critical path; no external paging/HA, production image, TLS staging
+or performance/recovery acceptance is implied by this lab.
 
 ## 18. Dependency policy
 
@@ -926,3 +1027,115 @@ Do not add technology only to increase stack size.
 Current MVP foundation includes technologies justified by planned MVP features.
 
 Potential later additions such as Redis, Kafka, Resilience4j, Spring Modulith, Spring Batch, ShedLock, QueryDSL, OpenSearch, or WebFlux require an explicit problem/use case before adoption.
+
+## 19. Phase 8 production-engineering design boundary
+
+P8-T01 establishes the Linux/container staging design after the verified Phase 7
+release was merged into remote main. It changes documentation only: no new
+runtime library, schema, public API/event, state machine, locking or transaction
+boundary is introduced. See [production engineering](production-engineering.md)
+for configuration, observability and operational contracts, and the
+[exit audit](production-exit-audit.md) for measured acceptance and limitations.
+
+Owning modules provide after-commit logical observations and bounded durable
+projections; shared observability does not acquire cross-module repository
+access. Diagnostic attempts/latency are distinct from committed outcomes.
+Metrics/traces/logs exclude secrets/bodies and unbounded identity labels, and
+collector/sampling failure cannot change financial outcomes.
+
+P8-T06 implements validated nullable Outbox W3C metadata under reviewed V012,
+not a change to success V1, source facts or public signed Webhook bodies.
+P8-T07 adds reviewed V013 Webhook-only metadata and bounded asynchronous span relations.
+Source/materialization/claim/HTTP/finalize transaction boundaries are preserved.
+
+T02 implements a prod-only dedicated management listener (loopback:9091 by
+default) with local-connector-port authorization. Only internal GET/HEAD health,
+info and Prometheus are permitted; all business-listener Actuator routes are
+denied, including for dashboard JWTs. Main-listener `/livez` checks process state;
+`/readyz` checks readinessState plus DB, not RabbitMQ or telemetry. Broker outage
+does not remove durable source + Outbox acceptance; aggregate health still
+reflects dependency failure. Startup validates required production configuration
+before bean binding, rejects dev/test conveniences, and loads matching persistent
+RSA keys with sanitized failures. Bounded HTTP graceful shutdown is tested on
+real listeners; T12–T15 separately verify image/worker lifecycle and private
+staging network enforcement on their recorded artifacts. These are bounded
+single-host proofs, not a retained deployment or host-HA guarantee.
+See section 6 of `production-engineering.md` for the exact
+configuration and probe contract. No schema or business contract changed.
+
+T09 implements effective-destination protection with a fixed enforcing CONNECT
+proxy and an application container on an internal-only network. Only the proxy
+joins its outbound network; trusted DB/broker/telemetry paths remain separate.
+The proxy evaluates every cached IPv4/IPv6 destination and denies private,
+special-use and mixed answers. A preliminary application DNS lookup alone is
+not network-hardening acceptance. See [egress design and evidence](webhook-egress.md).
+
+After reproduced proxied IPv6-literal SNI failures on Java 21/25, the user approved
+Apache HttpClient 5 solely for the Webhook infrastructure adapter. Java 21 and
+the public port/API/event/financial/transaction contracts remain unchanged.
+Client 5.6.4/Core 5.4.4 are explicitly selected over Boot's managed pair for
+documented stable async TLS/Core fixes. The dedicated asynchronous HTTP/1 client
+uses a fixed proxy route with no system proxy or direct fallback, trusted TLS
+chains and explicit hostname/IP-SAN verification. Only the operator's proxy DNS
+is snapshotted at bounded startup; refresh it by restarting the client after
+proxy address changes. Merchant DNS and effective-destination checks stay in
+the proxy. Redirects, transport retries, cookies, auth and compression are off.
+
+A monotonic delivery deadline covers signing, pool/CONNECT/TLS/header waits;
+an independent headers future permits hard cancellation of unread bodies.
+Plaintext CONNECT refusals are not merchant acknowledgements. No outgoing trace
+headers, raw HTTP logs or active DB transaction are allowed. Final clean verify,
+TLS/IP-SAN/DNS/rebinding/bypass fixtures and affected monitoring acceptance pass
+on the same final JAR/Java 21 runtime. Artifact and separate focused/full/native
+gate evidence are recorded in `webhook-egress.md`; this is T09 acceptance, not
+release-image, staged-host-firewall or production-readiness evidence.
+Security/API defects, new Java dependencies and concrete trace DDL require their
+recorded reviews before implementation, not incidental changes during telemetry.
+
+### P8-T10 reviewed auth and ingress protections
+
+The user approved the concrete auth marker and NGINX per-IP budget/429 proposals
+after the documented cookie CSRF and missing-ingress-limit findings. See
+[API security review](api-security-review.md) for evidence, preconditions,
+dependency/runtime selection, tests and remaining gates.
+
+`AuthRequestMarkerFilter` is a chain-local, infrastructure-only filter before
+bearer processing on the dashboard/auth chain, not a duplicate global servlet
+filter. Decoded Security/MVC path matching includes context paths and encoded
+letters. Auth POSTs need exactly one `X-FlowPay-CSRF: 1`; auth cross-origin
+preflights are denied regardless of marker. Existing normalized `403 ACCESS_DENIED`
+is used without credential/session/controller/DB work or Set-Cookie. Controllers
+remain thin, body/state/token/TTL contracts stay unchanged, and bearer financial/
+dashboard APIs are not forced into cookie CSRF semantics. No permissive CORS or
+Origin/Host/Forwarded-derived trust is added. Same-origin UI and non-browser
+auth clients must explicitly send the reviewed marker.
+
+The pinned NGINX 1.30.5 policy has finite shared zones/workers/connections and
+bounded waits, runs non-root/read-only/capability-free, and does not log request
+data or retry upstream mutations. TCP peer address selects shared auth and
+mutation buckets; inbound forwarded/rewrite headers are stripped and request IDs/
+Host overwritten. Production application forwarded-header handling is `none`.
+Excess receives a correlated safe `429 RATE_LIMIT_EXCEEDED` before reaching
+source/Idempotency/provider work; upstream 429 is passed through. Budget values
+and retry behavior are in `api-contract.md`. Replays consume ingress budget
+without changing duplicate-safe financial semantics. No Redis or new module,
+Java dependency, schema or financial locking/transaction change is introduced.
+
+Isolated HTTP policy fixtures verify real TCP IPv4/IPv6 limits, spoofing,
+non-forwarding, refill and actual prod/DB/broker/replay/Ledger behavior. They do
+not publish backend/management ports or provision TLS staging. T13 must supply
+reviewed TLS listen/ingress and prove no backend bypass on the selected host;
+T11/T12 own scanners/image acceptance and T14/T15 own load/multi-instance quotas.
+
+P8-T13 implements the separate [TLS staging topology](staging-deployment.md),
+private operator/telemetry networks, topology-before-producers and immutable-image
+fresh/Phase7-upgrade checks. It reuses approved contracts/policies and applies only
+existing additive V012/V013 trace migrations; no business/schema/transaction or
+retry changes. Native Docker-network proof is not external firewall certification.
+Security acceptance remains independently blocking. No cloud is provisioned.
+
+Load, extended multi-instance failure and DB/broker/key restore evidence remain
+separate from Java unit/integration tests. Performance and recovery targets are
+declared before their respective acceptance runs on recorded artifacts/resources.
+No external hosting/cloud provisioning, destructive dev reset, automatic DLQ
+replay, PUBLISHED reset or provider reconciliation is authorized by this design.

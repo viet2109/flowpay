@@ -67,6 +67,11 @@ public final class SecurityProblemHandler implements AuthenticationEntryPoint, A
         );
     }
 
+    void rejectAuthRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        write(response, problems.create(HttpStatus.FORBIDDEN, ErrorCode.ACCESS_DENIED,
+                "The authentication request is not allowed.", URI.create(request.getRequestURI())));
+    }
+
     private void write(HttpServletResponse response, ProblemDetail problem) throws IOException {
         response.setStatus(problem.getStatus());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);

@@ -56,7 +56,8 @@ class OutboxEventTest {
                 null,
                 0,
                 null,
-                CREATED_AT
+                CREATED_AT,
+                null
         )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("retry metadata");
     }

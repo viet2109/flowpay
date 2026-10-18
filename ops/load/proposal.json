@@ -1,0 +1,24 @@
+{
+  "status": "SELECTED_UNCHANGED_UNDER_OWNER_DELEGATION",
+  "calibrationSha256": "5e18faccf2c5362cd6bd8a357a221dddcb9119b5d07de7ad5a958f2238a111b7",
+  "workloadSha256": "5d25e9752a27b59a8dbf274c83d9d989a66a71481c96b422959c957151eb6ff8",
+  "calibrationCompletedAt": "2026-10-17T18:57:32.488864+00:00",
+  "history": "Original T14 declarations are preserved in history/t14. Numeric targets and workload schedules are unchanged. Owner delegated target selection and asked to continue final acceptance. Fresh calibration binds the remediated candidate, reviewed Dockerfile and actual exact host after retained rejected bootstrap/host preflights; no threshold relaxation.",
+  "thresholds": {
+    "apiP95Ms": 500,
+    "apiP99Ms": 1000,
+    "maxProviderP99Seconds": 0.05,
+    "maxUnexpectedErrors": 0,
+    "maxContractErrors": 0,
+    "maxDroppedIterations": 0,
+    "maxPolicyLimitedRegular": 0,
+    "maxDrainSeconds": 300,
+    "maxHeapRatio": 0.85,
+    "maxPoolPending": 2,
+    "maxOutboxP99Seconds": 60,
+    "maxWebhookP99Seconds": 300,
+    "maxSoakHeapGrowthBytes": 134217728
+  },
+  "scope": "Frozen one-replica Linux simulator workload only. Warmup is not steady-state latency; stress keeps policy limits/drops. No production SLO or security waiver.",
+  "acceptancePlan": "New project: warmup30s, steady120s, peak120s, stress60s, soak1800s, real drain/audits between profiles. Approval is recorded in acceptance.json under the owner's delegated target selection."
+}

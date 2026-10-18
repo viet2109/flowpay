@@ -1,0 +1,24 @@
+{
+  "exchanges": [
+    {"name": "flowpay.events", "type": "topic", "durable": true, "auto_delete": false, "internal": false, "arguments": {}},
+    {"name": "flowpay.events.dlx", "type": "direct", "durable": true, "auto_delete": false, "internal": false, "arguments": {}}
+  ],
+  "queues": [
+    {"name": "flowpay.ledger.events", "durable": true, "auto_delete": false, "arguments": {"x-dead-letter-exchange": "flowpay.events.dlx", "x-dead-letter-routing-key": "ledger.dead"}},
+    {"name": "flowpay.webhook.events", "durable": true, "auto_delete": false, "arguments": {"x-dead-letter-exchange": "flowpay.events.dlx", "x-dead-letter-routing-key": "webhook.dead"}},
+    {"name": "flowpay.ledger.events.dlq", "durable": true, "auto_delete": false, "arguments": {}},
+    {"name": "flowpay.webhook.events.dlq", "durable": true, "auto_delete": false, "arguments": {}}
+  ],
+  "bindings": [
+    {"source": "flowpay.events", "destination": "flowpay.ledger.events", "routing_key": "payment.succeeded.v1"},
+    {"source": "flowpay.events", "destination": "flowpay.ledger.events", "routing_key": "refund.succeeded.v1"},
+    {"source": "flowpay.events", "destination": "flowpay.webhook.events", "routing_key": "payment.processing.v1"},
+    {"source": "flowpay.events", "destination": "flowpay.webhook.events", "routing_key": "payment.succeeded.v1"},
+    {"source": "flowpay.events", "destination": "flowpay.webhook.events", "routing_key": "payment.failed.v1"},
+    {"source": "flowpay.events", "destination": "flowpay.webhook.events", "routing_key": "refund.processing.v1"},
+    {"source": "flowpay.events", "destination": "flowpay.webhook.events", "routing_key": "refund.succeeded.v1"},
+    {"source": "flowpay.events", "destination": "flowpay.webhook.events", "routing_key": "refund.failed.v1"},
+    {"source": "flowpay.events.dlx", "destination": "flowpay.ledger.events.dlq", "routing_key": "ledger.dead"},
+    {"source": "flowpay.events.dlx", "destination": "flowpay.webhook.events.dlq", "routing_key": "webhook.dead"}
+  ]
+}

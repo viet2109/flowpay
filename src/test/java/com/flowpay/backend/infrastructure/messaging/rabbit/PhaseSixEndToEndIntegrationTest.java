@@ -397,7 +397,7 @@ class PhaseSixEndToEndIntegrationTest extends PostgresIntegrationTest {
                 FROM flyway_schema_history
                 WHERE success = true
                 ORDER BY installed_rank
-                """, Integer.class)).containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
+                """, Integer.class)).containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13);
     }
 
     private StoredKey createStoredKey(String suffix) {

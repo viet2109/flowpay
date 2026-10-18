@@ -1,0 +1,139 @@
+# Disposable P8-T12 image acceptance only, not a public staging deployment.
+services:
+  postgres:
+    image: postgres:16.15-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    environment:
+      POSTGRES_DB: flowpay_lab
+      POSTGRES_USER: flowpay_lab
+      POSTGRES_PASSWORD_FILE: /run/secrets/DB_PASSWORD
+    secrets: [DB_PASSWORD]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U flowpay_lab -d flowpay_lab']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [lab]
+    mem_limit: 512m
+    cpus: 1
+  rabbitmq:
+    image: rabbitmq:4.3.0-management-alpine@sha256:1a43764bdcf116542e7c8c794adc67c79461727da16d474e9e21483fe7f716d3
+    environment:
+      RABBITMQ_DEFAULT_USER: flowpay_lab
+    entrypoint: [sh, -ec]
+    command:
+      - 'export RABBITMQ_DEFAULT_PASS="$$(cat /run/secrets/RABBITMQ_PASSWORD)"; exec docker-entrypoint.sh rabbitmq-server'
+    secrets: [RABBITMQ_PASSWORD]
+    volumes: [rabbit-data:/var/lib/rabbitmq]
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [lab]
+    mem_limit: 512m
+    cpus: 1
+  certificates:
+    image: eclipse-temurin:21.0.12.1_1-jre-jammy@sha256:8ecbec1f32912979c15b86aaf98f7082a77d318a7f92af3d9fe2c0fd2723df10
+    entrypoint: [sh, /checks/init-tls.sh]
+    volumes:
+      - ../../egress/tests/init-tls.sh:/checks/init-tls.sh:ro
+      - certificates:/cert
+    network_mode: none
+    mem_limit: 128m
+    cpus: 1
+  app:
+    image: ${FLOWPAY_IMAGE:?Use the image ID from image-build.json}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:rw,nosuid,nodev,size=128m,mode=1777']
+    pids_limit: 256
+    mem_limit: 1536m
+    cpus: 2
+    stop_grace_period: 120s
+    environment:
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
+      DB_URL: jdbc:postgresql://postgres:5432/flowpay_lab
+      DB_USERNAME: flowpay_lab
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: flowpay_lab
+      JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
+      JWT_PRIVATE_KEY_LOCATION: file:/run/secrets/jwt-private.pem
+      MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: 'false'
+      WEBHOOK_EGRESS_PROXY_HOST: egress
+      WEBHOOK_EGRESS_PROXY_PORT: '3128'
+      # Owned self-signed merchant CA only; no trust-all/hostname bypass.
+      JAVA_TOOL_OPTIONS: '-Djavax.net.ssl.trustStore=/cert/trust.p12 -Djavax.net.ssl.trustStorePassword=fixture-only'
+    secrets: [DB_PASSWORD, RABBITMQ_PASSWORD, WEBHOOK_SECRET_ENCRYPTION_KEY, jwt-public.pem, jwt-private.pem]
+    volumes: [certificates:/cert:ro]
+    depends_on:
+      postgres: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+      certificates: {condition: service_completed_successfully}
+      receiver: {condition: service_started}
+    networks: [lab]
+  egress:
+    image: ubuntu/squid:6.6-24.04_beta@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029
+    user: '13:13'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    entrypoint: [sh, /egress/start-proxy.sh]
+    command: [/etc/squid/flowpay.conf]
+    volumes:
+      - ../../egress/squid.conf:/etc/squid/flowpay.conf:ro
+      - ../../egress/start-proxy.sh:/egress/start-proxy.sh:ro
+    mem_limit: 128m
+    cpus: 0.5
+    networks:
+      lab: {}
+      destinations: {ipv4_address: 11.203.0.3}
+  receiver:
+    image: python:3.13.12-slim@sha256:f1927c75e81efd1e091dbd64b6c0ecaa5630b38635a3d1c04034ac636e1f94c8
+    user: '10001:10001'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    entrypoint: [python, -B, /checks/receiver.py]
+    volumes:
+      - ./receiver.py:/checks/receiver.py:ro
+      - certificates:/cert:ro
+    depends_on:
+      certificates: {condition: service_completed_successfully}
+    mem_limit: 128m
+    cpus: 0.5
+    networks:
+      lab: {}
+      destinations: {ipv4_address: 11.203.0.10}
+  probe:
+    profiles: [checks]
+    image: python:3.13.12-slim@sha256:f1927c75e81efd1e091dbd64b6c0ecaa5630b38635a3d1c04034ac636e1f94c8
+    user: '10001:10001'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    entrypoint: [python, -B, /checks/probe.py]
+    volumes: [./probe.py:/checks/probe.py:ro]
+    networks: [lab]
+    mem_limit: 128m
+    cpus: 0.5
+secrets:
+  DB_PASSWORD: {file: '${LAB_SECRETS_DIR:?External temporary fixture secrets}/DB_PASSWORD'}
+  RABBITMQ_PASSWORD: {file: '${LAB_SECRETS_DIR}/RABBITMQ_PASSWORD'}
+  WEBHOOK_SECRET_ENCRYPTION_KEY: {file: '${LAB_SECRETS_DIR}/WEBHOOK_SECRET_ENCRYPTION_KEY'}
+  jwt-public.pem: {file: '${LAB_SECRETS_DIR}/jwt-public.pem'}
+  jwt-private.pem: {file: '${LAB_SECRETS_DIR}/jwt-private.pem'}
+networks:
+  lab: {internal: true}
+  # Public-looking fixture IPs are routed only inside this owned internal bridge.
+  # Never attach these to the Internet or run overlapping network fixtures.
+  destinations:
+    internal: true
+    ipam:
+      config: [{subnet: 11.203.0.0/24}]
+volumes:
+  postgres-data: {}
+  rabbit-data: {}
+  certificates: {}

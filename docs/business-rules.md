@@ -106,6 +106,17 @@ Required policy:
 
 The raw refresh token must not appear in JSON responses.
 
+### BR-AUTH-012 — Browser-request marker
+
+P8-T10's reviewed contract requires exactly one `X-FlowPay-CSRF: 1` header on
+every auth POST. Reject missing/invalid/repeated values with `403 ACCESS_DENIED`
+before parsing credentials or creating/rotating/revoking a session; do not issue
+or clear a cookie on rejection. The fixed marker is not an authentication secret.
+Auth cross-origin preflights are denied; no credentialed cross-origin CORS
+allowlist is enabled. SameSite/HttpOnly/Secure/path remain defense in depth.
+Non-browser auth clients supply the same header. Bearer dashboard/financial APIs
+are unchanged and do not require it. Separate-origin UI support needs review.
+
 ## 2. Merchant
 
 ### BR-MER-001 — Merchant isolation
@@ -504,6 +515,12 @@ entities or versions, or raw provider responses.
 
 ### BR-EVT-007 — Confirmed retryable publication
 
+Optional technical trace context is not an event fact or duplicate/contradiction
+criterion. P8-T06 persists source `traceparent` atomically with Outbox and reuses
+it on retry/restart as a Rabbit header only. Absent/invalid metadata is discarded
+without rejecting otherwise valid financial events. V1 JSON schemas and public
+Webhook body/signature/headers are unchanged; no baggage/tracestate is stored.
+
 An Outbox event becomes `PUBLISHED` only after a positive publisher confirm and
 successful routing. A negative acknowledgement, confirm timeout, broker error,
 or mandatory return leaves the event retryable. Concurrent relay publication
@@ -648,13 +665,29 @@ opens the next numbered attempt. Manual retry does not reset automatic limits.
 
 Production endpoint URLs require HTTPS, a valid host, and no user-info or
 fragment. Literal localhost, loopback, link-local, private, unspecified,
-multicast, and known metadata-service targets are rejected. The explicit
+multicast, shared/special-use/reserved and known metadata-service targets are
+rejected. The explicit
 `allow-insecure-localhost` development/test switch permits HTTP only for
 localhost or loopback targets; it does not permit general HTTP or private-network
-destinations. This application check does not replace Phase 8 DNS-rebinding and
-network-egress controls.
+destinations. This application check does not replace delivery-time enforcement.
+P8-T09 requires a fixed enforcing CONNECT proxy, denial of all private/special-use
+addresses in a destination's DNS answers, and no direct merchant network path.
+Rebinding/new tunnels, IPv4/IPv6 and real TLS/IP-SAN are verified separately from
+URL registration. Trusted private DB/broker/telemetry paths remain allowed. See
+[Webhook egress design and acceptance](webhook-egress.md); no financial state,
+event, API or retry semantics change.
 
 ## 12. Security and logging
+
+P8-T10 approved single-edge abuse controls: auth POSTs share 10 requests/minute/IP
+plus burst 5; API mutations share 10 requests/second/IP plus burst 20. The edge
+uses the TCP peer, not incoming forwarded identity. Excess receives immediate
+`429 RATE_LIMIT_EXCEEDED` with a generated request ID and conservative Retry-After
+before upstream work. No provider retry/new financial key or source mutation is
+created by a rejection. Accepted replays preserve the stored logical result;
+clients retain the original Idempotency-Key after waiting. These are bounded
+per-IP guardrails, not per-account/global quotas or measured capacity. Shared-NAT
+and multi-edge behavior are deployment/operator concerns; see the security review.
 
 ### BR-SEC-001
 

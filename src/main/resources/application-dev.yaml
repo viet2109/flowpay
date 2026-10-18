@@ -15,7 +15,7 @@ spring:
 management:
   opentelemetry:
     tracing:
-      sampler: always-off
+      sampler: ${TRACING_SAMPLER:always-off}
 
 flowpay:
   security:

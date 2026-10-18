@@ -16,6 +16,7 @@ import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.Signature;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -77,9 +78,24 @@ class JwtKeyConfiguration {
             RSAPrivateKey privateKey = (RSAPrivateKey) keyFactory.generatePrivate(
                     new PKCS8EncodedKeySpec(readPem(privateKeyResource, "PRIVATE KEY"))
             );
+            if (publicKey.getModulus().bitLength() < RSA_KEY_SIZE
+                    || !publicKey.getModulus().equals(privateKey.getModulus())) {
+                throw new GeneralSecurityException();
+            }
+            byte[] challenge = "FlowPay JWT key validation".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+            Signature signature = Signature.getInstance("SHA256withRSA");
+            signature.initSign(privateKey);
+            signature.update(challenge);
+            byte[] signed = signature.sign();
+            signature.initVerify(publicKey);
+            signature.update(challenge);
+            if (!signature.verify(signed)) {
+                throw new GeneralSecurityException();
+            }
             return new JwtRsaKeyPair(publicKey, privateKey);
-        } catch (GeneralSecurityException | IOException exception) {
-            throw new IllegalStateException("Could not load configured JWT key pair", exception);
+        } catch (GeneralSecurityException | IOException | RuntimeException exception) {
+            // Resource paths and decoder/provider exceptions can contain supplied sensitive material.
+            throw new IllegalStateException("Configured JWT keys must be a readable matching RSA pair of at least 2048 bits");
         }
     }
 

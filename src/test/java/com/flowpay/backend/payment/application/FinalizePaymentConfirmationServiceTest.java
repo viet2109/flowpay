@@ -3,6 +3,8 @@ package com.flowpay.backend.payment.application;
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.common.money.Money;
+import com.flowpay.backend.common.observability.MetricsRecorder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.flowpay.backend.payment.application.event.PaymentIntegrationEventPublisher;
 import com.flowpay.backend.payment.application.event.PaymentSucceededEventV1;
 import com.flowpay.backend.payment.application.event.PaymentFailedEventV1;
@@ -63,7 +65,8 @@ class FinalizePaymentConfirmationServiceTest {
                 paymentIntentRepository,
                 paymentTransactionRepository,
                 eventPublisher,
-                Clock.fixed(COMPLETED_AT, ZoneOffset.UTC)
+                Clock.fixed(COMPLETED_AT, ZoneOffset.UTC),
+                new PaymentMetrics(new MetricsRecorder(new SimpleMeterRegistry()))
         );
     }
 

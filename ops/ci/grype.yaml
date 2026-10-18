@@ -1,0 +1,10 @@
+check-for-app-update: false
+db:
+  auto-update: true
+  require-update-check: true
+  validate-age: true
+  max-allowed-built-age: 72h
+  validate-by-hash-on-start: true
+  update-available-timeout: 30s
+  update-download-timeout: 5m
+  max-update-check-frequency: 0s

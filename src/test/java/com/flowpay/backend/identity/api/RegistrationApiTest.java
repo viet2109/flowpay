@@ -40,7 +40,7 @@ class RegistrationApiTest extends PostgresIntegrationTest {
 
     @Test
     void shouldRegisterUserMerchantAndOwnerMembership() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/api/v1/auth/register").header("X-FlowPay-CSRF", "1")
                         .header("X-Request-Id", "req_registration_success")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequest(" Viet@Example.COM ")))
@@ -74,12 +74,12 @@ class RegistrationApiTest extends PostgresIntegrationTest {
 
     @Test
     void shouldReturnConflictForDuplicateNormalizedEmail() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/api/v1/auth/register").header("X-FlowPay-CSRF", "1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequest("Owner@Example.COM")))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/api/v1/auth/register").header("X-FlowPay-CSRF", "1")
                         .header("X-Request-Id", "req_duplicate_email")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequest("owner@example.com")))
@@ -125,7 +125,7 @@ class RegistrationApiTest extends PostgresIntegrationTest {
     }
 
     private void assertValidationError(String requestBody, String field) throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/api/v1/auth/register").header("X-FlowPay-CSRF", "1")
                         .header("X-Request-Id", "req_validation")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))

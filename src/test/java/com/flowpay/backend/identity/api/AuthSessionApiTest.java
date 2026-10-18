@@ -141,7 +141,7 @@ class AuthSessionApiTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"))
                 .andExpect(jsonPath("$.detail").value("The email or password is incorrect."));
 
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login").header("X-FlowPay-CSRF", "1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody("missing@example.com", PASSWORD)))
                 .andExpect(status().isUnauthorized())
@@ -173,7 +173,7 @@ class AuthSessionApiTest extends PostgresIntegrationTest {
         register();
         String oldToken = extractRefreshToken(login(PASSWORD).andExpect(status().isOk()).andReturn());
 
-        MvcResult refresh = mockMvc.perform(post("/api/v1/auth/refresh")
+        MvcResult refresh = mockMvc.perform(post("/api/v1/auth/refresh").header("X-FlowPay-CSRF", "1")
                         .cookie(new Cookie("flowpay_refresh", oldToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").isString())
@@ -192,7 +192,7 @@ class AuthSessionApiTest extends PostgresIntegrationTest {
                 Integer.class
         )).isEqualTo(1);
 
-        mockMvc.perform(post("/api/v1/auth/refresh")
+        mockMvc.perform(post("/api/v1/auth/refresh").header("X-FlowPay-CSRF", "1")
                         .cookie(new Cookie("flowpay_refresh", oldToken)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_REVOKED"));
@@ -202,7 +202,7 @@ class AuthSessionApiTest extends PostgresIntegrationTest {
     void shouldRejectMissingAndExpiredRefreshTokens() throws Exception {
         register();
 
-        mockMvc.perform(post("/api/v1/auth/refresh"))
+        mockMvc.perform(post("/api/v1/auth/refresh").header("X-FlowPay-CSRF", "1"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALID"));
 
@@ -213,7 +213,7 @@ class AuthSessionApiTest extends PostgresIntegrationTest {
                     expires_at = now() - interval '1 second'
                 """);
 
-        mockMvc.perform(post("/api/v1/auth/refresh")
+        mockMvc.perform(post("/api/v1/auth/refresh").header("X-FlowPay-CSRF", "1")
                         .cookie(new Cookie("flowpay_refresh", rawToken)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_EXPIRED"));
@@ -224,7 +224,7 @@ class AuthSessionApiTest extends PostgresIntegrationTest {
         register();
         String rawToken = extractRefreshToken(login(PASSWORD).andExpect(status().isOk()).andReturn());
 
-        mockMvc.perform(post("/api/v1/auth/logout")
+        mockMvc.perform(post("/api/v1/auth/logout").header("X-FlowPay-CSRF", "1")
                         .cookie(new Cookie("flowpay_refresh", rawToken)))
                 .andExpect(status().isNoContent())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("flowpay_refresh=")))
@@ -235,12 +235,12 @@ class AuthSessionApiTest extends PostgresIntegrationTest {
                 Boolean.class
         )).isTrue();
 
-        mockMvc.perform(post("/api/v1/auth/refresh")
+        mockMvc.perform(post("/api/v1/auth/refresh").header("X-FlowPay-CSRF", "1")
                         .cookie(new Cookie("flowpay_refresh", rawToken)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_REVOKED"));
 
-        mockMvc.perform(post("/api/v1/auth/logout"))
+        mockMvc.perform(post("/api/v1/auth/logout").header("X-FlowPay-CSRF", "1"))
                 .andExpect(status().isNoContent());
     }
 
@@ -369,7 +369,7 @@ class AuthSessionApiTest extends PostgresIntegrationTest {
     }
 
     private org.springframework.test.web.servlet.ResultActions login(String password) throws Exception {
-        return mockMvc.perform(post("/api/v1/auth/login")
+        return mockMvc.perform(post("/api/v1/auth/login").header("X-FlowPay-CSRF", "1")
                 .header("X-Request-Id", "req_login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginBody(EMAIL, password)));

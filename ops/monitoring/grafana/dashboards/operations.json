@@ -1,0 +1,828 @@
+{
+  "uid": "flowpay-operations",
+  "title": "FlowPay — simulator operations",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "timezone": "utc",
+  "refresh": "15s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "tags": [
+    "flowpay",
+    "P8-T08"
+  ],
+  "links": [
+    {
+      "title": "Trace lookup (Tempo Explore)",
+      "url": "/explore",
+      "type": "link"
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "API mean latency (s)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (uri,method) (rate(http_server_requests_seconds_sum{job=\"flowpay\",uri=~\"/api/v1/.*\"}[5m])) / sum by (uri,method) (rate(http_server_requests_seconds_count{job=\"flowpay\",uri=~\"/api/v1/.*\"}[5m]))",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "API request rate / status",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{job=\"flowpay\",uri=~\"/api/v1/.*\"}[5m]))",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Payment / refund provider p95 (fixed buckets)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by (le,outcome) (rate(flowpay_payment_provider_duration_seconds_bucket{job=\"flowpay\"}[5m])))",
+          "legendFormat": "payment {{outcome}}"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95,sum by (le,outcome) (rate(flowpay_refund_provider_duration_seconds_bucket{job=\"flowpay\"}[5m])))",
+          "legendFormat": "refund {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Committed outcome observations",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (rate(flowpay_payment_confirmation_outcomes_total{job=\"flowpay\"}[5m]))",
+          "legendFormat": "payment {{outcome}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (outcome) (rate(flowpay_refund_outcomes_total{job=\"flowpay\"}[5m]))",
+          "legendFormat": "refund {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Idempotency decisions (including replay/conflict)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (operation,decision) (rate(flowpay_idempotency_decisions_total{job=\"flowpay\"}[5m]))",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Fresh shared DB outbox backlog (max, NOT sum)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "flowpay:outbox_backlog_rows",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Fresh shared DB oldest unpublished age",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "flowpay:outbox_oldest_age_seconds",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Fresh shared DB webhook backlog / DEAD",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "flowpay:webhook_backlog_rows",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Fresh shared DB webhook overdue age",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "flowpay:webhook_oldest_due_age_seconds",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Snapshot freshness (NaN/missing is NOT healthy)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "flowpay_metrics_sample_age_seconds{job=\"flowpay\"}",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "Consumer queue depth / DLQ",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rabbitmq_detailed_queue_messages{job=\"rabbitmq-queues\"}",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "Required consumers",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rabbitmq_detailed_queue_consumers{job=\"rabbitmq-queues\"}",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "title": "Publication attempts / Ledger dedupe",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (rate(flowpay_outbox_publication_attempts_total{job=\"flowpay\"}[5m]))",
+          "legendFormat": "outbox {{outcome}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (outcome) (rate(flowpay_ledger_posting_decisions_total{job=\"flowpay\"}[5m]))",
+          "legendFormat": "ledger {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "title": "Webhook HTTP attempts / lease recovery",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (rate(flowpay_webhook_http_outcomes_total{job=\"flowpay\"}[5m]))",
+          "legendFormat": "http {{outcome}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (outcome) (rate(flowpay_webhook_lease_recoveries_total{job=\"flowpay\"}[5m]))",
+          "legendFormat": "recovery {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "title": "JVM heap used / max",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance) (jvm_memory_used_bytes{job=\"flowpay\",area=\"heap\"}) / sum by (instance) (jvm_memory_max_bytes{job=\"flowpay\",area=\"heap\"} > 0)",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "title": "DB pool active / max",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "hikaricp_connections_active{job=\"flowpay\"} / hikaricp_connections_max{job=\"flowpay\"}",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "title": "Process / system CPU",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "process_cpu_usage{job=\"flowpay\"}",
+          "legendFormat": "process {{instance}}"
+        },
+        {
+          "refId": "B",
+          "expr": "system_cpu_usage{job=\"flowpay\"}",
+          "legendFormat": "system {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "title": "JVM GC pause time rate",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 64,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance) (rate(jvm_gc_pause_seconds_sum{job=\"flowpay\"}[5m]))",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 19,
+      "title": "Collector failed trace exports",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 72,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(otelcol_exporter_send_failed_spans_total{job=\"collector\"}[5m]))",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "title": "Scrape availability",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 72,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=~\"flowpay|rabbitmq|rabbitmq-queues|collector|tempo|prometheus\"}",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "title": "Firing/pending operational alerts",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "flowpay-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 80,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ALERTS{alertstate=~\"pending|firing\"}",
+          "legendFormat": "{{instance}} {{uri}} {{operation}} {{decision}} {{status}} {{queue}} {{outcome}} {{component}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    }
+  ]
+}

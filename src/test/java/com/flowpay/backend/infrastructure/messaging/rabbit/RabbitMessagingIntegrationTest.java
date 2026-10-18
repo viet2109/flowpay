@@ -260,6 +260,18 @@ class RabbitMessagingIntegrationTest extends PostgresIntegrationTest {
                             == IntegrationEventPublicationStatus.UNROUTABLE))
                     .extracting(Publication::eventId)
                     .containsExactlyInAnyOrderElementsOf(expectedIds(eventCount, false));
+            for (int i = 0; i < eventCount / 2; i++) {
+                Message message = receive(properties.topology().ledgerQueue());
+                int index = Integer.parseInt(message.getMessageProperties().getMessageId()
+                        .substring("ievt_concurrent_".length()));
+                assertThat((String) message.getMessageProperties().getHeader("traceparent"))
+                        .isEqualTo(concurrentParent(index));
+                assertThat(message.getMessageProperties().getHeaders())
+                        .doesNotContainKeys("tracestate", "baggage");
+                assertThat(objectMapper.readTree(message.getBody()).path("payload").path("sequence").intValue())
+                        .isEqualTo(index);
+                assertThat(new String(message.getBody(), StandardCharsets.UTF_8)).doesNotContain("traceparent");
+            }
         } finally {
             executor.shutdownNow();
             assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
@@ -279,10 +291,14 @@ class RabbitMessagingIntegrationTest extends PostgresIntegrationTest {
                     "pi_concurrent_" + index,
                     "{\"sequence\":" + index + "}"
             );
-            return new Publication(eventId, publisher.publish(envelope).status());
+            return new Publication(eventId, publisher.publish(envelope, concurrentParent(index)).status());
         } catch (Exception exception) {
             throw new IllegalStateException(exception);
         }
+    }
+
+    private static String concurrentParent(int index) {
+        return "00-" + String.format("%032x", index + 1) + "-" + "b".repeat(16) + "-01";
     }
 
     private void assertMessage(Message message, IntegrationEventEnvelope expected)

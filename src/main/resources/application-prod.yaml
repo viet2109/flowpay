@@ -2,6 +2,8 @@ spring:
   config:
     activate:
       on-profile: prod
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -13,13 +15,35 @@ spring:
     password: ${RABBITMQ_PASSWORD}
 
 management:
+  server:
+    port: ${MANAGEMENT_SERVER_PORT:9091}
+    address: ${MANAGEMENT_SERVER_ADDRESS:127.0.0.1}
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+      probes:
+        add-additional-paths: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
   tracing:
     sampling:
       probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
 
 flowpay:
+  webhook:
+    egress:
+      proxy-host: ${WEBHOOK_EGRESS_PROXY_HOST}
+      proxy-port: ${WEBHOOK_EGRESS_PROXY_PORT}
   security:
     prometheus-public: false
     jwt:
       public-key-location: ${JWT_PUBLIC_KEY_LOCATION}
       private-key-location: ${JWT_PRIVATE_KEY_LOCATION}
+
+# Edge owns client identity; never let caller-controlled forwarded headers rewrite it.
+server:
+  forward-headers-strategy: none

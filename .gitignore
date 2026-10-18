@@ -8,6 +8,8 @@ target/
 # Local planning/reference documents
 docs/README.md
 docs/phase-*.md
+docs/task-roadmap.md
+docs/agent/
 
 ### STS ###
 .apt_generated

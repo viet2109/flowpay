@@ -4,5 +4,10 @@ import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvel
 
 public interface IntegrationEventTransportPublisher {
 
-    IntegrationEventPublicationResult publish(IntegrationEventEnvelope envelope);
+    default IntegrationEventPublicationResult publish(IntegrationEventEnvelope envelope) {
+        return publish(envelope, null);
+    }
+
+    /** Optional transport metadata is deliberately separate from the JSON envelope. */
+    IntegrationEventPublicationResult publish(IntegrationEventEnvelope envelope, String traceparent);
 }

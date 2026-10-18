@@ -34,6 +34,7 @@ public class FinalizePaymentConfirmationService {
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final PaymentIntegrationEventPublisher eventPublisher;
     private final Clock clock;
+    private final PaymentMetrics metrics;
 
     @Transactional
     public FinalizedPaymentConfirmation finalizeConfirmation(
@@ -77,6 +78,7 @@ public class FinalizePaymentConfirmationService {
             ));
         }
 
+        metrics.outcomeCommitted(providerResult.outcome());
         return new FinalizedPaymentConfirmation(
                 savedPayment.publicId(),
                 savedPayment.status(),

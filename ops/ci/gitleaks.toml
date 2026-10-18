@@ -1,0 +1,11 @@
+title = "FlowPay tracked-snapshot secret gate"
+
+[extend]
+useDefault = true
+
+# A deliberately non-functional marker generated only in disposable negative tests.
+# No production/test/doc directory is globally exempted.
+[[rules]]
+id = "flowpay-negative-canary"
+description = "Nonfunctional scanner regression marker"
+regex = '''FLOWPAY_TEST_ONLY_[A-Z0-9]{24}'''

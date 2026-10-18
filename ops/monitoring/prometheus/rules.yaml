@@ -1,0 +1,98 @@
+groups:
+  - name: flowpay-shared-database
+    rules:
+      # Replicas observe the SAME database. Never sum these gauges or treat NaN as zero.
+      - record: flowpay:outbox_backlog_rows
+        expr: max by (status) (flowpay_outbox_backlog_rows{job="flowpay"} and on (job, instance) (flowpay_metrics_sample_age_seconds{job="flowpay",component="OUTBOX"} <= 120))
+      - record: flowpay:outbox_oldest_age_seconds
+        expr: max(flowpay_outbox_oldest_unpublished_age_seconds{job="flowpay"} and on (job, instance) (flowpay_metrics_sample_age_seconds{job="flowpay",component="OUTBOX"} <= 120))
+      - record: flowpay:webhook_backlog_rows
+        expr: max by (status) (flowpay_webhook_backlog_rows{job="flowpay"} and on (job, instance) (flowpay_metrics_sample_age_seconds{job="flowpay",component="WEBHOOK"} <= 120))
+      - record: flowpay:webhook_oldest_due_age_seconds
+        expr: max(flowpay_webhook_oldest_due_age_seconds{job="flowpay"} and on (job, instance) (flowpay_metrics_sample_age_seconds{job="flowpay",component="WEBHOOK"} <= 120))
+  - name: flowpay-operational-alerts
+    rules:
+      - alert: FlowPayTargetUnavailable
+        expr: up{job=~"flowpay|rabbitmq|rabbitmq-queues|collector|tempo"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: Required lab scrape target is unavailable
+          runbook: docs/monitoring-runbook.md#target-unavailable
+      - alert: FlowPayMetricsStale
+        expr: (flowpay_metrics_sample_age_seconds{job="flowpay"} > 120) or (up{job="flowpay"} == 1 unless on (job, instance) (flowpay_metrics_sample_age_seconds{job="flowpay",component="OUTBOX"} >= 0)) or (up{job="flowpay"} == 1 unless on (job, instance) (flowpay_metrics_sample_age_seconds{job="flowpay",component="WEBHOOK"} >= 0))
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: Durable metrics are stale, missing or never sampled
+          runbook: docs/monitoring-runbook.md#metrics-stale
+      - alert: FlowPayOutboxDelayed
+        expr: flowpay:outbox_oldest_age_seconds > 120
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: Unpublished source facts are delayed
+          runbook: docs/monitoring-runbook.md#outbox-delayed
+      - alert: FlowPayWebhookDelayed
+        expr: flowpay:webhook_oldest_due_age_seconds > 120
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: Webhook work is overdue
+          runbook: docs/monitoring-runbook.md#webhook-delayed
+      - alert: FlowPayWebhookDead
+        expr: flowpay:webhook_backlog_rows{status="DEAD"} > 0
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: Webhook deliveries require manual review
+          runbook: docs/monitoring-runbook.md#webhook-dead
+      - alert: FlowPayConsumerDlq
+        expr: rabbitmq_detailed_queue_messages{job="rabbitmq-queues",queue=~"flowpay\\.(ledger|webhook)\\.events\\.dlq"} > 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: Consumer dead-letter queue is nonempty
+          runbook: docs/monitoring-runbook.md#consumer-dlq
+      - alert: FlowPayConsumerUnavailable
+        expr: (rabbitmq_detailed_queue_consumers{job="rabbitmq-queues",queue=~"flowpay\\.(ledger|webhook)\\.events"} < 1) or absent(rabbitmq_detailed_queue_consumers{job="rabbitmq-queues",queue="flowpay.ledger.events"}) or absent(rabbitmq_detailed_queue_consumers{job="rabbitmq-queues",queue="flowpay.webhook.events"})
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: Required event queue has no consumer or its series is absent
+          runbook: docs/monitoring-runbook.md#consumer-unavailable
+      - alert: FlowPayHeapPressure
+        expr: sum by (job, instance) (jvm_memory_used_bytes{job="flowpay",area="heap"}) / sum by (job, instance) (jvm_memory_max_bytes{job="flowpay",area="heap"} > 0) > 0.85
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: JVM heap pressure is sustained
+          runbook: docs/monitoring-runbook.md#resource-pressure
+      - alert: FlowPayPoolPressure
+        expr: hikaricp_connections_active{job="flowpay"} / hikaricp_connections_max{job="flowpay"} > 0.8
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: Database connection pool pressure is sustained
+          runbook: docs/monitoring-runbook.md#resource-pressure
+      - alert: FlowPayCpuPressure
+        expr: process_cpu_usage{job="flowpay"} > 0.9
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Process CPU pressure is sustained
+          runbook: docs/monitoring-runbook.md#resource-pressure
+      - alert: FlowPayApiErrors
+        expr: (sum(rate(http_server_requests_seconds_count{job="flowpay",uri=~"/api/v1/.*",status=~"5.."}[5m])) / sum(rate(http_server_requests_seconds_count{job="flowpay",uri=~"/api/v1/.*"}[5m])) > 0.1) and (sum(increase(http_server_requests_seconds_count{job="flowpay",uri=~"/api/v1/.*"}[5m])) >= 20)
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: API server errors exceed the provisional operational threshold
+          runbook: docs/monitoring-runbook.md#api-errors
+      - alert: FlowPayCollectorExportFailure
+        expr: sum(rate(otelcol_exporter_send_failed_spans_total{job="collector"}[5m])) > 0
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: Collector trace export is failing
+          runbook: docs/monitoring-runbook.md#collector-export-failure

@@ -213,9 +213,127 @@ these boundaries. Phase 6 remains DONE/FROZEN; Phase 8 hardening is not included
 
 ### Phase 8 — Production engineering
 
-Status: `NOT STARTED`.
+Status: `IN PROGRESS` as of 2026-10-17; P8-T01 baseline/design, P8-T02
+production configuration/management, P8-T03 business metrics, P8-T04
+asynchronous operational metrics, P8-T05 synchronous tracing and P8-T06 durable
+Outbox trace context, P8-T07 consumer/delayed-worker tracing, P8-T08 monitoring
+lab/dashboards/alerts, P8-T09 Webhook egress protection and P8-T10 reviewed auth/
+ingress security controls complete. T11–T17 gate implementations and bounded
+staging/load/failure/restore/runbook evidence are recorded below. T18 final
+acceptance is in progress, not phase completion or security clearance.
 
-Hardening after the functional MVP: richer tracing/metrics, load testing, security hardening, deployment improvements, and operational tooling.
+Target selected by the user: reproducible staging on Linux/container, without
+a chosen provider or external deployment. The Phase 7 release is merged into
+remote main, the phase branch is isolated, and the fresh 1,173-test baseline
+gate passes with zero failures/errors/skips. P8-T01 introduces documentation
+only. P8-T02 adds fail-closed production startup, a dedicated loopback-by-default
+management scrape listener, public Actuator denial, DB/availability readiness,
+process liveness and bounded HTTP graceful shutdown. Broker/telemetry outages
+do not block durable source + Outbox acceptance; no business contract changed.
+Staging network and container/worker lifecycle proof remain separate gates.
+
+P8-T03 adds bounded, failure-isolated Payment/Refund outcome and provider-latency
+metrics plus Idempotency decisions/committed reservations. Logical counters are
+after-commit, not financial truth or HTTP success accounting; rollback/replay
+does not inflate them. UNKNOWN semantics are preserved. No new dependency,
+schema, business state/API/event, lock or transaction boundary is introduced.
+
+P8-T04 adds cached shared-DB Outbox/Webhook backlog/age projections plus bounded
+Outbox publication, Ledger posting/duplicate and Webhook attempt/HTTP/lease
+observations. Persisted success counters follow commit/fencing. Sampling is
+read-only, throttled, separate from financial orchestration and safe on failure;
+stale/shared gauge semantics and query costs are documented. No schema,
+business contract, retry budget, locking or transaction-boundary change.
+
+P8-T05 adds synchronous HTTP/provider/Webhook tracing using the installed SDK,
+bounded privacy-safe export and distinct request/trace/span log correlation.
+Collector failure does not change financial results, and signed merchant HTTP
+does not receive internal context headers. Root sampling and opt-in export are
+explicit. No dependency, schema, payload or financial transaction change.
+
+P8-T06 adds reviewed nullable technical Outbox metadata (V012) and validated
+source traceparent propagation in Rabbit headers across retry/restart. Legacy/
+malformed context is ignored; no baggage/tracestate, V1 payload/public Webhook
+change, dependency or financial TX/locking/retry change. Full clean verify
+passes 1,331 tests/187 suites with zero failures/errors/skips. Publication,
+consumer and delayed-worker spans still belong to T07, not this task.
+
+P8-T07 implements bounded publication/consumer/delivery/recovery spans and
+restart-stable Webhook-owned technical context (V013). Parent/cleanup/privacy
+policy is explicit; public IDs/JSON/HMAC/headers, financial/dedupe/ACK/retry/lease
+semantics are preserved. Full clean verify passes 1,351 tests/191 suites with
+no failures/errors/skips. This is not deployed collector/staging evidence.
+
+P8-T08 provides an independent Linux-container simulator monitoring lab with
+digest-pinned Prometheus/Grafana/Collector/Tempo, versioned dashboard/datasource
+provisioning, 12 alert rules with tested firing/resolution and runbook references.
+Management/broker/DB/collector remain private; Grafana is loopback/authenticated.
+Real metric/trace ingestion and all-monitoring outage/recovery preserve payment,
+refund, Idempotency and balanced duplicate-safe Ledger outcomes. This is not
+external paging, a production image, TLS staging or measured performance evidence.
+No application defaults, API/event/schema or financial semantics change.
+
+P8-T09 implements and verifies Webhook effective-destination/egress enforcement
+with a fixed CONNECT proxy and dedicated user-approved Apache transport on Java
+21. Real isolated DNS/TLS/IP-SAN/HMAC and IPv4/IPv6 bypass fixtures pass; affected
+monitoring/financial wiring is reverified on the final artifact. This is not
+external-provider deployment or actual staging-firewall acceptance.
+
+P8-T10's documented cookie CSRF/ingress findings and explicit user-approved
+mitigations are verified: required auth POST marker/closed preflight and bounded
+TCP-peer-IP edge limits with safe correlated 429/Retry-After. Final 266 focused
+and 1,405 full tests, native edge/real-app financial/replay gates, monitoring and
+Webhook egress regressions pass without weakening token/financial/TX semantics.
+The single-edge/per-IP, same-origin UI and pending TLS/scan/capacity limitations
+have explicit owners in `api-security-review.md`; this is not real-money readiness.
+
+P8-T11 implements CI/supply-chain gates with approved workflow adoption,
+mandatory real infrastructure coverage, pinned scanners/negative controls and
+safe SBOM/evidence. Gate implementation is complete, **security acceptance is
+BLOCKED**: ten baseline secret-format detections and 17 HIGH/CRITICAL dependency
+findings remain unwaived; the user chose later review, not fixture rewrites or
+scanner bypass. Full Java verification passes 1,405 tests/195 suites with no
+failures/errors/skips. This is not a clean security or hosted-CI acceptance claim.
+See [CI scope, policy and evidence](ci-supply-chain.md).
+
+P8-T12 adds an artifact-bound non-root Java21 runtime image, finite runtime
+budgets, external secret/key continuity and isolated API/Ledger/Webhook recovery
+gates. Image security remains a separate fail-closed release gate; see
+[runtime contract and current acceptance](container-runtime.md). No provider,
+registry publication, public API hosting or frontend deployment is selected.
+
+P8-T13 supplies [isolated TLS staging](staging-deployment.md), private
+persistence/broker/telemetry, external key continuity, topology-before-producers
+and fresh/Phase7 upgrade/recovery verification. This local simulator environment
+does not grant release clearance while T11/T12 security gates remain blocked.
+
+T14's [declared load/30-minute soak](load-testing.md), T15's
+[two-instance failure drills](operational-drills.md), T16's
+[DB/broker/key restore](backup-restore.md) and T17's
+[operational runbooks](operations-runbook.md) have bounded lab acceptance on
+their recorded T13 artifact. They do not transfer automatically to a different
+final image or host, waive source/image findings, provision off-host backups or
+provide public hosting. T18 must reconcile all required final-artifact gates.
+Specific tool versions, trace DDL/security contract changes and measured
+performance/recovery targets have explicit owner/review gates in
+`production-engineering.md`; they are not silently preimplemented or fabricated.
+Public financial/event contracts and Phase 7 reliability semantics remain frozen.
+
+The [P8-T18 exit audit](production-exit-audit.md) reconciles the current final
+candidate with those historical proofs and independently required gates. The
+2026-10-18 candidate repeats full30-minute load/soak, all eight two-instance
+failure cases, matched/mismatch restores and read-only runbook rehearsal with
+passing financial/HMAC/cleanup audits. Stress drops/429 and rolling transients
+remain explicit. Final native/source/clean-commit and hosted-CI evidence are
+separate, not inferred from these operational passes. Both hosted CI jobs and
+clean-committed source/preflight now pass. Phase8 is DONE/FROZEN as of2026-10-18
+for the Linux/container simulator baseline. Exact expiring source false-positive
+reviews are not real-secret waivers. The audit authorizes no public deployment,
+main merge, image publication, paid service or new business phase.
+
+Completion is evidence-bound to the selected staging target. It does not imply
+real-money readiness, an unspecified cloud deployment, exactly-once HTTP or
+zero-data-loss guarantees. Phase 8 is DONE/FROZEN only after P8-T18.
 
 ## 7. Explicitly out of scope for MVP
 

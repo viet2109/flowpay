@@ -480,11 +480,12 @@ class BrokerOutageBusinessRecoveryIntegrationTest extends PostgresIntegrationTes
 
         @Override
         public IntegrationEventPublicationResult publish(
-                IntegrationEventEnvelope envelope
+                IntegrationEventEnvelope envelope,
+                String traceparent
         ) {
             eventIds.add(envelope.eventId());
             awaitReleaseIfBlocked(envelope.eventId());
-            return delegate.publish(envelope);
+            return delegate.publish(envelope, traceparent);
         }
 
         void block(String eventId, int publisherCount) {

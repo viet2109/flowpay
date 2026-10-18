@@ -1,0 +1,22 @@
+# Disposable DR fixture only; do not apply to a retained deployment.
+# Cold Rabbit restore requires the original logical node name and exact image.
+services:
+  rabbitmq:
+    hostname: flowpay-backup-node
+    volumes:
+      - type: volume
+        source: rabbit-data
+        target: /var/lib/rabbitmq
+        volume: {nocopy: true}
+    environment:
+      RABBITMQ_NODENAME: rabbit@flowpay-backup-node
+  app:
+    environment:
+      LEDGER_EVENT_CONSUMER_ENABLED: '${BACKUP_CONSUMERS_ENABLED:-true}'
+      WEBHOOK_EVENT_CONSUMER_ENABLED: '${BACKUP_CONSUMERS_ENABLED:-true}'
+      WEBHOOK_DELIVERY_WORKER_ENABLED: '${BACKUP_HTTP_ENABLED:-true}'
+  probe:
+    entrypoint: [python, -B, /backup/probe.py]
+    volumes:
+      - ../backup/probe.py:/backup/probe.py:ro
+      - ../resilience/probe.py:/backup/base.py:ro

@@ -1,0 +1,17 @@
+{
+  "version": "P8-T16-v1",
+  "approvedOn": "2026-10-17",
+  "approval": "Owner delegated the proposed targets and original-event replay choice; isolated synthetic lab only",
+  "rpoSeconds": 86400,
+  "rtoSeconds": 900,
+  "cadenceHours": 24,
+  "retention": {"daily": 7, "weekly": 4},
+  "storage": "Encrypted data and key bundles in separate access-controlled off-host stores; decryption private keys held separately. Lab uses separate disposable external temporary directories; no off-host service or scheduler is provisioned.",
+  "replay": "original-event-facts-isolated-lab-only",
+  "rabbitNode": "rabbit@flowpay-backup-node",
+  "applicationImage": "sha256:951f5e3b2cc9124eb35af64c9969a8a3999884a9b05484e9c79e533ab6bbb993",
+  "jarSha256": "3212f15b52fb36ef9c967cb05e49b8bf897b822c0fa19b7424225f1c657be0d7",
+  "priorDrillSha256": "13f42a23270a47595abe8a9ea0b7b797f77524096a3ebbda3cdedadcc2d0c04e",
+  "rtoClock": "From restore request before bundle authentication through DB/broker restore, startup, replay if approved, API replay and full drain/invariant audit; backup creation and subsequent negative/duplicate controls measured separately",
+  "rpoClock": "Age of the consistent DB snapshot at simulated loss; exact checkpoint equality, not a claim to recover commits after the snapshot. No WAL/PITR."
+}

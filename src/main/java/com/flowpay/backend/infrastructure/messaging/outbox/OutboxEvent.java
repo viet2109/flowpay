@@ -1,5 +1,7 @@
 package com.flowpay.backend.infrastructure.messaging.outbox;
 
+import com.flowpay.backend.common.observability.DurableTraceContext;
+
 import java.time.Instant;
 import java.util.Objects;
 
@@ -16,12 +18,14 @@ public record OutboxEvent(
         Instant publishedAt,
         int retryCount,
         String lastError,
-        Instant createdAt
+        Instant createdAt,
+        String traceparent
 ) {
 
     private static final String EVENT_ID_PREFIX = "ievt_";
 
     public OutboxEvent {
+        traceparent = DurableTraceContext.validatedOrNull(traceparent);
         if (internalId != null && internalId <= 0) {
             throw new IllegalArgumentException("internalId must be positive");
         }
@@ -50,6 +54,20 @@ public record OutboxEvent(
             Instant occurredAt,
             Instant createdAt
     ) {
+        return pending(eventId, aggregateType, aggregateId, eventType, payload,
+                occurredAt, createdAt, null);
+    }
+
+    public static OutboxEvent pending(
+            String eventId,
+            String aggregateType,
+            String aggregateId,
+            String eventType,
+            String payload,
+            Instant occurredAt,
+            Instant createdAt,
+            String traceparent
+    ) {
         Instant materializedAt = Objects.requireNonNull(
                 createdAt,
                 "createdAt must not be null"
@@ -67,7 +85,8 @@ public record OutboxEvent(
                 null,
                 0,
                 null,
-                materializedAt
+                materializedAt,
+                traceparent
         );
     }
 

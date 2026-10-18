@@ -34,13 +34,51 @@ management:
         enabled: true
   tracing:
     sampling:
-      probability: 0.1
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+    export:
+      otlp:
+        enabled: ${TRACING_EXPORT_ENABLED:false}
+    baggage:
+      enabled: false
+  opentelemetry:
+    tracing:
+      sampler: ${TRACING_SAMPLER:parent-based-trace-id-ratio}
+      limits:
+        max-attributes: 16
+        max-attribute-value-length: 128
+        max-events: 0
+        max-links: 0
+      export:
+        include-unsampled: false
+        timeout: 3s
+        max-queue-size: 2048
+        max-batch-size: 512
+        schedule-delay: 5s
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+          transport: http
+          connect-timeout: 1s
+          timeout: 2s
 
 logging:
   pattern:
-    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] [requestId=%X{requestId:-}] %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] [requestId=%X{requestId:-} traceId=%X{traceId:-} spanId=%X{spanId:-}] %logger{36} - %msg%n"
+  level:
+    root: INFO
+    org.springframework.web: INFO
+    org.springframework.jdbc.core: INFO
+    org.hibernate.SQL: 'OFF'
+    org.hibernate.orm.jdbc.bind: 'OFF'
+    org.apache.hc.client5: 'OFF'
+    org.apache.hc.core5: 'OFF'
+    io.opentelemetry.exporter: 'OFF'
+    io.opentelemetry.sdk.trace.export: 'OFF'
 
 flowpay:
+  metrics:
+    sampling:
+      enabled: ${METRICS_SAMPLING_ENABLED:true}
+      fixed-delay: ${METRICS_SAMPLING_FIXED_DELAY:30s}
   messaging:
     topology:
       exchange: ${RABBITMQ_EVENT_EXCHANGE:flowpay.events}

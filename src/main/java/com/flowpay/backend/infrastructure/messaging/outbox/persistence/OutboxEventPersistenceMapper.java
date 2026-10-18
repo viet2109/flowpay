@@ -21,7 +21,8 @@ final class OutboxEventPersistenceMapper {
                 event.publishedAt(),
                 event.retryCount(),
                 event.lastError(),
-                event.createdAt()
+                event.createdAt(),
+                event.traceparent()
         );
     }
 
@@ -39,7 +40,8 @@ final class OutboxEventPersistenceMapper {
                 entity.publishedAt(),
                 entity.retryCount(),
                 entity.lastError(),
-                entity.createdAt()
+                entity.createdAt(),
+                entity.traceparent()
         );
     }
 }

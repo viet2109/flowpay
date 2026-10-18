@@ -1,11 +1,14 @@
 package com.flowpay.backend.infrastructure.messaging.outbox.relay;
 
+import com.flowpay.backend.common.observability.MetricsRecorder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.flowpay.backend.infrastructure.messaging.FlowPayMessagingProperties;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationResult;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventPublicationStatus;
 import com.flowpay.backend.infrastructure.messaging.IntegrationEventTransportPublisher;
 import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvelope;
 import com.flowpay.backend.infrastructure.messaging.outbox.IntegrationEventEnvelopeMapper;
+import com.flowpay.backend.infrastructure.messaging.outbox.metrics.OutboxMetrics;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -39,7 +42,9 @@ class OutboxRelayServiceTest {
             backoffPolicy,
             new OutboxRelayFailureSummary(),
             properties,
-            Clock.fixed(NOW, ZoneOffset.UTC)
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            new OutboxMetrics(new MetricsRecorder(new SimpleMeterRegistry())),
+            new com.flowpay.backend.common.observability.AsyncWorkTracing(io.opentelemetry.api.OpenTelemetry.noop())
     );
 
     @Test
@@ -61,7 +66,7 @@ class OutboxRelayServiceTest {
                 "amqp://user:password@broker\nAuthorization: secret"
         ));
         when(envelopeMapper.from(succeeding)).thenReturn(envelope);
-        when(transportPublisher.publish(envelope)).thenReturn(
+        when(transportPublisher.publish(envelope, null)).thenReturn(
                 IntegrationEventPublicationResult.of(
                         IntegrationEventPublicationStatus.CONFIRMED
                 )
@@ -88,7 +93,8 @@ class OutboxRelayServiceTest {
                 "payment.succeeded.v1",
                 "{\"occurredAt\":\"2026-09-02T05:00:00Z\"}",
                 Instant.parse("2026-09-02T05:00:00Z"),
-                retryCount
+                retryCount,
+                null
         );
     }
 

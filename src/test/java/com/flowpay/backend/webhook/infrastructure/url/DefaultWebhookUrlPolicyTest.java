@@ -3,14 +3,13 @@ package com.flowpay.backend.webhook.infrastructure.url;
 import com.flowpay.backend.webhook.application.WebhookHttpDeliveryRequest;
 import com.flowpay.backend.webhook.application.WebhookHttpDeliveryResult;
 import com.flowpay.backend.webhook.application.WebhookSigner;
-import com.flowpay.backend.webhook.infrastructure.http.JdkWebhookHttpClientAdapter;
+import com.flowpay.backend.webhook.infrastructure.http.ApacheWebhookHttpClientAdapter;
 import com.flowpay.backend.webhook.infrastructure.http.WebhookHttpProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import java.net.http.HttpClient;
+import org.apache.hc.client5.http.impl.async.CloseableHttpAsyncClient;
 import java.time.Duration;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,13 +22,12 @@ class DefaultWebhookUrlPolicyTest {
 
     @Test
     void outboundAdapterRechecksProductionPolicyBeforeSigningOrSendingAPreviouslyStoredUrl() {
-        var client = mock(HttpClient.class);
+        var client = mock(CloseableHttpAsyncClient.class);
         var signer = mock(WebhookSigner.class);
         var timeout = Duration.ofSeconds(2);
-        when(client.followRedirects()).thenReturn(HttpClient.Redirect.NEVER);
-        when(client.connectTimeout()).thenReturn(Optional.of(timeout));
-        var adapter = new JdkWebhookHttpClientAdapter(client, signer, productionPolicy,
-                new WebhookHttpProperties(timeout, Duration.ofSeconds(5)));
+        var adapter = new ApacheWebhookHttpClientAdapter(client, signer, productionPolicy,
+                new WebhookHttpProperties(timeout, Duration.ofSeconds(5)),
+                new com.flowpay.backend.common.observability.ExternalCallTracing(io.micrometer.tracing.Tracer.NOOP));
         clearInvocations(client);
         for (String target : new String[]{"http://127.0.0.1/webhooks", "https://localhost/webhooks",
                 "https://127.0.0.1/webhooks", "https://[::1]/webhooks", "https://10.0.0.1/webhooks",
@@ -81,7 +79,13 @@ class DefaultWebhookUrlPolicyTest {
             "https://224.0.0.1/webhooks",
             "https://[fe80::1]/webhooks",
             "https://[fd00::1]/webhooks",
-            "https://[::]/webhooks"
+            "https://[::]/webhooks",
+            "https://100.64.0.1/hooks", "https://192.0.0.1/hooks", "https://192.0.2.1/hooks",
+            "https://192.88.99.1/hooks", "https://198.18.0.1/hooks", "https://198.51.100.1/hooks",
+            "https://203.0.113.1/hooks", "https://240.0.0.1/hooks", "https://255.255.255.255/hooks",
+            "https://[::ffff:127.0.0.1]/hooks", "https://[64:ff9b::a00:1]/hooks",
+            "https://[100::1]/hooks", "https://[2001::1]/hooks", "https://[2001:db8::1]/hooks",
+            "https://[2002::1]/hooks", "https://[3fff::1]/hooks", "https://[4000::1]/hooks"
     })
     void shouldRejectLocalPrivateMetadataAndNonRoutableLiteralTargets(String url) {
         assertThatThrownBy(() -> productionPolicy.validate(url))

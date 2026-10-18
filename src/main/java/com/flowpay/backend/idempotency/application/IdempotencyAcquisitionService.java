@@ -17,13 +17,14 @@ public class IdempotencyAcquisitionService {
     private final IdempotencyRepository repository;
     private final Clock clock;
     private final IdempotencyProperties properties;
+    private final IdempotencyMetrics metrics;
 
     @Transactional
     public IdempotencyAcquisitionResult acquire(IdempotencyAcquisitionCommand command) {
         Instant createdAt = clock.instant();
         IdempotencyRecord candidate = newCandidate(command, createdAt);
 
-        return repository.tryInsert(candidate)
+        IdempotencyAcquisitionResult result = repository.tryInsert(candidate)
                 .map(inserted -> IdempotencyAcquisitionResult.newExecution(
                         requireInternalId(inserted)
                 ))
@@ -32,13 +33,17 @@ public class IdempotencyAcquisitionService {
                                 "Conflicting idempotency record could not be loaded"
                         )
                 ));
+        metrics.acquired(command.operation(), result.decision());
+        return result;
     }
 
     @Transactional(readOnly = true)
     public Optional<IdempotencyAcquisitionResult> findExisting(
             IdempotencyAcquisitionCommand command
     ) {
-        return findExistingDecision(command);
+        Optional<IdempotencyAcquisitionResult> result = findExistingDecision(command);
+        metrics.lookup(command.operation(), result.map(IdempotencyAcquisitionResult::decision).orElse(null));
+        return result;
     }
 
     private IdempotencyRecord newCandidate(

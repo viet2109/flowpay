@@ -1,6 +1,8 @@
 package com.flowpay.backend.refund.application;
 
 import com.flowpay.backend.common.money.Money;
+import com.flowpay.backend.common.observability.MetricsRecorder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.flowpay.backend.common.security.MerchantApiPrincipal;
 import com.flowpay.backend.idempotency.application.IdempotencyCompletionCommand;
 import com.flowpay.backend.idempotency.application.IdempotencyCompletionService;
@@ -117,7 +119,9 @@ class IdempotentRefundServiceTest {
                 finalizationService,
                 snapshotMapper,
                 snapshotCodec,
-                completionService
+                completionService,
+                new RefundMetrics(new MetricsRecorder(new SimpleMeterRegistry())),
+                new com.flowpay.backend.common.observability.ExternalCallTracing(io.micrometer.tracing.Tracer.NOOP)
         );
     }
 

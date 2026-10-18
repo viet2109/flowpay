@@ -8,7 +8,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.0</version>
+        <version>4.1.1</version>
         <relativePath/>
     </parent>
 
@@ -20,6 +20,17 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- P8-T09 approved Webhook transport. Boot 4.1.1 now manages Client 5.6.4;
+             retain the reviewed Core 5.4.4 override; see docs/webhook-egress.md. -->
+        <httpcore5.version>5.4.4</httpcore5.version>
+        <!-- P8-T18 owner-approved security remediation beyond the Boot 4.1.1 BOM.
+             Keep component families aligned; review/verification in
+             docs/dependency-security-review.md. No scanner exceptions. -->
+        <tomcat.version>11.0.27</tomcat.version>
+        <jackson-bom.version>3.1.7</jackson-bom.version>
+        <jackson-2-bom.version>2.21.7</jackson-2-bom.version>
+        <netty.version>4.2.19.Final</netty.version>
+        <rabbit-amqp-client.version>5.37.0</rabbit-amqp-client.version>
         <!-- Not managed by Spring Boot's dependency BOM -->
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
@@ -40,6 +51,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-restclient</artifactId>
+        </dependency>
+        <!-- Dedicated Webhook infrastructure client, not an application/domain dependency. -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
         </dependency>
 
         <!-- Persistence -->
