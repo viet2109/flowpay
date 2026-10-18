@@ -16,6 +16,26 @@ approval for these seven source locations and ten observed detector rows only.
 It is separate from `ops/ci/exceptions.json`, which stays empty: dependency/SAST
 exceptions and image secret acceptance are not authorized.
 
+### Owner-approved LF detector metadata correction (2026-10-18)
+
+Hosted run39109618819 fails with the fixed annotation
+`stage=severity-policy; code=source-review-count`. Native reproduction confirms
+that CRLF versus LF changes one detector end coordinate, not a credential:
+the two rows for the same synthetic test-profile setting at line28 become
+spans28–28 and28–29 under LF. All five whole-file LF identities and all ten
+detector rows remain present. The original seven reviewed source-value
+locations are unchanged; no new value is accepted.
+
+The owner explicitly delegated proceeding with canonical LF and these exact
+metadata on2026-10-18. Security snapshots normalize Git-classified text only in
+the temporary copy, never checkout/fixture/binary bytes. `source-fp-07` alone
+declares `findingSpans`: exactly one28–28 row and one28–29 row, both mandatory.
+The other six entries are unchanged. This is not a range/line-ending tolerance,
+fallback, duplicate folding or permission to accept fewer/additional rows.
+Missing/shifted/duplicate/extra spans fail. Seven reviewed positions/ten rows,
+hashes, pinned detector/config and original exclusive expiry remain bounded.
+No auto renewal, fixture rewrite, new source waiver or image-secret exception.
+
 Each entry binds the rule, exact test/doc path and line, occurrence count and
 LF-normalized **whole source-file** SHA-256. The policy also binds the pinned
 Gitleaks image and config checksum. These are public source-file identities,

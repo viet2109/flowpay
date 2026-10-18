@@ -265,6 +265,35 @@ class GateTest(unittest.TestCase):
             self.assertEqual(gate.tracked_snapshot(output), 1)
         self.assertFalse((output / ".env").exists())
 
+    def test_canonical_security_snapshot_normalizes_git_text_not_binary_or_live_files(self):
+        text = self.root / "sample.java"
+        original = b"one\r\ntwo\nthree\r\n"
+        text.write_bytes(original)
+        binary = self.root / "binary.bin"
+        binary.write_bytes(b"\0binary\r\n")
+        output = self.root / "snapshot"
+        replies = [(b"sample.java\0binary.bin\0", 0),
+                   (b"i/lf w/mixed attr/\tsample.java\0i/-text w/-text attr/\tbinary.bin\0", 0)]
+        with patch.object(gate, "ROOT", self.root), patch.object(gate, "run", side_effect=replies):
+            self.assertEqual(gate.tracked_snapshot(output, canonical_text=True), 2)
+        self.assertEqual((output / "sample.java").read_bytes(), b"one\ntwo\nthree\n")
+        self.assertEqual((output / "binary.bin").read_bytes(), binary.read_bytes())
+        self.assertEqual(text.read_bytes(), original)
+
+    def test_canonical_snapshot_refuses_incomplete_or_unexpected_text_inventory(self):
+        (self.root / "sample.java").write_bytes(b"one\r\n")
+        for metadata in (b"", b"invalid\0", b"i/lf w/unknown attr/\tsample.java\0",
+                         b"i/lf w/lf attr/\t../escape\0"):
+            with self.subTest(metadata=metadata), patch.object(gate, "ROOT", self.root), \
+                    patch.object(gate, "run", side_effect=[(b"sample.java\0", 0), (metadata, 0)]), \
+                    self.assertRaises(gate.GateError):
+                gate.tracked_snapshot(self.root / "out", canonical_text=True)
+
+    def test_canonical_snapshot_checks_protected_paths_before_eol_inspection(self):
+        with patch.object(gate, "run", return_value=(b".env\0", 0)) as invoked, self.assertRaises(gate.GateError):
+            gate.tracked_snapshot(self.root / "out", canonical_text=True)
+        self.assertEqual(invoked.call_count, 1)
+
     def test_tracked_local_only_and_symlink_escape_fail(self):
         for name in (".env", "AGENTS.md", "nested/AGENTS.override.md", "docs/README.md", "docs/phase-8-test.md", "../escape"):
             with self.subTest(name=name), patch.object(gate, "run", return_value=(name.encode() + b"\0", 0)):

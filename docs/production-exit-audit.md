@@ -15,6 +15,14 @@ remains required; no unique historical hosted root cause is claimed without its 
 The subsequent hosted run39109259458 still fails source security. A fixed-code,
 privacy-tested CI annotation is added for stage/category diagnosis without raw
 logs. No root cause or phase acceptance is inferred from native passes alone.
+Run39109618819 now identifies `source-review-count` at severity policy. Native
+LF reproduction retains ten rows and all five approved content identities, but
+one test-profile detector span is28–29 instead of28–28. The owner explicitly
+approved canonical text snapshots and exact metadata correction. Both spans
+are now separately required, one row each, under the same seventh reviewed
+source location/hash/expiry; no finding is discarded or shifted automatically.
+228 Windows controls pass; full canonical/native/Linux and hosted verification
+remain required. Phase8 cannot be frozen merely because a fixture is known.
 
 2026-10-18: **Verified local candidate; phase IN PROGRESS, not DONE/FROZEN.**
 Final clean-committed attestation is a generated post-commit checkpoint;

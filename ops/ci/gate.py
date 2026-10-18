@@ -236,7 +236,7 @@ def lint_workflow():
         run([str(executable), "-shellcheck=", "-pyflakes=", str(ROOT / ".github/workflows/ci.yml")], timeout=30)
 
 
-def tracked_snapshot(destination):
+def tracked_snapshot(destination, *, canonical_text=False):
     files, _ = run(["git", "ls-files", "-z"])
     count = 0
     for name in files.decode("utf-8").split("\0"):
@@ -256,6 +256,27 @@ def tracked_snapshot(destination):
         shutil.copyfile(source, target)
         count += 1
     require(count > 0, "empty tracked snapshot")
+    if canonical_text:
+        # Git identifies text versus binary. Inspect only after every tracked
+        # path has passed the local-only/symlink checks above. Never touch live
+        # checkout bytes or normalize binary resources based on an extension.
+        eol, _ = run(["git", "ls-files", "--eol", "-z"])
+        tracked_names = {name for name in files.decode("utf-8").split("\0") if name}
+        seen = set()
+        for entry in eol.decode("utf-8").split("\0"):
+            if not entry:
+                continue
+            metadata, separator, name = entry.partition("\t")
+            parts = metadata.split()
+            require(separator and len(parts) >= 2 and name not in seen
+                    and name in tracked_names, "invalid tracked text inventory")
+            seen.add(name)
+            require(parts[1] in {"w/lf", "w/crlf", "w/mixed", "w/none", "w/-text"},
+                    "unknown tracked text encoding classification")
+            if parts[1] in {"w/lf", "w/crlf", "w/mixed"}:
+                target = destination / name
+                target.write_bytes(target.read_bytes().replace(b"\r\n", b"\n"))
+        require(seen == tracked_names, "tracked text inventory incomplete")
     return count
 
 
@@ -516,8 +537,10 @@ def review_secret_findings(leaks, policy, source, now):
     fields = {"id", "rule", "path", "startLine", "endLine", "occurrences", "sourceSha256Lf",
               "owner", "approvedBy", "reason", "evidence", "reviewedAt", "expiresAt"}
     identities, identifiers, deadlines = {}, set(), []
+    explicit_span_reviews = 0
     for entry in policy["reviews"]:
-        require(isinstance(entry, dict) and set(entry) == fields, "incomplete source secret review")
+        require(isinstance(entry, dict) and set(entry) in (fields, fields | {"findingSpans"}),
+                "incomplete source secret review")
         require(all(isinstance(entry[key], str) and entry[key].strip() for key in fields - {
             "startLine", "endLine", "occurrences"
         }), "empty source secret-review field")
@@ -562,9 +585,23 @@ def review_secret_findings(leaks, policy, source, now):
                     "expired, future or overlong source secret review")
         except ValueError as error:
             raise GateError("invalid source secret-review dates") from error
-        identity = (entry["rule"], entry["path"], entry["startLine"], entry["endLine"])
-        require(identity not in identities, "duplicate source secret-review location")
-        identities[identity] = entry
+        spans = [{key: entry[key] for key in ("startLine", "endLine", "occurrences")}]
+        if "findingSpans" in entry:
+            explicit_span_reviews += 1
+            spans = entry["findingSpans"]
+            require(explicit_span_reviews <= 1 and isinstance(spans, list) and len(spans) == 2
+                    and entry["occurrences"] == 2, "invalid or excessive exact detector spans")
+            require(all(isinstance(span, dict) and set(span) == {"startLine", "endLine", "occurrences"}
+                        and all(type(span[key]) is int for key in span) and span["occurrences"] == 1
+                        for span in spans), "invalid exact detector span")
+            require({(span["startLine"], span["endLine"]) for span in spans} == {
+                (entry["startLine"], entry["endLine"]), (entry["startLine"], entry["endLine"] + 1)
+            } and entry["endLine"] + 1 <= len(candidate.read_bytes().splitlines()),
+                    "exact approved detector spans required; no location tolerance")
+        for span in spans:
+            identity = (entry["rule"], entry["path"], span["startLine"], span["endLine"])
+            require(identity not in identities, "duplicate source secret-review location")
+            identities[identity] = entry | {"occurrences": span["occurrences"]}
         identifiers.add(entry["id"])
         deadlines.append(expires)
     require(sum(entry["occurrences"] for entry in identities.values()) <= 10,
@@ -624,7 +661,8 @@ def security(evidence):
         source, output = work / "source", work / "reports"
         source.mkdir()
         output.mkdir()
-        evidence["trackedFiles"] = tracked_snapshot(source)
+        evidence["trackedFiles"] = tracked_snapshot(source, canonical_text=True)
+        evidence["sourceTextLineEndings"] = "LF; Git-classified text only; binary bytes unchanged"
         evidence["trackedSnapshotSha256"] = snapshot_digest(source)
         evidence["stage"] = "tracked-source-scans"
         print("security: tracked source scans", flush=True)

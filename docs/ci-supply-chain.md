@@ -105,6 +105,26 @@ arbitrary errors and newline/annotation-injection inputs map to generic codes.
 No annotation is emitted for a pass or outside GitHub Actions. This diagnostic
 does not change exit status, policy, controls, permissions or acceptance.
 
+Run39109618819 supplies a concrete public annotation:
+`stage=severity-policy; code=source-review-count`. This supersedes speculation
+about that run's failure: its source report reaches severity policy but fails
+the strict reviewed finding multiplicity. A native LF snapshot reproduces ten
+detector rows, with all five approved file identities unchanged. Nine rows map
+to the original ranges; one test-profile row spans28–29 rather than28–28.
+The second row at28 remains. These are two distinct detector rows for the same
+approved synthetic setting, not a new value or grounds to deduplicate findings.
+
+Security snapshots now canonicalize only Git-classified text to LF in the
+temporary copy, after path/local-only/symlink validation and before hashing or
+scanning. Binary bytes and live checkout/fixtures remain unchanged. Incomplete,
+unexpected or unknown Git text inventory fails. The owner explicitly approved
+the exact LF span-metadata correction on2026-10-18. It keeps seven source-value locations,
+five unchanged approved files, ten rows, detector identity and the original
+exclusive expiry. Only `source-fp-07` declares the two exact spans28–28 and28–29,
+one row each; both are required, not alternatives. No coordinate folding,
+deduplication, count tolerance, shifted location or additional finding is accepted.
+228 offline controls pass on Windows; canonical Linux/native validation follows.
+
 Requirements: JDK 21, Python 3.11+, Git, Bash (Git Bash on Windows), Linux Docker daemon and outbound access
 to Maven Central, official release/image endpoints and the Grype database.
 Execute from the repository root:

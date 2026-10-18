@@ -956,7 +956,7 @@ Hosted GitHub CI remains unobserved; owner approval for branch publication was
 requested separately, not inferred. Phase remains IN PROGRESS, no task DONE,
 freeze, push, merge or deployment is claimed by this documentation checkpoint.
 
-## Agent task template
+### P8-T18 hosted portability and detector metadata continuation
 
 P8-T18 hosted continuation: owner-approved phase-branch publication at4fa6d30
 produced run39105546749. Full Java/build/runtime/fresh-Phase7 staging pass, both
@@ -966,6 +966,16 @@ retains the sandbox and policy.219 controls pass on Windows/Linux. Fresh full
 UID1001 source/image gates PASS with the original policy and real fresh-DB/
 vulnerability/absence controls; new hosted verification remains required; no phase freeze,
 merge, deployment, image publication or security waiver is declared.
+
+Fixed-code annotation in run39109618819 identifies source-review-count at
+severity policy. Native LF reproduction isolates the unchanged test setting's
+two detector spans28–28/28–29. The owner approved canonical LF snapshots and
+exact span metadata, retaining all ten rows/seven source positions/five file
+identities, scanner/config and the original exclusive expiry. No row is
+deduplicated and no finding is accepted by tolerance.228 Windows controls pass;
+canonical native/Linux and new hosted acceptance remain required.
+
+## Agent task template
 
 Every coding-agent task should contain:
 

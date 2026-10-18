@@ -60,6 +60,41 @@ class SecretReviewTest(unittest.TestCase):
         self.assertEqual(self.check(policy=self.policy | {"reviews": []})["unreviewedSecretFindings"], 1)
         self.assertEqual(self.check(leaks=[], policy=self.policy | {"reviews": []})["acceptedSecretFindings"], 0)
 
+    def test_approved_exact_lf_spans_keep_both_rows_at_one_source_location(self):
+        entry = self.entry | {'occurrences': 2, 'findingSpans': [
+            {'startLine': 1, 'endLine': 1, 'occurrences': 1},
+            {'startLine': 1, 'endLine': 2, 'occurrences': 1}]}
+        result = self.check(leaks=[self.finding, self.finding | {'EndLine': 2}],
+                            policy=self.policy | {'reviews': [entry]})
+        self.assertEqual(result['acceptedSecretFindings'], 2)
+        self.assertEqual(result['acceptedSecretReviewIds'], ['source-fp-01'])
+        self.assertEqual(result['acceptedSecretReviewExpiresAt'], entry['expiresAt'])
+
+    def test_explicit_spans_reject_missing_duplicate_shifted_or_extra_rows(self):
+        entry = self.entry | {'occurrences': 2, 'findingSpans': [
+            {'startLine': 1, 'endLine': 1, 'occurrences': 1},
+            {'startLine': 1, 'endLine': 2, 'occurrences': 1}]}
+        for leaks in ([self.finding], [self.finding, self.finding],
+                      [self.finding | {'StartLine': 2, 'EndLine': 2}],
+                      [self.finding, self.finding | {'EndLine': 2}, self.finding]):
+            with self.subTest(leaks=leaks), self.assertRaises(gate.GateError):
+                self.check(leaks=leaks, policy=self.policy | {'reviews': [entry]})
+
+    def test_multiline_span_is_not_accepted_without_explicit_approval(self):
+        with self.assertRaises(gate.GateError):
+            self.check(leaks=[self.finding | {'EndLine': 2}])
+
+    def test_span_schema_is_bounded_and_cannot_be_used_as_a_fuzzy_range(self):
+        spans = [{'startLine': 1, 'endLine': 1, 'occurrences': 1},
+                 {'startLine': 1, 'endLine': 2, 'occurrences': 1}]
+        for value in (None, [], spans[:1], spans + spans, [spans[0], spans[0]],
+                      [spans[0], spans[1] | {'EndLine': 2}],
+                      [spans[0], spans[1] | {'startLine': True}],
+                      [spans[0], spans[1] | {'endLine': 3}],
+                      [spans[0], spans[1] | {'occurrences': 2}]):
+            with self.subTest(spans=value), self.assertRaises(gate.GateError):
+                self.check(policy=self.policy | {'reviews': [self.entry | {'occurrences': 2, 'findingSpans': value}]})
+
     def test_report_deadline_is_earliest_accepted_review_not_latest(self):
         policy = copy.deepcopy(self.policy)
         early = policy['reviews'][0] | {'id': 'source-fp-02', 'startLine': 2, 'endLine': 2,
