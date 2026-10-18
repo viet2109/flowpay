@@ -1,23 +1,13 @@
-# Production Engineering — Phase 8 Design Record
+# Production engineering reference
 
-Status: P8-T01 design/exit baseline, P8-T02 configuration/management, P8-T03
-business metrics, P8-T04 asynchronous operational metrics, P8-T05 synchronous
-HTTP/provider/Webhook tracing, P8-T06 durable Outbox trace metadata and P8-T07
-consumer/delayed-worker tracing and P8-T08 monitoring lab/dashboards/alerts
-implemented through 2026-10-11; P8-T09 effective-destination/egress protection
-and approved Apache transport on Java 21 are verified. P8-T10's approved auth/
-ingress controls are verified on 2026-10-13. P8-T11 CI gate implementation is
-verified on 2026-10-15, with security acceptance BLOCKED by unwaived baseline
-findings. P8-T12 adds the verified-artifact image and isolated runtime/recovery
-gates; its acceptance is recorded in [container runtime](container-runtime.md).
-P8-T13–T16 staging/load/failure/restore evidence and P8-T17 verified operational
-runbooks are now recorded below. **Phase8 is DONE/FROZEN as of2026-10-18** for
-the selected disposable Linux/container simulator scope. T18 local operational,
-clean-committed source/preflight and hosted verification/security gates pass.
-Approved dependency/image remediation and exact expiring source reviews remain
-explicit; no real-secret waiver or automatic renewal exists.
-Phase7 remains DONE/FROZEN; the
-simulator functional MVP remains complete.
+This reference describes production configuration, health probes, metric and
+trace contracts, privacy boundaries and operational verification for developers
+and operators. The Linux/container simulator baseline completed its quality
+gate on2026-10-18; it is not a retained/public deployment or real-money system.
+The [exit audit](production-exit-audit.md) records measured acceptance and
+limitations; the [release checklist](release-checklist.md) covers prerequisites
+for a future deployment. Historical task identifiers below identify the origin
+of design decisions and measurements, not pending implementation assignments.
 
 The [T18 exit audit](production-exit-audit.md) separates the fresh final
 verification/security results from historical operational proofs and the new
@@ -27,10 +17,6 @@ artifact's rejected workload preflights. The accepted implementation is
 Documentation freeze changes no executable/CI/build inputs. This is not an
 authorization to merge, publish an image, select paid services or deploy.
 
-This tracked document records shared scope and decision gates. The detailed
-`phase-8-production-engineering.md` assignment plan is a local-only companion,
-not a file to commit. `task-roadmap.md` records actual task completion.
-
 ## 1. Selected target and authority
 
 The user selected **staging Linux/container, provider not chosen** on 2026-10-04.
@@ -38,17 +24,13 @@ Implement a reproducible isolated staging lab before claiming operational
 readiness. No cloud account, paid host, external deployment, image publication
 or Kubernetes cluster is selected or authorized.
 
-Use one phase branch, `feature/phase-8-production-engineering`, based on the
-verified remote main containing the complete Phase 7 release. One task at a
-time; do not implement future tasks as part of the exit gate.
-
 The phase covers metrics/tracing, monitoring, configuration/security, network
 egress, CI/supply-chain checks, container packaging, staging, load/failure drills,
 backup/restore and operational procedures. It does not add real provider
 processing, provider inquiry/reconciliation, settlement, fees, new financial
 states, microservices or a new business module.
 
-## 2. Observed baseline versus future work
+## 2. Historical implementation baseline
 
 The completed source release is `d348b10` (P7-T16), merged into remote main at
 `0b96400`. The merge tree equals the release tree. Baseline schema is V001-V011.
@@ -73,9 +55,10 @@ documentation-only preparation does not require repeating an unchanged suite.
 | CI | T11 adopts the workflow with explicit user approval; JDK21/Docker coverage and pinned supply-chain gates are implemented | Security acceptance remains blocked by baseline secret-format findings; no waiver or hosted-CI acceptance is claimed |
 | Packaging/operations | T12 verified-artifact non-root image and isolated runtime/recovery gates implemented; security acceptance remains separately gated | T13-T18 own actual staging/load/failure/restore acceptance; no release while security is blocked |
 
-This table is an inventory, not a claim that the future controls are already
-available. Never document a passing Java suite as proof of load capacity, DNS
-rebinding protection, image safety or successful disaster recovery.
+This table retains the staged implementation inventory, including security
+rejections that were later remediated. Current acceptance is in the exit audit.
+A passing Java suite alone is not proof of load capacity, DNS rebinding
+protection, image safety or successful disaster recovery.
 
 ## 3. Preserved contracts and invariants
 

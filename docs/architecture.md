@@ -1033,8 +1033,9 @@ Potential later additions such as Redis, Kafka, Resilience4j, Spring Modulith, S
 P8-T01 establishes the Linux/container staging design after the verified Phase 7
 release was merged into remote main. It changes documentation only: no new
 runtime library, schema, public API/event, state machine, locking or transaction
-boundary is introduced. See `production-engineering.md` for the shared design
-record and `task-roadmap.md` for the 18 task owners/dependencies.
+boundary is introduced. See [production engineering](production-engineering.md)
+for configuration, observability and operational contracts, and the
+[exit audit](production-exit-audit.md) for measured acceptance and limitations.
 
 Owning modules provide after-commit logical observations and bounded durable
 projections; shared observability does not acquire cross-module repository

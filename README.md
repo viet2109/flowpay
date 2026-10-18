@@ -1,383 +1,162 @@
 # FlowPay Backend
 
-FlowPay is a Java 21 / Spring Boot 4.1 modular-monolith payment platform built
-to demonstrate transactional consistency, financial concurrency, Idempotency,
-double-entry accounting, and reliable event delivery. It uses controllable
-Payment/Refund provider simulators; it does not process real money or store card
-data.
+FlowPay is a Java 21 / Spring Boot 4.1 payment-platform backend built as a
+modular monolith. It demonstrates financial concurrency control, idempotent
+APIs, double-entry accounting and reliable asynchronous delivery.
 
-Phases 0–8 are complete. Phase 8 is **DONE/FROZEN as of2026-10-18** for the
-selected Linux/container simulator baseline. Phase 7 remains frozen as of
-2026-10-04. The functional simulator MVP is complete. Phase 8
-production engineering has completed P8-T01's baseline/design, P8-T02's
-production configuration/management/probes, P8-T03's business metrics and
-P8-T04's asynchronous operational metrics, P8-T05's synchronous tracing and
-P8-T06's durable Outbox trace context and P8-T07's consumer/delayed-worker tracing,
-P8-T08's monitoring lab, P8-T09's Webhook egress and P8-T10's approved auth/ingress
-protections. T11–T17 also provide image/staging gates, measured load/recovery
-evidence and operational runbooks. P8-T18's artifact-bound local gates and
-[hosted CI](https://github.com/viet2109/flowpay/actions/runs/39110490452) pass.
-This freeze does not provision public hosting or authorize merge/deployment.
+**Simulator only:** payment and refund providers are controllable simulators.
+FlowPay does not process real money or store card data. The Linux/container lab
+has passed its quality gates; no public hosting or frontend is provisioned.
 
-P8-T11 adds [CI verification and supply-chain gates](docs/ci-supply-chain.md).
-The initial security gates blocked baseline findings. The owner later approved
-dependency/base-image remediation and seven exact, expiring source false-positive
-reviews, not a real-secret waiver. Source/image scans passed; final source
-re-attestation includes current review-expiry metadata; require the post-commit
-generated security/preflight reports to match clean HEAD.
-CI does not publish images or deploy the application.
+## Capabilities
 
-P8-T12 adds a [verified-artifact runtime image](docs/container-runtime.md) and
-isolated restart/API-to-Ledger/Webhook gates. Runtime success is separate from
-security acceptance: blocked findings still prevent release. No registry upload
-or public/staging deployment is included.
+- Identity and merchant management, dashboard JWTs and rotating refresh cookies.
+- Merchant API keys, tenant isolation and prefixed public resource IDs.
+- Payment intents and provider attempts, including ambiguous UNKNOWN outcomes.
+- Partial/full refunds with database-protected refund-capacity reservations.
+- Append-only, balanced Ledger postings with duplicate protection and reversals.
+- Transactional Outbox, confirmed RabbitMQ publication and idempotent consumers.
+- Signed Webhooks with immutable payloads, jittered retries, lease recovery,
+  delivery history and explicit manual retry for DEAD deliveries.
+- Private health/management endpoints, bounded metrics and privacy-safe tracing.
 
-P8-T13 adds [isolated Linux/container staging](docs/staging-deployment.md):
-TLS ingress, private persistence/telemetry, topology-before-producers,
-external keys and fresh/Phase7 upgrade/recovery checks. It does not provision
-hosting or override blocked release security gates.
-
-P8-T14's [load/stress/soak harness](docs/load-testing.md) passes independent
-warmup/steady/peak/stress/30-minute soak acceptance, including a new independent
-run on the final remediated artifact/declared host, with unchanged owner-delegated
-targets and financial/identity audits. Stress13 drops/96 policy limits remain explicit.
-This is bounded simulator evidence, not a production capacity SLO or release
-security clearance.
-
-P8-T15's [two-replica failure/recovery drills](docs/operational-drills.md) pass
-broker/DB interruption, worker kill and stale-result fencing, real slow-receiver
-retry, monitoring outage/fresh scrape recovery and graceful rolling restart.
-Financial/history/HMAC audits pass; observed rolling GET transients remain
-explicit, not a zero-downtime or multi-host HA claim. External release remains NO-GO.
-
-P8-T16's [backup/restore lab](docs/backup-restore.md) encrypts consistent DB/cold
-broker data and key material separately, restores into new empty projects, and
-reconciles checkpoints before resuming consumers. Original-event replay is
-approved only for its synthetic mismatch case; both native restores pass within
-the predeclared bounds. RPO target24h/RTO lab15m do not
-provision daily/off-host backups, production HA or security clearance.
-
-P8-T17 adds [operational runbooks](docs/operations-runbook.md), an explicit
-[NO-GO release checklist](docs/release-checklist.md) and tested read-only staging
-triage. UNKNOWN, DEAD/DLQ, key exposure and rollout/restore actions have distinct
-approval boundaries. Native diagnosis/rejected-retry checks preserve persisted
-history; no automatic repair/replay or deployment authorization is added.
-
-P8-T18's [exit audit](docs/production-exit-audit.md) records the fresh final
-verification and independently artifact-bound acceptance. Phase8 is DONE/FROZEN
-for the stated lab scope; public/retained deployment remains a separate NO-GO.
-The owner subsequently approved [dependency/base-image security remediation](docs/dependency-security-review.md),
-without exceptions or fixture suppression; acceptance of that new candidate is
-separate from the earlier evidence.
-After individual review, the owner also approved
-[bounded source false-positive acceptance](docs/secret-findings-review.md#approved-bounded-false-positive-acceptance)
-for seven exact test/doc locations only, with content/scanner binding and expiry.
-The full security gate now passes with10 total/10 accepted/zero unreviewed
-source findings;228 control tests pass on Windows/Linux. Canonical LF snapshots
-bind both exact approved detector spans without discarding findings or changing
-the seven reviewed positions, file identities or expiry.
-Real/new findings and image secrets remain blocking. The source reviews expire
-exclusively2026-11-16T18:22:02Z; phase completion is not perpetual security clearance.
-
-## Implemented flow
+## Architecture
 
 ```text
-merchant Payment/Refund API
-  → short business transaction + Outbox
-  → confirmed RabbitMQ publication
-      ├── success-only Ledger consumer → balanced, duplicate-safe postings
-      └── six-event Webhook consumer → immutable event/subscription snapshot
-          → claim + OPEN attempt transaction
-          → HMAC-signed HTTP outside a database transaction
-          → fenced result transaction → DELIVERED / RETRYING / DEAD
+Payment / Refund API
+  -> short business transaction + Outbox
+  -> confirmed RabbitMQ publication
+      -> success-only Ledger consumer -> balanced, duplicate-safe postings
+      -> Webhook consumer -> immutable event and subscription snapshot
+          -> claim transaction -> signed HTTP without a DB transaction
+          -> fenced result transaction -> DELIVERED / RETRYING / DEAD
 ```
 
-Dashboard JWTs protect merchant configuration and Webhook history; merchant API
-keys protect Payment/Refund APIs. Public identifiers, tenant-scoped reads, RFC
-9457 errors, optimistic locking, database constraints, and Flyway migrations are
-part of the implementation. Source mutations use `Idempotency-Key` where
-specified by the [API contract](docs/api-contract.md).
+Each business module separates API, application use cases, domain behavior and
+infrastructure adapters. Cross-module access uses explicit public APIs or
+integration events, not another module's repositories or JPA entities.
+PostgreSQL constraints and locking protect financial invariants; Flyway owns
+schema evolution. Money uses integer minor units, never floating point.
 
-Webhook endpoints use `wep_`, events `evt_`, and deliveries `wdl_` public IDs.
-Endpoint create/rotate returns a signing secret once; stored secrets are
-AES-256-GCM ciphertext and normal reads never expose them. The consumer handles
-`payment.processing`, `payment.succeeded`, `payment.failed`, `refund.processing`,
-`refund.succeeded`, and `refund.failed`; UNKNOWN provider outcomes remain
-non-terminal.
+See [architecture](docs/architecture.md), [domain model](docs/domain-model.md)
+and [business rules](docs/business-rules.md) for the detailed contracts.
 
-HTTP delivery is at-least-once: merchants deduplicate by `FlowPay-Event-Id`,
-verify HMAC-SHA256 against the exact received body bytes, and tolerate events
-arriving out of order. Retries reuse the same event ID/body. Five base delays
-(10s, 30s, 2m, 10m, 1h) with deterministic additive 0–20% jitter give six normal
-attempts. Expired leases recover safely but can cause external duplicates.
-Dashboard manual retry schedules a DEAD delivery asynchronously and preserves
-attempt count/history. Materializer RabbitMQ DLQ and delivery DEAD are separate
-failure domains; neither changes financial records or published Outbox state.
+## Run locally
 
-## Local development
+Requirements: JDK 21, Linux Docker containers and Docker Compose v2 or later.
+The Maven wrapper selects Maven 3.9.16. Set `JAVA_HOME` to JDK 21.
 
-Prerequisites: JDK 21, Docker with Compose v2, and Maven (the wrapper selects
-3.9.16). Ensure `JAVA_HOME` points to JDK 21.
-
-1. Supply `WEBHOOK_SECRET_ENCRYPTION_KEY` to the application process through
-   local secret tooling or IDE environment settings. It must be standard Base64
-   encoding of exactly 32 cryptographically random bytes. Keep this key stable
-   across restarts while encrypted endpoint records exist; replacing it is not
-   a supported key-rotation workflow. Never commit environment files or keys.
-2. Start PostgreSQL 16.15 and RabbitMQ 4.3:
+1. Supply `WEBHOOK_SECRET_ENCRYPTION_KEY` through your IDE environment or local
+   secret tooling: standard Base64 encoding of exactly 32 cryptographically
+   random bytes. Keep it stable across restarts while encrypted Webhook records
+   exist. Never commit keys or environment files.
+2. Start the development PostgreSQL and RabbitMQ services:
 
    ```sh
-   docker compose up -d --wait
+   docker compose -f docker-compose.yaml up -d --wait
    ```
 
-3. Start the application with the development profile:
+3. Run the development profile:
 
    ```sh
    ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
    ```
 
-   On Windows, use `mvnw.cmd`, or an installed Maven 3.9.x `mvn.cmd` if wrapper
-   bootstrap is unavailable. The development profile uses an ephemeral JWT key
-   pair, so dashboard sessions do not survive a restart.
+   In PowerShell:
 
-Compose may read a root `.env` for its own variable substitution. Spring Boot
-does **not** automatically load that file: export application variables or set
-them in the IDE. If Compose database/user/password or ports differ from its
-development defaults, also supply the matching `DB_URL`, `DB_USERNAME`,
-`DB_PASSWORD`, `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USERNAME`, and
-`RABBITMQ_PASSWORD` to the application. Production additionally requires the
-configured JWT public/private key locations; no production secrets have
-defaults in the production profile.
+   ```powershell
+   .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev"
+   ```
 
-Development health is available at `/actuator/health`. OTLP export is optional
-for local development; without an OTLP collector, it can be disabled with
+The API defaults to `http://localhost:8080/api/v1`; development health is at
+`http://localhost:8080/actuator/health`. Development JWT keys are ephemeral, so
+dashboard sessions do not survive application restart.
+
+Compose may read a root `.env` for variable substitution; Spring Boot does not
+automatically load that file. Export application variables separately. If you
+override Compose defaults, supply matching `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`,
+`RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USERNAME` and `RABBITMQ_PASSWORD` to
+the application. Development credentials and exposed infrastructure ports are
+not a production deployment configuration.
+
+OTLP tracing is opt-in and no collector is required for local API development.
+Optional OTLP metric export can be disabled with
 `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=false`.
 
-Production Webhook URL policy requires HTTPS and rejects obvious private,
-localhost, loopback, metadata, and non-routable literal targets. Redirects are
-never followed; connect/request timeouts default to 2s/5s. Only controlled local
-receiver testing should opt into `WEBHOOK_ALLOW_INSECURE_LOCALHOST=true`; this
-does not allow arbitrary HTTP/private-network destinations. Application URL
-checks do not replace DNS-rebinding or network-egress controls.
+## API integration
 
-## Production configuration and probes
+The [API contract](docs/api-contract.md) documents requests, responses, errors,
+authentication, pagination, idempotency and Webhook signing.
 
-Activate only `prod`, not `prod,dev` or `prod,test`. Startup rejects missing or
-invalid mandatory DB/broker settings, ephemeral JWT keys, insecure-localhost
-Webhooks, public Prometheus and non-Secure refresh cookies. Supply external
-matching RSA PEM keys (X.509 public / PKCS#8 private, at least 2048 bits) and the
-stable Webhook master key. Keep database credentials separate from the single-host
-PostgreSQL JDBC URL; prod uses Rabbit `host`/`port`, not `addresses` overrides.
-Configuration failures are sanitized without echoing secret values/parser causes.
+- Dashboard APIs use JWT Bearer authentication; merchant Payment/Refund APIs
+  use merchant API keys. Never embed a long-lived merchant key in a public
+  frontend bundle.
+- Register/login/refresh/logout POSTs require exactly one `X-FlowPay-CSRF: 1`
+  header, including non-browser clients. Cross-origin auth preflights are
+  intentionally denied; a separately hosted frontend needs a reviewed
+  same-origin proxy/BFF or explicit security-contract work, not wildcard CORS.
+- Financial mutations require `Idempotency-Key` where specified. The same key
+  with changed input returns a conflict rather than another operation.
+- Webhook receivers verify HMAC-SHA256 over the exact received bytes and
+  deduplicate by `FlowPay-Event-Id`. Delivery is at-least-once and events may
+  arrive out of order; a timeout does not prove the remote side had no effect.
 
-Prod management defaults to `127.0.0.1:9091`. GET/HEAD
-`/actuator/prometheus`, `/actuator/info` and minimal `/actuator/health/**` are
-available only on that dedicated listener. All business-port `/actuator/**`
-requests are denied, including authenticated scrapes. The business listener
-instead serves `/livez` and `/readyz`: liveness checks process state; readiness
-checks accepting-traffic state and DB SQL connectivity, not RabbitMQ/OTLP.
-DB outage returns readiness 503; broker outage makes aggregate internal health
-503 without blocking otherwise durable source + Outbox acceptance.
-
-`MANAGEMENT_SERVER_PORT` must differ from the business port. Override
-`MANAGEMENT_SERVER_ADDRESS` only for an explicitly private interface/container
-network; never publish or proxy the management port to public ingress. There
-is no management credential flow: loopback/private network is its trust boundary.
-Linux staging network enforcement is verified separately in
-[the T13 staging lab](docs/staging-deployment.md), not inferred from this binding.
-
-Graceful HTTP shutdown is enabled with a prod limit of 30s **per lifecycle phase**,
-not a whole-process deadline. T12–T15 separately verify container signal handling,
-the 120s container stop allowance, worker recovery and finite CPU/memory/JVM
-budgets; they do not establish a universal shutdown or availability SLO. See the
-[configuration, listener and lifecycle contract](docs/production-engineering.md#6-production-configuration-and-management-t02).
-
-## Business metrics
-
-P8-T03 instruments committed Payment/Refund outcomes (including non-terminal
-UNKNOWN), per-call provider latency and Idempotency decision/reservation counts.
-Logical counters update only after commit; rollback/replay cannot inflate them.
-Provider timers count attempts separately; conflict decisions remain diagnostic
-even if an outer TX rolls back. Metrics recording/export failures do not change
-financial results. Labels are bounded enums, never tenant/IDs/amounts/payloads.
-See the [metric catalog and aggregation semantics](docs/production-engineering.md#p8-t03-metric-catalog-frozen-before-instrumentation).
-These process-local observations are not durable financial accounting.
-
-P8-T04 adds Outbox/Webhook backlog and age gauges cached from owning read-only
-DB projections, plus Outbox publication, Ledger posting/duplicate and Webhook
-HTTP/claim/delivery/lease-recovery observations. Shared-DB gauges must not be
-summed across replicas; choose a fresh replica or max. Scrapes read cache only.
-Sampling defaults to 30s on its separate scheduler (validated 10s–5m), with
-2s statement timeout; connection acquisition can take the existing pool timeout.
-Use `METRICS_SAMPLING_ENABLED=false` to disable automatic sampling or
-`METRICS_SAMPLING_FIXED_DELAY` to configure cadence. Before first success gauges
-are NaN; failure retains stale values with `flowpay.metrics.sample.age`, never
-fabricated healthy zeros. Missing/stale telemetry requires separate monitoring.
-See the [operational catalog and cost limits](docs/production-engineering.md#p8-t04-catalog-and-sampling-decision-frozen-before-instrumentation).
-Dashboards and monitoring deployment remain later tasks.
-
-## Synchronous tracing
-
-P8-T05 reuses Boot's installed Micrometer/OpenTelemetry SDK for incoming HTTP,
-Payment/Refund provider calls and Webhook HTTP CLIENT spans. Logs correlate
-`requestId`, `traceId` and `spanId` separately; the existing X-Request-Id/error
-contract is unchanged. Export accepts only fixed names and bounded HTTP method,
-status-class or normalized outcome attributes, never URLs, bodies, secrets,
-exception text, arbitrary baggage, events or links. Webhook signed HTTP receives
-no internal tracing headers. External calls remain outside DB transactions.
-
-No collector is required by default. To enable trace export to an owned collector,
-set `TRACING_EXPORT_ENABLED=true` and `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` to its
-full HTTP `/v1/traces` endpoint. Roots default to 10% sampling in prod; set
-`TRACING_SAMPLING_PROBABILITY` (0..1) as needed. Dev sampling stays off unless
-`TRACING_SAMPLER=parent-based-trace-id-ratio` is set. Parent sampling is honored,
-not a rate-limit control. Unsampled IDs still correlate logs but have no exported
-trace. Export is asynchronous/bounded and may drop spans on outage/overflow;
-no financial result depends on it. Keep request/SQL/transport DEBUG logging off.
-See the [tracing privacy/configuration policy](docs/production-engineering.md#synchronous-tracing-policy-t05).
-P8-T06 persists validated optional source `traceparent` atomically with Outbox
-(V012, nullable VARCHAR(55)). Retry/restart retain it as a Rabbit header only,
-not JSON event fields or merchant HTTP headers. Missing/invalid metadata does
-not block valid business events; no baggage/tracestate is persisted. The relay
-never substitutes ambient scheduler context. P8-T07 adds independent publication,
-consumer, delivery/recovery spans and V013 nullable first-materialization context.
-Retries/restarts remain causally connected without long-lived spans, business
-payload/HMAC/headers or dedupe changes. See the
-[async parent/worker/privacy policy](docs/production-engineering.md#asynchronous-tracing-policy-t07).
-No monitoring/collector or Linux staging deployment is claimed.
+Production Webhook delivery requires HTTPS and enforcing network egress. URL
+validation alone does not prevent DNS rebinding. See the
+[egress guide](docs/webhook-egress.md) before connecting external receivers.
 
 ## Verification
+
+With Docker available:
 
 ```sh
 ./mvnw clean verify
 ```
 
-Run with Docker available. PostgreSQL and RabbitMQ integration suites use fresh
-Testcontainers resources, not the development database or H2. The gate includes
-V001–V011 migration/upgrade checks, domain/application/API/security tests,
-concurrency/crash/lease recovery, real DB + RabbitMQ + signed HTTP E2E, and
-ArchUnit/transaction-boundary regressions. Do not accept skipped infrastructure
-tests as a completed phase gate.
+Use `.\mvnw.cmd clean verify` in PowerShell. Integration tests use disposable
+PostgreSQL/RabbitMQ Testcontainers resources, not H2 or the development database.
+The suite includes domain/API/security, migrations, concurrency, architecture,
+transaction boundaries and signed-HTTP end-to-end coverage.
 
-The P7-T16 gate passed on Java 21 / Maven 3.9.16: 59 focused Webhook migration
-tests and 1,173 full-suite tests, with zero failures, errors, or skipped tests.
-See the [architecture verification record](docs/architecture.md#phase-7-quality-gate)
-for scope and infrastructure isolation.
+The stricter CI gate additionally requires fresh complete reports with no
+infrastructure skips, workflow validation and independent security controls:
 
-P8-T02 passed focused configuration/security regressions and full `clean verify`:
-1,227 tests in 173 suites, zero failures/errors/skips. The new prod-profile tests
-use real separate listeners, disposable DB/broker resources and synthetic
-temporary keys; deployment-network and image lifecycle proof remain later gates.
+```sh
+python3 -B -m unittest discover -s ops/ci/tests
+python3 -B ops/ci/gate.py verify
+python3 -B ops/ci/gate.py security
+```
 
-P8-T03 passed 179 focused tests and full `clean verify`: 1,256 tests in 176
-suites, zero failures/errors/skips. Coverage includes real commit/rollback,
-replay/conflict/concurrency, UNKNOWN, Prometheus cardinality/redaction and
-recording/export failure isolation using an owned OTLP HTTP 503 collector.
+Use `python` instead of `python3` on Windows. Run gates sequentially on a
+resource-constrained host. Source security, image safety, staging, performance
+and restore evidence are separate checks; one passing suite does not replace
+the others. See [CI and supply-chain gates](docs/ci-supply-chain.md).
 
-P8-T04 passed 186 focused tests and full `clean verify`: 1,287 tests in 180
-suites, zero failures/errors/skips. Coverage includes durable counts/ages,
-cache/cadence/staleness, real SQL timeout, shared-replica semantics, callback
-rollback, concurrent duplicates, late-result fencing and recording outage.
-Query/load cost on Linux staging still requires its later measured gate.
+## Documentation
 
-P8-T05 passed the final 22-test tracing/correlation gate and an earlier
-249-test broader regression gate. Full `clean verify`: 1,307 tests in 184
-suites, zero failures/errors/skips, 5m53s. Coverage includes pooled-thread
-isolation, sampling/malformed context, sensitive-data exclusion in spans/logs,
-real financial work during exporter outage, and Webhook body/header preservation.
-PostgreSQL/RabbitMQ suites ran; no deployed collector/staging claim.
+| Reader goal | Reference |
+|---|---|
+| Understand product scope and behavior | [Requirements](docs/product-requirements.md), [business rules](docs/business-rules.md) |
+| Review module boundaries and financial invariants | [Architecture](docs/architecture.md), [domain model](docs/domain-model.md), [database design](docs/database-design.md) |
+| Integrate a client or Webhook receiver | [API contract](docs/api-contract.md), [auth/security review](docs/api-security-review.md) |
+| Configure health, metrics and tracing | [Production engineering](docs/production-engineering.md), [monitoring runbook](docs/monitoring-runbook.md) |
+| Build and verify the runtime | [Container runtime](docs/container-runtime.md), [staging guide](docs/staging-deployment.md), [CI gates](docs/ci-supply-chain.md) |
+| Review measured load and recovery | [Load testing](docs/load-testing.md), [failure drills](docs/operational-drills.md), [backup/restore](docs/backup-restore.md) |
+| Operate or assess a release | [Operations runbook](docs/operations-runbook.md), [release checklist](docs/release-checklist.md), [quality-gate evidence](docs/production-exit-audit.md) |
 
-P8-T06 final focused gates passed 21 trace/migration/concurrent Rabbit tests
-and 27 metrics/Ledger regressions after correcting old fixtures. Full clean
-verify: 1,331 tests/187 suites, zero failures/errors/skips, 6m45s. Includes actual
-application restart, rollback, sampled/unsampled/absent/bad context, concurrent
-isolation, byte-identical retried envelopes and old/enriched consumer duplicates.
-V001-V011 remain unchanged; V012 adds optional technical Outbox metadata only.
+Security reviews retain the rationale for dependency overrides and exact,
+expiring source-scanner false-positive reviews. These are reviewer/operator
+evidence, not approval to accept real secrets or deploy with stale scans.
 
-P8-T07 focused checkpoints verified 125 unique cases, including the final
-two-test restart/concurrent-worker rerun. Full clean verify passes 1,351 tests/
-191 suites, zero failures/errors/skips, 7m39s. Includes real broker retry/DLQ,
-equal redelivery with different context, V013 upgrade compatibility, actual app/
-SDK restart, timeout/recovery/stale fencing, worker-thread context/MDC isolation
-and exact-body HMAC. V001-V012/public contracts remain unchanged; V013 adds only
-nullable technical Webhook metadata. Artifact: backend-0.0.1-SNAPSHOT.jar.
+## Deployment limits
 
-For a clean infrastructure smoke check, use a dedicated disposable Compose
-project with separate container names, volumes, and ports. The checked-in
-Compose file pins development container names, so `-p` alone is not isolation.
-Never run `docker compose down -v` against a development/shared project without
-explicit approval: it irreversibly deletes that project's persistent data.
+The accepted baseline is a disposable Linux/container simulator lab, not a
+live payment service. A retained/public target still needs TLS/DNS, protected
+secret storage, separate database migration/runtime privileges, independent
+backups, notification routing and resource/security review. Follow the release
+checklist for that specific target; CI does not publish images or deploy.
 
-## Documentation and scope
-
-### Isolated monitoring lab (P8-T08)
-
-Prometheus/Grafana and OTLP Collector/Tempo are provisioned from digest-pinned
-images/configuration in `ops/monitoring`. The disposable simulator lab mounts the
-verified JAR, keeps DB/broker/management/collector private, and publishes only the
-authenticated Grafana UI on loopback. See [monitoring commands and alert runbook](docs/monitoring-runbook.md)
-for external secret setup, dashboard semantics, all 12 alerts, acceptance/outage
-checks and safe cleanup. This is not the production image or staging deployment;
-external paging and measured performance thresholds remain later gates.
-
-- [Product requirements](docs/product-requirements.md)
-- [Business rules](docs/business-rules.md)
-- [Domain model](docs/domain-model.md)
-- [Architecture and verification](docs/architecture.md)
-- [Database design](docs/database-design.md)
-- [API contract](docs/api-contract.md)
-- [Task roadmap](docs/task-roadmap.md)
-- [Production engineering design and decision gates](docs/production-engineering.md)
-- [Webhook egress protection and verification](docs/webhook-egress.md)
-- [API/auth security review and ingress policy](docs/api-security-review.md)
-
-Phase documents and `docs/README.md` are local-only planning/reference files,
-not published documentation. The root README and linked tracked documents are
-the repository's shared entry points.
-
-Phase 8 targets reproducible Linux/container staging; no provider, cloud account
-or external deployment has been selected. P8-T01 verifies the merged Phase 7
-baseline; P8-T02 implements production startup and management/probe controls;
-P8-T03 adds Payment/Refund/Idempotency metrics; P8-T04 adds asynchronous operational
-metrics; P8-T05 adds synchronous HTTP/provider/Webhook tracing and P8-T06
-adds durable Outbox source context. P8-T07 adds asynchronous spans and restart-
-stable worker context. P8-T08 provisions and verifies the isolated monitoring lab,
-dashboards and operational alerts. P8-T09 verifies enforced CONNECT/proxy egress,
-DNS-rebinding/bypass protection and dedicated Apache Webhook transport on Java 21,
-retaining trusted TLS/IP-SAN, signing and deadlines. P8-T10 adds the reviewed
-auth/ingress controls below. P8-T11/T12 add dependency/image security gates and
-verified-artifact packaging; findings still block release. P8-T13 adds isolated
-staging and P8-T14 verifies the declared load/stress/30-minute soak workload.
-P8-T15 verifies bounded two-instance operational failure drills. P8-T16 implements
-isolated encrypted backup/restore and approved original-event mismatch recovery.
-P8-T17 verifies operational runbooks/read-only rehearsal. T18 final exit gates
-include fresh passing local source/image/runtime/staging/load/failure/restore/
-runbook and network/monitoring checks. Clean-committed source/preflight and hosted
-CI also pass independently; external operational prerequisites still block deployment.
-The functional simulator MVP is not a claim of
-production readiness, real payment processing, guaranteed cross-event ordering,
-or exactly-once external HTTP delivery. Endpoint re-enable, dual-secret grace,
-custom headers/templates/retry schedules, and automatic DLQ replay are not
-implemented.
-
-P8-T09 passed 205 focused tests and full `clean verify` with 1,388 tests/193 suites,
-zero failures/errors/skips. Its isolated Linux DNS/TLS/HMAC/proxy fixture passed
-all 34 independent assertions, including public IPv6 literal and rejected
-missing IP-SAN certificates. The affected monitoring smoke passed on the same
-final JAR, including production proxy startup and financial integrity during
-telemetry outage/recovery. See the egress record for artifact/runtime evidence,
-proxy-DNS restart requirements and deployment limitations. These fixtures do not
-replace T11-T13 supply-chain, image or actual staging-network acceptance.
-
-P8-T10's user-approved auth protection requires exactly one `X-FlowPay-CSRF: 1`
-header for register/login/refresh/logout POSTs, including non-browser clients.
-Missing/invalid/repeated values return `403 ACCESS_DENIED` before session work.
-Bearer dashboard/financial APIs keep their existing contracts; auth CORS
-preflight is closed. The reviewed NGINX policy adds bounded TCP-peer-IP auth/
-mutation budgets and safe `429 RATE_LIMIT_EXCEEDED`/Retry-After without forwarding
-excess requests or retrying mutations. See the security review for exact
-budgets and owned fixture commands. Final focused 266 tests and full clean verify
-1,405 tests/195 suites pass without failures/errors/skips, along with native edge,
-real-app financial/replay/rate-limit, monitoring and Webhook egress regressions
-on the same final JAR. No public TLS
-staging, image scan, measured capacity or global quota is implied by this policy.
+Single-host drills do not prove multi-host HA or zero downtime. Load targets
+apply only to their recorded artifact, host and workload. There is no automatic
+provider reconciliation, settlement, blind DLQ replay or repair of financial
+history. Do not delete development/shared volumes to reproduce a clean lab.
