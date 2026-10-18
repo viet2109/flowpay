@@ -104,6 +104,22 @@ class GateTest(unittest.TestCase):
             with self.assertRaisesRegex(gate.GateError, "raw output withheld"):
                 gate.run(["scanner"])
 
+    def test_ci_failure_annotation_exports_fixed_codes_not_private_error_text(self):
+        with patch.dict(gate.os.environ, {"GITHUB_ACTIONS": "true"}), patch("builtins.print") as printed:
+            gate.publish_failure_annotation(dict(status="failed", stage="dependency-scan",
+                                                reason="command failed; raw output withheld"))
+            printed.assert_called_once_with("::error title=FlowPay quality gate::stage=dependency-scan; code=subprocess-failed")
+        with patch.dict(gate.os.environ, {"GITHUB_ACTIONS": "true"}), patch("builtins.print") as printed:
+            gate.publish_failure_annotation(dict(status="failed", stage="private-marker\n::warning::injection",
+                                                reason="private-marker", payload="private-marker"))
+            printed.assert_called_once_with("::error title=FlowPay quality gate::stage=preflight-or-other; code=gate-rejected")
+
+    def test_failure_annotation_does_not_emit_for_pass_or_non_ci(self):
+        for environment, status in (("false", "failed"), ("true", "passed")):
+            with patch.dict(gate.os.environ, {"GITHUB_ACTIONS": environment}), patch("builtins.print") as printed:
+                gate.publish_failure_annotation(dict(status=status, stage="dependency-scan"))
+            printed.assert_not_called()
+
     def test_timeout_cleanup_requires_owned_name_and_label(self):
         name = "flowpay-ci-" + "a" * 32
         with patch.object(gate.subprocess, "run") as invoked:

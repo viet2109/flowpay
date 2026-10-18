@@ -97,6 +97,14 @@ A new hosted run must still pass before phase closure. No application/build/test
 input changed: preserve the verified JAR/image and original load/failure/restore
 hash chain rather than rebuilding or relabeling operational evidence.
 
+The first corrected hosted run39109259458 still rejects source security; native
+passes do not establish its cause. CI failures now emit a fixed-code annotation
+containing only an allow-listed stage and reason category, readable through
+public check metadata without exposing logs or report contents. Unknown stages,
+arbitrary errors and newline/annotation-injection inputs map to generic codes.
+No annotation is emitted for a pass or outside GitHub Actions. This diagnostic
+does not change exit status, policy, controls, permissions or acceptance.
+
 Requirements: JDK 21, Python 3.11+, Git, Bash (Git Bash on Windows), Linux Docker daemon and outbound access
 to Maven Central, official release/image endpoints and the Grype database.
 Execute from the repository root:

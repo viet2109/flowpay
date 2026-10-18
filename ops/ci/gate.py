@@ -37,6 +37,39 @@ def require(condition, label):
         raise GateError(label)
 
 
+def publish_failure_annotation(evidence):
+    """Public CI diagnosis from fixed codes only, never raw error/report data."""
+    if os.environ.get("GITHUB_ACTIONS") != "true" or evidence.get("status") != "failed":
+        return
+    stages = {"pinned-tool-downloads", "native-source-controls", "tracked-source-scans", "resolved-maven-sbom",
+              "dependency-scan", "native-dependency-controls", "severity-policy", "image-inventory",
+              "application-resource-secrets", "image-vulnerability-scan", "verified-artifact-build"}
+    reasons = {
+        "command failed; raw output withheld": "subprocess-failed",
+        "command unavailable or timed out": "subprocess-unavailable-or-timeout",
+        "SAST incomplete or malformed": "sast-report-incomplete",
+        "SAST skipped required Java source files": "sast-source-coverage",
+        "not all Java SAST canaries detected": "sast-canary-coverage",
+        "built-in secret detection control failed": "secret-canary-coverage",
+        "missing or malformed scanner report": "scanner-report-missing-or-malformed",
+        "vulnerability database unavailable": "database-unavailable",
+        "scan database metadata missing or differs from owned database status": "database-identity-mismatch",
+        "vulnerability database stale or future-dated": "database-age",
+        "reviewed source contents changed; new review required": "source-review-content-changed",
+        "expired, future or overlong source secret review": "source-review-age",
+        "stale or unmatched source secret review; remove or re-review": "source-review-unmatched",
+        "reviewed secret-finding count changed; new review required": "source-review-count",
+        "unreviewed secret findings block; no automatic baseline waiver": "unreviewed-secret-finding",
+        "unapproved blocking SAST/dependency findings; see safe evidence": "blocking-source-or-dependency-finding",
+        "unapproved image security findings; release blocked": "blocking-image-finding",
+    }
+    stage = evidence.get("stage")
+    stage = stage if isinstance(stage, str) and stage in stages else "preflight-or-other"
+    reason = evidence.get("reason")
+    code = reasons.get(reason, "gate-rejected") if isinstance(reason, str) else "gate-rejected"
+    print(f"::error title=FlowPay quality gate::stage={stage}; code={code}")
+
+
 def run(command, *, cwd=ROOT, timeout=600, allowed=(0,)):
     # Not inherited by scanner containers. CI has no write token or app secrets.
     with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
@@ -674,6 +707,7 @@ def main():
         evidence["reason"] = "unexpected gate/report failure; no clean result"
     finally:
         write_json(output, evidence)
+    publish_failure_annotation(evidence)
     print(f"{args.gate}: {evidence['status']} (safe evidence: {output.relative_to(ROOT)})")
     return 0 if evidence["status"] == "passed" else 1
 

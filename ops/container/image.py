@@ -351,6 +351,7 @@ def main():
     except Exception:
         evidence.update(status="failed", reason="unexpected image gate failure; raw output withheld")
     gate.write_json(path, evidence)
+    gate.publish_failure_annotation(evidence)
     print(f"image-{args.gate}: {evidence['status']} (safe evidence: {path.relative_to(ROOT)})")
     return 0 if evidence["status"] == "passed" else 1
 

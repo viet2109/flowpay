@@ -12,6 +12,9 @@ Windows/Linux. Full corrected UID1001 source/dependency and image scan gates
 now PASS, with unchanged policy and real fresh-DB controls. New hosted acceptance
 remains required; no unique historical hosted root cause is claimed without its reports. See
 [Linux ownership correction](ci-supply-chain.md#linux-scanner-ownership-correction-p8-t18).
+The subsequent hosted run39109259458 still fails source security. A fixed-code,
+privacy-tested CI annotation is added for stage/category diagnosis without raw
+logs. No root cause or phase acceptance is inferred from native passes alone.
 
 2026-10-18: **Verified local candidate; phase IN PROGRESS, not DONE/FROZEN.**
 Final clean-committed attestation is a generated post-commit checkpoint;
