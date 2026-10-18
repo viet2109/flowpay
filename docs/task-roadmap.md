@@ -958,6 +958,15 @@ freeze, push, merge or deployment is claimed by this documentation checkpoint.
 
 ## Agent task template
 
+P8-T18 hosted continuation: owner-approved phase-branch publication at4fa6d30
+produced run39105546749. Full Java/build/runtime/fresh-Phase7 staging pass, both
+source/image scan steps fail. Native Linux fixtures independently reproduce
+report-output UID denial; the corrected scanner identity/cache ownership path
+retains the sandbox and policy.219 controls pass on Windows/Linux. Fresh full
+UID1001 source/image gates PASS with the original policy and real fresh-DB/
+vulnerability/absence controls; new hosted verification remains required; no phase freeze,
+merge, deployment, image publication or security waiver is declared.
+
 Every coding-agent task should contain:
 
 1. Documents to read.

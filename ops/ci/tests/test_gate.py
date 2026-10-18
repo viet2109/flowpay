@@ -187,6 +187,60 @@ class GateTest(unittest.TestCase):
             with self.assertRaises(gate.GateError):
                 gate.container("semgrep", [], [])
 
+    def test_linux_scanners_use_host_uid_without_privilege_bypass(self):
+        with patch.object(gate, "scanner_identity", return_value=(1001, 1002)):
+            command = gate.container("gitleaks", [], ["--version"])
+        self.assertEqual(command[command.index("--user") + 1], "1001:1002")
+        self.assertNotIn("--cap-add", command)
+        self.assertNotIn("--privileged", command)
+        self.assertIn("--read-only", command)
+        self.assertEqual(command[command.index("--cap-drop") + 1], "ALL")
+        self.assertEqual(command[command.index("--tmpfs") + 1],
+                         "/tmp:rw,nosuid,nodev,size=512m,mode=1777")
+        with patch.object(gate, "scanner_identity", return_value=None):
+            self.assertNotIn("--user", gate.container("gitleaks", [], ["--version"]))
+
+    def test_cache_initializer_is_owned_empty_volume_only_and_not_a_scanner_privilege(self):
+        name = "flowpay-ci-" + "b" * 32
+        with patch.object(gate, "run", return_value=(name.encode(), 0)) as invoked:
+            gate.initialize_scanner_database(name, (1001, 1001))
+        command = invoked.call_args.args[0]
+        self.assertEqual(command[command.index("--network") + 1], "none")
+        self.assertEqual(command[command.index("--user") + 1], "0:0")
+        self.assertEqual(command[command.index("--cap-add") + 1], "CHOWN")
+        self.assertEqual(command.count("--mount"), 1)
+        self.assertIn("type=volume,source=" + name + ",target=/db", command)
+        self.assertIn("--read-only", command)
+        self.assertIn("not os.listdir(p)", command[-1])
+        self.assertNotIn("rglob", command[-1])
+        self.assertNotIn("/var/run/docker.sock", " ".join(command))
+
+    def test_cache_initializer_refuses_foreign_volume_or_invalid_owner(self):
+        name = "flowpay-ci-" + "b" * 32
+        with patch.object(gate, "run") as invoked, self.assertRaises(gate.GateError):
+            gate.initialize_scanner_database("development", (1001, 1001))
+        invoked.assert_not_called()
+        with patch.object(gate, "run", return_value=(b"foreign", 0)) as invoked, self.assertRaises(gate.GateError):
+            gate.initialize_scanner_database(name, (1001, 1001))
+        self.assertEqual(invoked.call_count, 1)
+        for owner in ((-1, 1), (True, 1), (1, "1")):
+            with self.subTest(owner=owner), patch.object(gate, "run", return_value=(name.encode(), 0)) as invoked, self.assertRaises(gate.GateError):
+                gate.initialize_scanner_database(name, owner)
+            self.assertEqual(invoked.call_count, 1)
+
+    def test_linux_cache_initialization_precedes_use_and_failed_init_still_cleans_owned_volume(self):
+        def responses(command, **kwargs):
+            if command[:3] == ["docker", "volume", "inspect"]:
+                return command[-1].encode(), 0
+            return b"", 0
+        with patch.object(gate, "scanner_identity", return_value=(1001, 1001)), \
+                patch.object(gate, "run", side_effect=responses) as invoked, \
+                patch.object(gate, "initialize_scanner_database", side_effect=gate.GateError("init failed")), \
+                self.assertRaises(gate.GateError):
+            with gate.scanner_database():
+                self.fail("failed cache initialization must not yield")
+        self.assertTrue(any(call.args[0][:3] == ["docker", "volume", "rm"] for call in invoked.call_args_list))
+
     def test_tracked_snapshot_excludes_untracked_env_and_analysis(self):
         (self.root / "safe.txt").write_text("safe")
         (self.root / ".env").write_text("PRIVATE_TEST_ONLY")

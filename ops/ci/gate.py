@@ -234,6 +234,15 @@ def snapshot_digest(source):
     return digest.hexdigest()
 
 
+def scanner_identity():
+    # Linux bind outputs belong to the host runner, not root. With all
+    # capabilities dropped, root cannot bypass a different UID's 0755 directory.
+    # Docker Desktop's Windows bind semantics have no corresponding POSIX UID.
+    if not hasattr(os, "getuid"):
+        return None
+    return os.getuid(), os.getgid()
+
+
 def container(tool, mounts, args, *, network="none", env=(), database_volume=None):
     image = TOOLS[tool]
     require(re.fullmatch(r"[^@]+@sha256:[0-9a-f]{64}", image) is not None, "scanner image must be digest-pinned")
@@ -241,7 +250,10 @@ def container(tool, mounts, args, *, network="none", env=(), database_volume=Non
     command = ["docker", "run", "--rm", "--name", name, "--label", "flowpay.ci.owner=" + name,
                "--network", network, "--read-only", "--cap-drop", "ALL",
                "--security-opt", "no-new-privileges", "--memory", "1536m", "--cpus", "2",
-               "--pids-limit", "256", "--tmpfs", "/tmp:rw,nosuid,nodev,size=512m", "-e", "HOME=/tmp"]
+               "--pids-limit", "256", "--tmpfs", "/tmp:rw,nosuid,nodev,size=512m,mode=1777", "-e", "HOME=/tmp"]
+    identity = scanner_identity()
+    if identity is not None:
+        command += ["--user", f"{identity[0]}:{identity[1]}"]
     for value in env:
         command += ["-e", value]
     for source, destination, writable in mounts:
@@ -252,12 +264,36 @@ def container(tool, mounts, args, *, network="none", env=(), database_volume=Non
     return command + [image] + args
 
 
+def initialize_scanner_database(name, identity):
+    """Assign only a new empty invocation-owned cache to the Linux runner UID."""
+    require(re.fullmatch(r"flowpay-ci-[a-f0-9]{32}", name), "unsafe database volume name")
+    output, _ = run(["docker", "volume", "inspect", "--format", '{{index .Labels "flowpay.ci.owner"}}', name], timeout=30)
+    require(output.decode().strip() == name, "database volume ownership mismatch; initialization aborted")
+    require(len(identity) == 2 and all(type(value) is int and value >= 0 for value in identity),
+            "invalid scanner cache owner")
+    image = TOOLS["volume-init"]
+    require(re.fullmatch(r"[^@]+@sha256:[0-9a-f]{64}", image), "cache initializer must be digest-pinned")
+    # No source, reports, credentials, host path, socket or network reaches this
+    # short-lived helper. CHOWN is never granted to scanners. No recursive chown.
+    script = ("import os,stat; p='/db'; s=os.lstat(p); "
+              "assert stat.S_ISDIR(s.st_mode) and not os.listdir(p), 'cache must be empty'; "
+              f"os.chmod(p,0o700); os.chown(p,{identity[0]},{identity[1]})")
+    helper = "flowpay-ci-" + uuid.uuid4().hex
+    run(["docker", "run", "--rm", "--name", helper, "--label", "flowpay.ci.owner=" + helper,
+         "--user", "0:0", "--network", "none", "--read-only", "--cap-drop", "ALL", "--cap-add", "CHOWN",
+         "--security-opt", "no-new-privileges", "--memory", "64m", "--cpus", "1", "--pids-limit", "32",
+         "--mount", f"type=volume,source={name},target=/db", image, "python", "-B", "-c", script], timeout=120)
+
+
 @contextmanager
 def scanner_database():
     # SQLite stays on Linux storage, not a Windows host bind mount. No shared cache.
     name = "flowpay-ci-" + uuid.uuid4().hex
     run(["docker", "volume", "create", "--label", "flowpay.ci.owner=" + name, name], timeout=30)
     try:
+        identity = scanner_identity()
+        if identity is not None and identity[0] != 0:
+            initialize_scanner_database(name, identity)
         yield name
     finally:
         output, _ = run(["docker", "volume", "inspect", "--format", '{{index .Labels "flowpay.ci.owner"}}', name], timeout=30)

@@ -58,6 +58,45 @@ or security-events-write permission is required.
 
 ## Reproduce
 
+### Linux scanner ownership correction (P8-T18)
+
+Owner-authorized publication of commit `4fa6d30` produced hosted
+[run39105546749](https://github.com/viet2109/flowpay/actions/runs/39105546749):
+full verification, image build, runtime and fresh/Phase7 staging pass, but both
+source security and image scanning fail. Their raw logs/artifacts remain
+unread without authenticated GitHub access; the exact hosted failure cause is
+not inferred from exit1 alone.
+
+A separate native Linux-volume reproduction finds a real portability defect:
+with `--cap-drop ALL`, default root cannot write a0755 output directory owned
+by runner UID1001. Both pinned Gitleaks and Syft reject that fixture; using its
+owner UID writes the report. Windows Docker Desktop binds had hidden this
+POSIX ownership difference. Scanners now explicitly use the actual POSIX
+runner UID/GID. They retain read-only roots, no-new-privileges, all capabilities
+dropped, unchanged source mounts, detector controls, severity policy and
+default network isolation. The private bounded `/tmp` tmpfs declares sticky
+mode1777 explicitly instead of inheriting an image-specific directory mode;
+Grype's image otherwise rejects UID1001 temporary-file creation. Windows keeps
+its existing non-POSIX identity behavior.
+
+Each newly created/label-verified Grype cache is assigned only to that runner
+before use. A short-lived pinned Python helper (the same image already used
+for Linux controls) receives only the empty owned volume, no network, source,
+credentials or Docker socket. It has only CHOWN in addition to cap-drop ALL,
+sets0700 and changes that directory's owner, not recursively. Scanners never
+receive CHOWN or DAC overrides. Wrong labels, nonempty caches and failed
+initialization fail; the existing exact-owner cleanup still applies.
+
+219 offline controls pass on Windows/pinned Linux; actionlint and diff checks
+pass. Native UID1001 Gitleaks/Semgrep/Syft controls verify report creation,
+continued canary detection and cache writes. Full UID1001 source/dependency and
+image gates now PASS, including real fresh DB download, vulnerable/unavailable-DB
+controls and unchanged severity policy. Source235 components have zero SAST/
+advisory matches;10/10/0 exact source finding accounting/current expiry pass.
+A new hosted run must still pass before phase closure. No application/build/test
+input changed: preserve the verified JAR/image and original load/failure/restore
+hash chain rather than rebuilding or relabeling operational evidence.
+
 Requirements: JDK 21, Python 3.11+, Git, Bash (Git Bash on Windows), Linux Docker daemon and outbound access
 to Maven Central, official release/image endpoints and the Grype database.
 Execute from the repository root:

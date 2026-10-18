@@ -2,6 +2,17 @@
 
 ## Decision and scope
 
+Hosted continuation: the owner subsequently approved publishing only the phase
+branch. Commit4fa6d30 is published, not merged. Run39105546749 passes full Java,
+build/runtime and staging but fails both source/image scan steps. Local passes
+remain separate. A new native Linux fixture reproduces output-directory UID
+denial under cap-drop ALL; matching runner UID and a narrowly initialized
+empty Grype cache correct that proven portability bug.219 controls pass on
+Windows/Linux. Full corrected UID1001 source/dependency and image scan gates
+now PASS, with unchanged policy and real fresh-DB controls. New hosted acceptance
+remains required; no unique historical hosted root cause is claimed without its reports. See
+[Linux ownership correction](ci-supply-chain.md#linux-scanner-ownership-correction-p8-t18).
+
 2026-10-18: **Verified local candidate; phase IN PROGRESS, not DONE/FROZEN.**
 Final clean-committed attestation is a generated post-commit checkpoint;
 GitHub-hosted workflow execution remains unobserved on the unpublished branch.
