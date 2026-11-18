@@ -114,9 +114,16 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * Ticks in whole microseconds, the precision of PostgreSQL TIMESTAMPTZ.
+     * PostgreSQL rounds finer values, so a reading such as .3457739 reloads as
+     * the later .345774 and a timestamp taken in the same tick compares as
+     * earlier ("completedAt must not be before createdAt"). Truncating here keeps
+     * domain timestamps identical before and after persistence.
+     */
     @Bean
     Clock clock() {
-        return Clock.systemUTC();
+        return Clock.tick(Clock.systemUTC(), Duration.ofNanos(1_000));
     }
 
     @Bean
