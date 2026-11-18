@@ -123,10 +123,12 @@ flowpay:
     provider: ${PAYMENT_PROVIDER:simulator}
     simulator:
       default-outcome: ${PAYMENT_SIMULATOR_DEFAULT_OUTCOME:SUCCESS}
+      amount-triggers-enabled: ${PAYMENT_SIMULATOR_AMOUNT_TRIGGERS_ENABLED:false}
   refund:
     provider: ${REFUND_PROVIDER:simulator}
     simulator:
       default-outcome: ${REFUND_SIMULATOR_DEFAULT_OUTCOME:SUCCESS}
+      amount-triggers-enabled: ${REFUND_SIMULATOR_AMOUNT_TRIGGERS_ENABLED:false}
   webhook:
     delivery-worker:
       enabled: ${WEBHOOK_DELIVERY_WORKER_ENABLED:true}

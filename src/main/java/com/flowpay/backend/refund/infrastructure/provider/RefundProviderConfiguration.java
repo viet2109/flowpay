@@ -13,7 +13,8 @@ public class RefundProviderConfiguration {
     RefundProviderPort refundProvider(RefundProviderProperties properties) {
         return switch (properties.provider()) {
             case SIMULATOR -> new SimulatorRefundProvider(
-                    properties.simulator().defaultOutcome()
+                    properties.simulator().defaultOutcome(),
+                    properties.simulator().amountTriggersEnabled()
             );
         };
     }

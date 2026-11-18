@@ -722,6 +722,25 @@ Defaults are page `0`, size `20`, maximum size `100`, ordered by `createdAt DESC
 All Refund endpoints require merchant API-key authentication and cross-merchant
 Payment/Refund access behaves as not found.
 
+### Simulator test triggers
+
+Disabled by default and enabled by the `dev` profile
+(`PAYMENT_SIMULATOR_AMOUNT_TRIGGERS_ENABLED`, `REFUND_SIMULATOR_AMOUNT_TRIGGERS_ENABLED`).
+When enabled, the last three digits of the amount in minor units select the
+simulator outcome for that confirm or refund; any other amount uses the
+configured default outcome:
+
+| Amount ends in | Payment confirm                     | Refund                        |
+|---|---|---|
+| `901` | `200`, `FAILED` (`DECLINED`)          | `201`, `FAILED` (`DECLINED`)  |
+| `902` | `202`, `PROCESSING` (`UNKNOWN`)       | `202`, `PROCESSING`           |
+| `903` | `200`, `FAILED` (`TECHNICAL_FAILURE`) | `201`, `FAILED` (`TECHNICAL_FAILURE`) |
+
+Examples: `500901` VND is declined; `1009.02` USD (`100902` minor units) is
+UNKNOWN; `12.01` USD (`1201`) is not a trigger.
+Request and response shapes, idempotency and replays are unchanged; the outcome
+is a pure function of the request, so a replay never re-evaluates it.
+
 ## 13. Webhook endpoint management
 
 Dashboard JWT required.

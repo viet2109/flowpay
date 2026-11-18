@@ -70,7 +70,10 @@ The Maven wrapper selects Maven 3.9.16. Set `JAVA_HOME` to JDK 21.
 
 The API defaults to `http://localhost:8080/api/v1`; development health is at
 `http://localhost:8080/actuator/health`. Development JWT keys are ephemeral, so
-dashboard sessions do not survive application restart.
+dashboard sessions do not survive application restart. The development profile
+enables simulator amount triggers: amounts ending in `901`/`902`/`903` (minor
+units) produce declined/unknown/technical-failure outcomes without a restart
+(see [API contract](docs/api-contract.md#simulator-test-triggers)).
 
 Compose may read a root `.env` for variable substitution; Spring Boot does not
 automatically load that file. Export application variables separately. If you

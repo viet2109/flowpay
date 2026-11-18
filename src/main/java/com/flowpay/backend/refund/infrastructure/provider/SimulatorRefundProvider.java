@@ -18,13 +18,23 @@ public final class SimulatorRefundProvider implements RefundProviderPort {
     static final String TECHNICAL_FAILURE_MESSAGE =
             "The refund provider operation did not complete.";
 
+    static final long TRIGGER_DECLINED = 901;
+    static final long TRIGGER_UNKNOWN = 902;
+    static final long TRIGGER_TECHNICAL_FAILURE = 903;
+
     private final RefundProviderOutcome defaultOutcome;
+    private final boolean amountTriggersEnabled;
 
     SimulatorRefundProvider(RefundProviderOutcome defaultOutcome) {
+        this(defaultOutcome, false);
+    }
+
+    SimulatorRefundProvider(RefundProviderOutcome defaultOutcome, boolean amountTriggersEnabled) {
         this.defaultOutcome = Objects.requireNonNull(
                 defaultOutcome,
                 "defaultOutcome must not be null"
         );
+        this.amountTriggersEnabled = amountTriggersEnabled;
     }
 
     @Override
@@ -33,12 +43,35 @@ public final class SimulatorRefundProvider implements RefundProviderPort {
                 request,
                 "request must not be null"
         );
-        return switch (defaultOutcome) {
+        return switch (outcomeFor(providerRequest)) {
             case SUCCESS -> success(providerRequest);
             case DECLINED -> declined();
             case UNKNOWN -> unknown();
             case TECHNICAL_FAILURE -> technicalFailure();
         };
+    }
+
+    /**
+     * Development-only test triggers, as in PSP sandboxes: when enabled, the last
+     * three digits of the refund amount in minor units select a non-success
+     * outcome, so every outcome is reachable without restarting the process. The
+     * result stays a pure function of the request, so replays remain deterministic.
+     */
+    private RefundProviderOutcome outcomeFor(RefundProviderRequest request) {
+        if (!amountTriggersEnabled) {
+            return defaultOutcome;
+        }
+        long trigger = request.amount().amountMinor() % 1000;
+        if (trigger == TRIGGER_DECLINED) {
+            return RefundProviderOutcome.DECLINED;
+        }
+        if (trigger == TRIGGER_UNKNOWN) {
+            return RefundProviderOutcome.UNKNOWN;
+        }
+        if (trigger == TRIGGER_TECHNICAL_FAILURE) {
+            return RefundProviderOutcome.TECHNICAL_FAILURE;
+        }
+        return defaultOutcome;
     }
 
     private static RefundProviderResult success(RefundProviderRequest request) {

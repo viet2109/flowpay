@@ -6,7 +6,9 @@ import com.flowpay.backend.payment.application.PaymentProviderResult;
 import com.flowpay.backend.payment.domain.ProviderOutcome;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,6 +51,80 @@ class SimulatorPaymentProviderTest {
                     ).charge(REQUEST);
                     assertThat(result.outcome()).isEqualTo(ProviderOutcome.UNKNOWN);
                 });
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "50901, DECLINED",
+            "50902, UNKNOWN",
+            "50903, TECHNICAL_FAILURE",
+            "901, DECLINED",
+            "1000902, UNKNOWN",
+            "50000, SUCCESS",
+            "50900, SUCCESS",
+            "50904, SUCCESS",
+            "91, SUCCESS"
+    })
+    void shouldSelectOutcomeFromAmountTriggerWhenEnabled(long amountMinor, ProviderOutcome expected) {
+        SimulatorPaymentProvider provider = new SimulatorPaymentProvider(ProviderOutcome.SUCCESS, true);
+        PaymentProviderRequest request = new PaymentProviderRequest(
+                "pi_simulator",
+                Money.of(amountMinor, "VND")
+        );
+
+        PaymentProviderResult first = provider.charge(request);
+        PaymentProviderResult replay = provider.charge(request);
+
+        assertThat(first.outcome()).isEqualTo(expected);
+        assertThat(replay).isEqualTo(first);
+        assertMetadata(expected, first);
+    }
+
+    @Test
+    void shouldFallBackToConfiguredOutcomeForAmountsWithoutTrigger() {
+        SimulatorPaymentProvider provider = new SimulatorPaymentProvider(ProviderOutcome.DECLINED, true);
+
+        assertThat(provider.charge(REQUEST).outcome()).isEqualTo(ProviderOutcome.DECLINED);
+        assertThat(provider.charge(requestFor(50_902L)).outcome()).isEqualTo(ProviderOutcome.UNKNOWN);
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {50_901L, 50_902L, 50_903L})
+    void shouldIgnoreAmountTriggersWhenDisabled(long amountMinor) {
+        SimulatorPaymentProvider provider = new SimulatorPaymentProvider(ProviderOutcome.SUCCESS, false);
+
+        assertThat(provider.charge(requestFor(amountMinor)).outcome()).isEqualTo(ProviderOutcome.SUCCESS);
+    }
+
+    @Test
+    void shouldKeepAmountTriggersDisabledUnlessConfigured() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(PaymentProviderConfiguration.class)
+                .withPropertyValues(
+                        "flowpay.payment.provider=simulator",
+                        "flowpay.payment.simulator.default-outcome=success"
+                )
+                .run(context -> assertThat(context.getBean(
+                        com.flowpay.backend.payment.application.PaymentProviderPort.class
+                ).charge(requestFor(50_901L)).outcome()).isEqualTo(ProviderOutcome.SUCCESS));
+    }
+
+    @Test
+    void shouldBindAmountTriggersFromConfiguration() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(PaymentProviderConfiguration.class)
+                .withPropertyValues(
+                        "flowpay.payment.provider=simulator",
+                        "flowpay.payment.simulator.default-outcome=success",
+                        "flowpay.payment.simulator.amount-triggers-enabled=true"
+                )
+                .run(context -> assertThat(context.getBean(
+                        com.flowpay.backend.payment.application.PaymentProviderPort.class
+                ).charge(requestFor(50_901L)).outcome()).isEqualTo(ProviderOutcome.DECLINED));
+    }
+
+    private static PaymentProviderRequest requestFor(long amountMinor) {
+        return new PaymentProviderRequest("pi_simulator", Money.of(amountMinor, "VND"));
     }
 
     private static void assertMetadata(

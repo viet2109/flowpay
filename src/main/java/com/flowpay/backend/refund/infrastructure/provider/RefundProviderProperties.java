@@ -20,7 +20,11 @@ public record RefundProviderProperties(
         SIMULATOR
     }
 
-    public record Simulator(RefundProviderOutcome defaultOutcome) {
+    /**
+     * @param amountTriggersEnabled development-only amount triggers; see
+     *                              {@link SimulatorRefundProvider}. Off unless set.
+     */
+    public record Simulator(RefundProviderOutcome defaultOutcome, boolean amountTriggersEnabled) {
 
         public Simulator {
             Objects.requireNonNull(defaultOutcome, "defaultOutcome must not be null");

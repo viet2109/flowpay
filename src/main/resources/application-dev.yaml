@@ -18,6 +18,14 @@ management:
       sampler: ${TRACING_SAMPLER:always-off}
 
 flowpay:
+  # Amounts ending in 901/902/903 (minor units) force DECLINED/UNKNOWN/TECHNICAL_FAILURE
+  # in the simulators, so every outcome is reachable without a restart.
+  payment:
+    simulator:
+      amount-triggers-enabled: ${PAYMENT_SIMULATOR_AMOUNT_TRIGGERS_ENABLED:true}
+  refund:
+    simulator:
+      amount-triggers-enabled: ${REFUND_SIMULATOR_AMOUNT_TRIGGERS_ENABLED:true}
   security:
     prometheus-public: true
     jwt:
