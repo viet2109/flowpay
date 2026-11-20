@@ -108,8 +108,8 @@ Use:
 
 `Authorization: Bearer <JWT>`
 
-Dashboard reads of payments and refunds use their own paths (§18); the
-Merchant API paths in §11–§12 accept only API keys.
+Dashboard payment and refund reads and commands use their own paths (§18);
+the Merchant API paths in §11–§12 accept only API keys.
 
 ### Merchant integration APIs
 
@@ -1136,7 +1136,9 @@ are recorded in `api-security-review.md`.
 
 Implementation exceptions, SQL names, Hibernate messages, stack traces, and internal IDs must not leak through this contract.
 
-## 18. Dashboard payment and refund reads
+## 18. Dashboard payments and refunds
+
+### Reads
 
 ```http
 GET /api/v1/merchant/payments
@@ -1165,5 +1167,34 @@ A client can switch between the two by changing the path and credential only.
 A dashboard JWT sent to a Merchant API route (§11–§12) returns
 `401 INVALID_API_KEY`.
 
-Creating, confirming and refunding payments through the dashboard is not part of
-this contract yet.
+### Commands
+
+```http
+POST /api/v1/merchant/payments
+POST /api/v1/merchant/payments/{paymentId}/confirm
+POST /api/v1/merchant/payments/{paymentId}/refunds
+Authorization: Bearer <JWT>
+Idempotency-Key: <client-generated-key>
+```
+
+Only the `OWNER` role may run them. Any other role receives
+`403 ACCESS_DENIED` before the request reaches the application: no idempotency
+key is reserved and nothing is written, so the same key can still be used later.
+
+Request bodies, validation, status codes, error codes and response bodies are
+those of Create and Confirm in §11 and Create refund in §12. `Location` points
+to the dashboard path (`/api/v1/merchant/payments/{id}`,
+`/api/v1/merchant/refunds/{id}`).
+
+Idempotency (§10) uses the same operations and the same
+`merchant + operation + key` scope as the Merchant API. A key therefore means
+one logical request whichever entry point receives it:
+
+| First request | Same key, second request | Result |
+|---|---|---|
+| Merchant API, body A | Dashboard, body A | Replay of the first result, `Idempotency-Replayed: true` |
+| Merchant API, body A | Dashboard, body B | `409 IDEMPOTENCY_KEY_REUSED` |
+| Either entry point, still processing | The other entry point | `409 IDEMPOTENCY_REQUEST_IN_PROGRESS` |
+
+Clients retry with the same key after a timeout or network error and must not
+assume a provider outcome.

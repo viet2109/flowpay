@@ -102,6 +102,10 @@ public class SecurityConfig {
                     authorize.requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll();
                     authorize.requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll();
                     authorize.requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").permitAll();
+                    // Financial commands from the dashboard: OWNER only, refused here before any
+                    // idempotency key is reserved or anything is written.
+                    authorize.requestMatchers(HttpMethod.POST,
+                            "/api/v1/merchant/payments", "/api/v1/merchant/payments/**").hasRole("OWNER");
                     authorize.requestMatchers("/api/v1/merchant/**").authenticated();
                     authorize.anyRequest().denyAll();
                 });

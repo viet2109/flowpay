@@ -175,6 +175,12 @@ secrets, `.env` or dev/shared data is touched.
   revocation. This is frozen MVP semantics, not a new bypass waiver; owner is the
   project maintainer. Require separate token/revocation contract review before
   production real-money use or a stronger immediate-revocation requirement.
+- Dashboard financial commands (create/confirm payment, create refund under
+  `/api/v1/merchant/payments`) require role `OWNER`, enforced by a request matcher
+  in the JWT chain before the controller, so a refused request reserves no
+  idempotency key and writes nothing. They share the Merchant API use cases and
+  idempotency scope. The role is the token snapshot described above; other
+  dashboard mutations (webhook endpoints, API keys) have no role check yet.
 - Refresh rotation: opaque hashed tokens, row-lock lookup, single-use rotation,
   revocation and expired/disabled/locked-user checks. Changing family-wide
   revocation or access-token immediate revocation is not in scope by inference.
