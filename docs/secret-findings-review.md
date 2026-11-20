@@ -13,6 +13,28 @@ their original restrictions and rejected attempts. Approval scope, all five
 whole-file identities, scanner/config and exclusive2026-11-16T18:22:02Z expiry
 remain unchanged; no new finding, `.env` or image-secret waiver is accepted.
 
+## Owner renewal (2026-11-20)
+
+The approval expired at 2026-11-16T18:22:02Z, and two reviewed files changed in
+later work: `docs/api-contract.md` (error-code corrections and the dashboard
+section) and `src/test/resources/application-test.yaml` (OTLP metrics export
+disabled for tests). The source security gate therefore failed closed with
+"reviewed source contents changed; new review required".
+
+On 2026-11-20 the owner decided to renew the same seven locations for 30 days.
+Before re-binding, each flagged line was compared with the reviewed snapshot
+(`ea53cca`): the text is byte-identical and unique in its file, only its line
+moved. `source-fp-01` moved from line 637 to 640; `source-fp-07` from 28 to 34,
+with its two exact detector spans now 34–34 and 34–35 (line 35 is the reviewed
+line 29, unchanged). The other five files are unchanged. The scan still reports
+ten rows; scope, rule, occurrence counts, scanner image and configuration are
+unchanged, and no new finding is accepted.
+
+`ops/ci/secret-reviews.json` records `reviewedAt` 2026-11-20T08:19:16Z and an
+exclusive `expiresAt` of 2026-12-20T08:19:16Z for all seven entries. The rules
+below still apply: no automatic renewal, and any further change to a reviewed
+file needs another owner decision.
+
 ## Decision and authority
 
 2026-10-18: the owner authorized continuing the individual finding review after
