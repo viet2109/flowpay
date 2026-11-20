@@ -2,7 +2,7 @@ package com.flowpay.backend.payment.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.application.ConfirmPaymentFingerprint;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionCommand;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionDecision;
@@ -44,10 +44,7 @@ import static org.mockito.Mockito.when;
 class IdempotentConfirmPaymentServiceTest {
 
     private static final String REQUEST_HASH = "a".repeat(64);
-    private static final MerchantApiPrincipal PRINCIPAL = new MerchantApiPrincipal(
-            "mrc_confirm_idempotent",
-            "key_confirm_idempotent"
-    );
+    private static final MerchantContext PRINCIPAL = new MerchantContext("mrc_confirm_idempotent");
     private static final IdempotentConfirmPaymentCommand COMMAND =
             new IdempotentConfirmPaymentCommand(
                     PRINCIPAL,

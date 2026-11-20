@@ -2,7 +2,7 @@ package com.flowpay.backend.payment.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.merchant.application.ActiveMerchantSnapshot;
 import com.flowpay.backend.merchant.application.MerchantAccessApi;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ class PaymentMerchantResolverTest {
 
     @Test
     void shouldResolveActiveMerchantFromAuthenticatedPrincipal() {
-        MerchantApiPrincipal principal = principal("mrc_active");
+        MerchantContext principal = principal("mrc_active");
         ActiveMerchantSnapshot snapshot = new ActiveMerchantSnapshot(41L, "mrc_active");
         when(merchantAccessApi.requireActiveMerchant("mrc_active")).thenReturn(snapshot);
 
@@ -58,12 +58,12 @@ class PaymentMerchantResolverTest {
     void shouldRejectMissingPrincipalBeforeMerchantResolution() {
         assertThatThrownBy(() -> resolver.resolve(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("principal must not be null");
+                .hasMessage("merchantContext must not be null");
 
         verifyNoInteractions(merchantAccessApi);
     }
 
-    private static MerchantApiPrincipal principal(String merchantPublicId) {
-        return new MerchantApiPrincipal(merchantPublicId, "key_payment_access");
+    private static MerchantContext principal(String merchantPublicId) {
+        return new MerchantContext(merchantPublicId);
     }
 }

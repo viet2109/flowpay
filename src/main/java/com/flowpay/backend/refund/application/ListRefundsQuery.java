@@ -1,11 +1,11 @@
 package com.flowpay.backend.refund.application;
 
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 
 import java.util.Objects;
 
 public record ListRefundsQuery(
-        MerchantApiPrincipal merchantContext,
+        MerchantContext merchantContext,
         String paymentPublicId,
         int page,
         int size

@@ -37,7 +37,7 @@ public class RefundCreationController {
             @Valid @RequestBody CreateRefundRequest request
     ) {
         IdempotentRefundResult result = service.create(mapper.toCommand(
-                principal,
+                principal.merchantContext(),
                 idempotencyKeyParser.parseRequired(rawIdempotencyKey),
                 paymentId,
                 request,

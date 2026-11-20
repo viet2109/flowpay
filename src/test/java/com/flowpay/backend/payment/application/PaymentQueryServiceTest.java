@@ -3,7 +3,7 @@ package com.flowpay.backend.payment.application;
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.common.money.Money;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.merchant.application.ActiveMerchantSnapshot;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
@@ -29,10 +29,7 @@ import static org.mockito.Mockito.when;
 class PaymentQueryServiceTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-08-30T10:00:00Z");
-    private static final MerchantApiPrincipal PRINCIPAL = new MerchantApiPrincipal(
-            "mrc_query_owner",
-            "key_query_owner"
-    );
+    private static final MerchantContext PRINCIPAL = new MerchantContext("mrc_query_owner");
 
     @Mock
     private PaymentMerchantResolver merchantResolver;

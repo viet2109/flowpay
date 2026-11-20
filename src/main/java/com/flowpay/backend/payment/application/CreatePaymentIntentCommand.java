@@ -1,11 +1,11 @@
 package com.flowpay.backend.payment.application;
 
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 
 import java.util.Objects;
 
 public record CreatePaymentIntentCommand(
-        MerchantApiPrincipal merchantContext,
+        MerchantContext merchantContext,
         long amountMinor,
         String currency,
         String orderId,

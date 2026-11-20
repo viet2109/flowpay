@@ -2,7 +2,7 @@ package com.flowpay.backend.payment.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.merchant.application.ActiveMerchantSnapshot;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
@@ -27,8 +27,8 @@ public class PaymentQueryService {
     private final PaymentTransactionRepository paymentTransactionRepository;
 
     @Transactional(readOnly = true)
-    public PaymentIntentView get(MerchantApiPrincipal principal, String paymentPublicId) {
-        return toView(ownershipService.requireOwnedPayment(principal, paymentPublicId));
+    public PaymentIntentView get(MerchantContext merchantContext, String paymentPublicId) {
+        return toView(ownershipService.requireOwnedPayment(merchantContext, paymentPublicId));
     }
 
     @Transactional(readOnly = true)
@@ -57,10 +57,10 @@ public class PaymentQueryService {
 
     @Transactional(readOnly = true)
     public List<PaymentTransactionView> transactionHistory(
-            MerchantApiPrincipal principal,
+            MerchantContext merchantContext,
             String paymentPublicId
     ) {
-        PaymentIntent payment = ownershipService.requireOwnedPayment(principal, paymentPublicId);
+        PaymentIntent payment = ownershipService.requireOwnedPayment(merchantContext, paymentPublicId);
         return paymentTransactionRepository.findByPaymentIntentId(payment.internalId()).stream()
                 .map(PaymentQueryService::toView)
                 .toList();

@@ -1,13 +1,13 @@
 package com.flowpay.backend.refund.application;
 
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.domain.IdempotencyKey;
 import com.flowpay.backend.refund.domain.RefundReason;
 
 import java.util.Objects;
 
 public record PrepareRefundCommand(
-        MerchantApiPrincipal merchantContext,
+        MerchantContext merchantContext,
         IdempotencyKey idempotencyKey,
         String paymentPublicId,
         long amountMinor,

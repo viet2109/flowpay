@@ -2,7 +2,7 @@ package com.flowpay.backend.refund.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.merchant.application.ActiveMerchantSnapshot;
 import com.flowpay.backend.merchant.application.MerchantAccessApi;
 import com.flowpay.backend.payment.application.OwnedPaymentSnapshot;
@@ -26,8 +26,8 @@ public class RefundQueryService {
     private final RefundRepository refundRepository;
 
     @Transactional(readOnly = true)
-    public RefundView get(MerchantApiPrincipal principal, String refundPublicId) {
-        ActiveMerchantSnapshot merchant = requireMerchant(principal);
+    public RefundView get(MerchantContext merchantContext, String refundPublicId) {
+        ActiveMerchantSnapshot merchant = requireMerchant(merchantContext);
         Refund refund = refundRepository.findByPublicIdAndMerchantId(
                 refundPublicId,
                 merchant.internalId()
@@ -66,8 +66,8 @@ public class RefundQueryService {
         );
     }
 
-    private ActiveMerchantSnapshot requireMerchant(MerchantApiPrincipal principal) {
-        return merchantAccessApi.requireActiveMerchant(principal.merchantPublicId());
+    private ActiveMerchantSnapshot requireMerchant(MerchantContext merchantContext) {
+        return merchantAccessApi.requireActiveMerchant(merchantContext.merchantPublicId());
     }
 
     private static void validatePage(int page, int size) {

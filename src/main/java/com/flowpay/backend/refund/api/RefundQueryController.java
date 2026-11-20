@@ -28,7 +28,7 @@ public class RefundQueryController {
             @AuthenticationPrincipal MerchantApiPrincipal principal,
             @PathVariable String refundId
     ) {
-        return ApiResponse.of(mapper.toResponse(queryService.get(principal, refundId)));
+        return ApiResponse.of(mapper.toResponse(queryService.get(principal.merchantContext(), refundId)));
     }
 
     @GetMapping("/payment-intents/{paymentId}/refunds")
@@ -39,7 +39,7 @@ public class RefundQueryController {
             @RequestParam(defaultValue = "20") int size
     ) {
         RefundViewPage result = queryService.list(mapper.toQuery(
-                principal,
+                principal.merchantContext(),
                 paymentId,
                 page,
                 size

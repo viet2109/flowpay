@@ -5,7 +5,7 @@ import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.payment.application.event.PaymentIntegrationEventPublisher;
 import com.flowpay.backend.payment.application.event.PaymentProcessingEventV1;
 import com.flowpay.backend.common.money.Money;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
@@ -39,10 +39,7 @@ class PreparePaymentConfirmationServiceTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-08-30T08:00:00Z");
     private static final Instant STARTED_AT = Instant.parse("2026-08-30T09:00:00Z");
-    private static final MerchantApiPrincipal PRINCIPAL = new MerchantApiPrincipal(
-            "mrc_prepare_owner",
-            "key_prepare_payment"
-    );
+    private static final MerchantContext PRINCIPAL = new MerchantContext("mrc_prepare_owner");
 
     @Mock
     private PaymentOwnershipService ownershipService;

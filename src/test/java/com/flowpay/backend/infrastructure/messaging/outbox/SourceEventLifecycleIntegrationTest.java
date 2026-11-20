@@ -1,6 +1,6 @@
 package com.flowpay.backend.infrastructure.messaging.outbox;
 
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.domain.IdempotencyKey;
 import com.flowpay.backend.idempotency.application.IdempotencyKeyReusedException;
 import com.flowpay.backend.payment.application.ConfirmPaymentCommand;
@@ -57,7 +57,7 @@ import static org.mockito.Mockito.*;
 class SourceEventLifecycleIntegrationTest extends PostgresIntegrationTest {
     private static final Instant NOW = Instant.parse("2026-10-02T09:00:00.123456Z");
     private static final Instant TRANSITION = NOW.truncatedTo(ChronoUnit.MICROS);
-    private static final MerchantApiPrincipal PRINCIPAL = new MerchantApiPrincipal("mrc_source_events", "key_source");
+    private static final MerchantContext PRINCIPAL = new MerchantContext("mrc_source_events");
 
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ObjectMapper json;

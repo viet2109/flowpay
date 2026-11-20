@@ -1,6 +1,6 @@
 package com.flowpay.backend.refund.api;
 
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.domain.IdempotencyKey;
 import com.flowpay.backend.refund.application.IdempotentRefundCommand;
 import com.flowpay.backend.refund.application.ListRefundsQuery;
@@ -26,7 +26,7 @@ public interface RefundApiMapper {
     @Mapping(target = "amountMinor", source = "request.amount")
     @Mapping(target = "reason", source = "reason")
     IdempotentRefundCommand toCommand(
-            MerchantApiPrincipal merchantContext,
+            MerchantContext merchantContext,
             IdempotencyKey idempotencyKey,
             String paymentPublicId,
             CreateRefundRequest request,
@@ -40,7 +40,7 @@ public interface RefundApiMapper {
     @Mapping(target = "page", source = "page")
     @Mapping(target = "size", source = "size")
     ListRefundsQuery toQuery(
-            MerchantApiPrincipal merchantContext,
+            MerchantContext merchantContext,
             String paymentPublicId,
             int page,
             int size

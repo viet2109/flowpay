@@ -5,7 +5,7 @@ import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.common.money.Money;
 import com.flowpay.backend.common.observability.MetricsRecorder;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransactionStatus;
 import com.flowpay.backend.payment.domain.ProviderOutcome;
@@ -31,10 +31,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ConfirmPaymentServiceTest {
 
-    private static final MerchantApiPrincipal PRINCIPAL = new MerchantApiPrincipal(
-            "mrc_confirm",
-            "key_confirm"
-    );
+    private static final MerchantContext PRINCIPAL = new MerchantContext("mrc_confirm");
     private static final ConfirmPaymentCommand COMMAND = new ConfirmPaymentCommand(
             PRINCIPAL,
             "pi_confirm"

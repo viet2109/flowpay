@@ -3,7 +3,7 @@ package com.flowpay.backend;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.domain.IdempotencyKey;
 import com.flowpay.backend.payment.application.*;
 import com.flowpay.backend.payment.domain.ProviderOutcome;
@@ -89,7 +89,7 @@ class HttpTracingIntegrationTest extends PostgresIntegrationTest {
     private static final AtomicReference<Map<String, List<String>>> MERCHANT_HEADERS = new AtomicReference<>();
     private static final AtomicReference<byte[]> MERCHANT_BODY = new AtomicReference<>();
     private static final HttpServer PEER = ownedPeer();
-    private static final MerchantApiPrincipal PRINCIPAL = new MerchantApiPrincipal("mrc_tracing_fixture", "key_tracing_fixture");
+    private static final MerchantContext PRINCIPAL = new MerchantContext("mrc_tracing_fixture");
 
     @Value("${local.server.port}") int port;
     @Autowired CapturingSpanExporter captured;

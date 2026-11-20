@@ -2,7 +2,7 @@ package com.flowpay.backend.payment.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.testing.PostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,10 +47,7 @@ class CreatePaymentIntentIntegrationTest extends PostgresIntegrationTest {
     @Test
     void shouldPersistOwnershipAndAllowDuplicateOrderId() {
         long merchantId = insertActiveMerchant("mrc_create_payment");
-        MerchantApiPrincipal principal = new MerchantApiPrincipal(
-                "mrc_create_payment",
-                "key_create_payment"
-        );
+        MerchantContext principal = new MerchantContext("mrc_create_payment");
         CreatePaymentIntentCommand command = new CreatePaymentIntentCommand(
                 principal,
                 50_000L,
@@ -160,7 +157,7 @@ class CreatePaymentIntentIntegrationTest extends PostgresIntegrationTest {
             String currency
     ) {
         return new CreatePaymentIntentCommand(
-                new MerchantApiPrincipal(merchantPublicId, "key_create_payment"),
+                new MerchantContext(merchantPublicId),
                 amountMinor,
                 currency,
                 "ORDER-VALIDATION",

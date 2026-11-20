@@ -2,7 +2,7 @@ package com.flowpay.backend.payment.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.merchant.application.ActiveMerchantSnapshot;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import lombok.RequiredArgsConstructor;
@@ -17,11 +17,11 @@ public class PaymentOwnershipService {
     private final PaymentIntentRepository paymentIntentRepository;
 
     public PaymentIntent requireOwnedPayment(
-            MerchantApiPrincipal principal,
+            MerchantContext merchantContext,
             String paymentPublicId
     ) {
         String publicId = requirePaymentPublicId(paymentPublicId);
-        ActiveMerchantSnapshot merchant = merchantResolver.resolve(principal);
+        ActiveMerchantSnapshot merchant = merchantResolver.resolve(merchantContext);
         return paymentIntentRepository.findByPublicIdAndMerchantId(
                 publicId,
                 merchant.internalId()

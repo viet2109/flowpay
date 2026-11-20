@@ -3,7 +3,7 @@ package com.flowpay.backend.payment.application;
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.common.money.Money;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
@@ -35,10 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PreparePaymentConfirmationIntegrationTest extends PostgresIntegrationTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-08-29T08:00:00Z");
-    private static final MerchantApiPrincipal PRINCIPAL = new MerchantApiPrincipal(
-            "mrc_prepare_integration",
-            "key_prepare_integration"
-    );
+    private static final MerchantContext PRINCIPAL = new MerchantContext("mrc_prepare_integration");
 
     @Autowired
     private PreparePaymentConfirmationService service;

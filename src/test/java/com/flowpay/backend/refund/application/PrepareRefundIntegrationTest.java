@@ -3,7 +3,7 @@ package com.flowpay.backend.refund.application;
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.common.money.Money;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionDecision;
 import com.flowpay.backend.idempotency.application.IdempotencyCompletionCommand;
 import com.flowpay.backend.idempotency.application.IdempotencyCompletionService;
@@ -380,7 +380,7 @@ class PrepareRefundIntegrationTest extends PostgresIntegrationTest {
             String reason
     ) {
         return new PrepareRefundCommand(
-                new MerchantApiPrincipal(merchantPublicId, "key_refund_prepare"),
+                new MerchantContext(merchantPublicId),
                 IdempotencyKey.of(idempotencyKey),
                 paymentPublicId,
                 amountMinor,

@@ -1,13 +1,13 @@
 package com.flowpay.backend.payment.application;
 
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 
 import java.time.Instant;
 import java.util.Objects;
 
 public record SearchPaymentIntentsQuery(
-        MerchantApiPrincipal merchantContext,
+        MerchantContext merchantContext,
         PaymentStatus status,
         String orderId,
         Instant createdFrom,

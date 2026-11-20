@@ -1,6 +1,6 @@
 package com.flowpay.backend.payment.api;
 
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.domain.IdempotencyKey;
 import com.flowpay.backend.payment.application.CreatePaymentResponseSnapshot;
 import com.flowpay.backend.payment.application.ConfirmPaymentResponseSnapshot;
@@ -31,7 +31,7 @@ public interface PaymentApiMapper {
     @Mapping(target = "orderId", source = "request.orderId")
     @Mapping(target = "description", source = "request.description")
     IdempotentCreatePaymentCommand toCommand(
-            MerchantApiPrincipal merchantContext,
+            MerchantContext merchantContext,
             IdempotencyKey idempotencyKey,
             CreatePaymentIntentRequest request
     );
@@ -42,7 +42,7 @@ public interface PaymentApiMapper {
     @Mapping(target = "idempotencyKey", source = "idempotencyKey")
     @Mapping(target = "paymentPublicId", source = "paymentPublicId")
     IdempotentConfirmPaymentCommand toConfirmCommand(
-            MerchantApiPrincipal merchantContext,
+            MerchantContext merchantContext,
             IdempotencyKey idempotencyKey,
             String paymentPublicId
     );
@@ -57,7 +57,7 @@ public interface PaymentApiMapper {
     @Mapping(target = "page", source = "page")
     @Mapping(target = "size", source = "size")
     SearchPaymentIntentsQuery toQuery(
-            MerchantApiPrincipal merchantContext,
+            MerchantContext merchantContext,
             PaymentStatus status,
             String orderId,
             Instant createdFrom,
