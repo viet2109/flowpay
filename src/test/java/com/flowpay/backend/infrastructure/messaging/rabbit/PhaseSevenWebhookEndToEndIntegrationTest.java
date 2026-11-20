@@ -31,6 +31,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -108,6 +109,7 @@ class PhaseSevenWebhookEndToEndIntegrationTest extends PostgresIntegrationTest {
             "refund.processing", "refund.succeeded", "refund.failed");
     private static final List<Duration> RETRY_DELAYS = List.of(Duration.ofSeconds(10), Duration.ofSeconds(30),
             Duration.ofMinutes(2), Duration.ofMinutes(10), Duration.ofHours(1));
+    private static final int CLEAN_ATTEMPTS = 5;
     private static final String CLEAN = """
             TRUNCATE TABLE merchants, users, ledger_entries, ledger_transactions, ledger_accounts,
                 outbox_events RESTART IDENTITY CASCADE
@@ -146,7 +148,7 @@ class PhaseSevenWebhookEndToEndIntegrationTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
         // No deliveries survive cleanup, so the actual scheduler cannot contact a prior test's URL.
-        jdbc.execute(CLEAN);
+        clean(jdbc);
         clock.set(Instant.now().truncatedTo(ChronoUnit.MICROS));
         purgeQueues();
         when(paymentProvider.charge(any())).thenAnswer(call -> {
@@ -226,7 +228,7 @@ class PhaseSevenWebhookEndToEndIntegrationTest extends PostgresIntegrationTest {
             // Both listeners finish before another test truncates the shared PostgreSQL fixture.
             listeners.stop();
             purgeQueues();
-            jdbc.execute(CLEAN);
+            clean(jdbc);
         } finally {
             if (receiver != null) receiver.stop(0);
             if (receiverThreads != null) receiverThreads.shutdownNow();
@@ -661,6 +663,25 @@ class PhaseSevenWebhookEndToEndIntegrationTest extends PostgresIntegrationTest {
                 messaging.topology().ledgerQueue(), messaging.topology().ledgerDeadLetterQueue())) admin.purgeQueue(queue, false);
     }
 
+    /**
+     * TRUNCATE ... CASCADE takes ACCESS EXCLUSIVE locks table by table while the enabled
+     * delivery scheduler keeps claiming rows (FOR UPDATE OF deliveries, FOR SHARE OF
+     * endpoints), so PostgreSQL may abort the cleanup as a deadlock victim. The scheduler
+     * logs and retries a failed claim on its next tick; the cleanup retries the same way.
+     */
+    private static void clean(JdbcTemplate jdbc) {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                jdbc.execute(CLEAN);
+                return;
+            } catch (PessimisticLockingFailureException deadlock) {
+                if (attempt == CLEAN_ATTEMPTS) {
+                    throw deadlock;
+                }
+            }
+        }
+    }
+
     private long count(String sql, Object... parameters) {
         return jdbc.queryForObject(sql, Long.class, parameters);
     }
@@ -707,7 +728,7 @@ class PhaseSevenWebhookEndToEndIntegrationTest extends PostgresIntegrationTest {
         @DependsOnDatabaseInitialization
         TestClock testClock(JdbcTemplate jdbc) {
             // Clean before the enabled scheduler is instantiated, including in a shared-DB full suite.
-            jdbc.execute(CLEAN);
+            clean(jdbc);
             return new TestClock();
         }
     }
