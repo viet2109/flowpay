@@ -108,6 +108,9 @@ Use:
 
 `Authorization: Bearer <JWT>`
 
+Dashboard reads of payments and refunds use their own paths (§18); the
+Merchant API paths in §11–§12 accept only API keys.
+
 ### Merchant integration APIs
 
 Use:
@@ -1132,3 +1135,35 @@ must not be published. Details, fixture results and remaining T13 staging gates
 are recorded in `api-security-review.md`.
 
 Implementation exceptions, SQL names, Hibernate messages, stack traces, and internal IDs must not leak through this contract.
+
+## 18. Dashboard payment and refund reads
+
+```http
+GET /api/v1/merchant/payments
+GET /api/v1/merchant/payments/{paymentId}
+GET /api/v1/merchant/payments/{paymentId}/transactions
+GET /api/v1/merchant/payments/{paymentId}/refunds
+GET /api/v1/merchant/refunds/{refundId}
+Authorization: Bearer <JWT>
+```
+
+Every merchant role may read. The merchant is the token's `merchant` claim; no
+request parameter selects it.
+
+Query parameters, defaults, maximum page size, ordering, validation and response
+bodies are exactly those of the matching Merchant API routes: Retrieve, List and
+Transaction attempts in §11, Retrieve refund and List refunds for payment in §12.
+A client can switch between the two by changing the path and credential only.
+
+| Situation | Response |
+|---|---|
+| Missing or invalid token, or a merchant API key instead of a JWT | `401 AUTHENTICATION_REQUIRED` |
+| Merchant suspended | `403 MERCHANT_SUSPENDED` |
+| Unknown ID, or an ID that belongs to another merchant | `404 PAYMENT_NOT_FOUND` / `404 REFUND_NOT_FOUND` |
+| Invalid filter or paging value | `400 VALIDATION_ERROR` |
+
+A dashboard JWT sent to a Merchant API route (§11–§12) returns
+`401 INVALID_API_KEY`.
+
+Creating, confirming and refunding payments through the dashboard is not part of
+this contract yet.
