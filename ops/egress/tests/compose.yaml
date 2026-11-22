@@ -1,7 +1,7 @@
 # Owned effective-destination fixture, not the T13 staging deployment.
 services:
   certificates:
-    image: eclipse-temurin:21.0.12.1_1-jre-jammy@sha256:8ecbec1f32912979c15b86aaf98f7082a77d318a7f92af3d9fe2c0fd2723df10
+    image: eclipse-temurin:21.0.13.1_2-jre-jammy@sha256:04bcffe1d3d31b0829c827e2c5c30c82f1768e16eae880d11961910c33db7456
     entrypoint: [/bin/sh, /checks/init-tls.sh]
     volumes: [./init-tls.sh:/checks/init-tls.sh:ro, certificates:/cert]
     network_mode: none
@@ -54,7 +54,7 @@ services:
     mem_limit: 128m
     cpus: 0.5
   probe:
-    image: eclipse-temurin:21.0.12.1_1-jre-jammy@sha256:8ecbec1f32912979c15b86aaf98f7082a77d318a7f92af3d9fe2c0fd2723df10
+    image: eclipse-temurin:21.0.13.1_2-jre-jammy@sha256:04bcffe1d3d31b0829c827e2c5c30c82f1768e16eae880d11961910c33db7456
     user: '10001:10001'
     entrypoint: [java]
     command:

@@ -1,7 +1,7 @@
 # Artifact-first equivalent to a multi-stage build: use the exact clean-verified
 # JAR, not a second Maven compilation. ops/container/image.py supplies a minimal
 # context, checks verification evidence and records both JAR and image identity.
-FROM eclipse-temurin:21.0.12.1_1-jre-jammy@sha256:8ecbec1f32912979c15b86aaf98f7082a77d318a7f92af3d9fe2c0fd2723df10
+FROM eclipse-temurin:21.0.13.1_2-jre-jammy@sha256:04bcffe1d3d31b0829c827e2c5c30c82f1768e16eae880d11961910c33db7456
 ARG JAR_SHA256
 WORKDIR /opt/flowpay
 COPY --chown=0:0 --chmod=0444 app.jar /opt/flowpay/app.jar

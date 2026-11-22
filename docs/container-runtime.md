@@ -34,9 +34,12 @@ The Dockerfile independently verifies the copied JAR checksum. Do not pass real
 credentials through build arguments or modify this context policy to include
 local configuration.
 
-The runtime is official Eclipse Temurin **21.0.12.1+1 JRE/Jammy**, amd64 manifest
-`sha256:8ecbec1f32912979c15b86aaf98f7082a77d318a7f92af3d9fe2c0fd2723df10`,
-reviewed from official registry metadata on 2026-10-17 for P8-T18. This replaces
+The runtime is official Eclipse Temurin **21.0.13.1+2 JRE/Jammy**, amd64 manifest
+`sha256:04bcffe1d3d31b0829c827e2c5c30c82f1768e16eae880d11961910c33db7456`,
+reviewed from official registry metadata on 2026-11-22 after the image
+vulnerability gate blocked the previous 21.0.12.1+1 manifest
+(`sha256:8ecbec1f32912979c15b86aaf98f7082a77d318a7f92af3d9fe2c0fd2723df10`, reviewed
+2026-10-17 for P8-T18) on newly published HIGH findings. This replaces
 the October15 digest recorded in the historical T12 evidence. No `apt upgrade`,
 floating `latest` or startup installation is performed. Digest pinning prevents
 replacement, not vulnerabilities; review updates and rescan periodically.
