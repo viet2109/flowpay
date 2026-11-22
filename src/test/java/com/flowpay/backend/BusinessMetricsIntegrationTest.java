@@ -1,6 +1,6 @@
 package com.flowpay.backend;
 
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionCommand;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionService;
 import com.flowpay.backend.idempotency.application.IdempotencyKeyReusedException;
@@ -80,7 +80,7 @@ class BusinessMetricsIntegrationTest extends PostgresIntegrationTest {
     private static final HttpServer UNAVAILABLE_COLLECTOR = unavailableCollector();
     private static final AtomicBoolean RECORDING_UNAVAILABLE = new AtomicBoolean();
     private static final AtomicBoolean FILTER_INSTALLED = new AtomicBoolean();
-    private static final MerchantApiPrincipal PRINCIPAL = new MerchantApiPrincipal("mrc_metrics", "key_metrics");
+    private static final MerchantContext PRINCIPAL = new MerchantContext("mrc_metrics");
 
     @Autowired private IdempotentCreatePaymentService creation;
     @Autowired private IdempotentConfirmPaymentService confirmation;

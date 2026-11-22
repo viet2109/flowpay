@@ -381,6 +381,19 @@ A small current-principal provider may expose the relevant principal to applicat
 
 Do not force dashboard and API-key authentication into one ambiguous business identity.
 
+### MerchantContext
+
+Payment and refund use cases take a `MerchantContext` (`common.tenant`): the
+merchant public ID that authentication established, and nothing about who
+authenticated. A principal produces it (`MerchantApiPrincipal.merchantContext()`);
+controllers pass it on and never build one from request data. The principals
+stay separate; only the tenant scope is shared, so one use case can serve more
+than one authenticated entry point.
+
+ArchUnit enforces both halves: `payment.application` and `refund.application`
+do not depend on `common.security`, and only `common.security` and
+`common.tenant` call the `MerchantContext` constructor.
+
 ## 9. Password and secret hashing
 
 Different secret types use different strategies.

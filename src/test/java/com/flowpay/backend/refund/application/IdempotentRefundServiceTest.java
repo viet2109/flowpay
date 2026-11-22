@@ -3,7 +3,7 @@ package com.flowpay.backend.refund.application;
 import com.flowpay.backend.common.money.Money;
 import com.flowpay.backend.common.observability.MetricsRecorder;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.application.IdempotencyCompletionCommand;
 import com.flowpay.backend.idempotency.application.IdempotencyCompletionService;
 import com.flowpay.backend.idempotency.application.IdempotencyKeyReusedException;
@@ -37,7 +37,7 @@ class IdempotentRefundServiceTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-09-01T00:00:00Z");
     private static final IdempotentRefundCommand COMMAND = new IdempotentRefundCommand(
-            new MerchantApiPrincipal("mrc_refund_orchestration", "key_refund_orchestration"),
+            new MerchantContext("mrc_refund_orchestration"),
             IdempotencyKey.of("refund-order-1001"),
             "pi_refund_orchestration",
             20_000L,

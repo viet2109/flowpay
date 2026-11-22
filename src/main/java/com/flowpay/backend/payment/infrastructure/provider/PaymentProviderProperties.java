@@ -20,7 +20,11 @@ public record PaymentProviderProperties(
         SIMULATOR
     }
 
-    public record Simulator(ProviderOutcome defaultOutcome) {
+    /**
+     * @param amountTriggersEnabled development-only amount triggers; see
+     *                              {@link SimulatorPaymentProvider}. Off unless set.
+     */
+    public record Simulator(ProviderOutcome defaultOutcome, boolean amountTriggersEnabled) {
 
         public Simulator {
             Objects.requireNonNull(defaultOutcome, "defaultOutcome must not be null");

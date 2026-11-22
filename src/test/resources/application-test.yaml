@@ -16,6 +16,12 @@ management:
   opentelemetry:
     tracing:
       sampler: always-off
+  # No local OTLP receiver: cached test contexts would log a failed push every
+  # 60 s into whichever test is running. Export tests enable it explicitly.
+  otlp:
+    metrics:
+      export:
+        enabled: false
 
 flowpay:
   metrics:

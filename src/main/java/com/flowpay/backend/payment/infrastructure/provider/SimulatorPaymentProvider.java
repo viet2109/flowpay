@@ -18,13 +18,23 @@ public final class SimulatorPaymentProvider implements PaymentProviderPort {
     static final String TECHNICAL_FAILURE_MESSAGE =
             "The provider operation did not complete.";
 
+    static final long TRIGGER_DECLINED = 901;
+    static final long TRIGGER_UNKNOWN = 902;
+    static final long TRIGGER_TECHNICAL_FAILURE = 903;
+
     private final ProviderOutcome defaultOutcome;
+    private final boolean amountTriggersEnabled;
 
     SimulatorPaymentProvider(ProviderOutcome defaultOutcome) {
+        this(defaultOutcome, false);
+    }
+
+    SimulatorPaymentProvider(ProviderOutcome defaultOutcome, boolean amountTriggersEnabled) {
         this.defaultOutcome = Objects.requireNonNull(
                 defaultOutcome,
                 "defaultOutcome must not be null"
         );
+        this.amountTriggersEnabled = amountTriggersEnabled;
     }
 
     @Override
@@ -33,12 +43,35 @@ public final class SimulatorPaymentProvider implements PaymentProviderPort {
                 request,
                 "request must not be null"
         );
-        return switch (defaultOutcome) {
+        return switch (outcomeFor(providerRequest)) {
             case SUCCESS -> success(providerRequest);
             case DECLINED -> declined(providerRequest);
             case UNKNOWN -> unknown();
             case TECHNICAL_FAILURE -> technicalFailure();
         };
+    }
+
+    /**
+     * Development-only test triggers, as in PSP sandboxes: when enabled, the last
+     * three digits of the amount in minor units select a non-success outcome, so
+     * every outcome is reachable without restarting the process. The result stays
+     * a pure function of the request, so replays remain deterministic.
+     */
+    private ProviderOutcome outcomeFor(PaymentProviderRequest request) {
+        if (!amountTriggersEnabled) {
+            return defaultOutcome;
+        }
+        long trigger = request.amountMinor() % 1000;
+        if (trigger == TRIGGER_DECLINED) {
+            return ProviderOutcome.DECLINED;
+        }
+        if (trigger == TRIGGER_UNKNOWN) {
+            return ProviderOutcome.UNKNOWN;
+        }
+        if (trigger == TRIGGER_TECHNICAL_FAILURE) {
+            return ProviderOutcome.TECHNICAL_FAILURE;
+        }
+        return defaultOutcome;
     }
 
     private static PaymentProviderResult success(PaymentProviderRequest request) {

@@ -1,6 +1,6 @@
 package com.flowpay.backend.payment.application;
 
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.application.CreatePaymentFingerprint;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionCommand;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionDecision;
@@ -248,7 +248,7 @@ class IdempotentCreatePaymentIntegrationTest extends PostgresIntegrationTest {
             long amountMinor
     ) {
         return new IdempotentCreatePaymentCommand(
-                new MerchantApiPrincipal(merchantPublicId, "key_" + merchantPublicId),
+                new MerchantContext(merchantPublicId),
                 IdempotencyKey.of(idempotencyKey),
                 amountMinor,
                 "VND",

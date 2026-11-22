@@ -2,7 +2,7 @@ package com.flowpay.backend.payment.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.merchant.application.ActiveMerchantSnapshot;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
@@ -32,10 +32,7 @@ import static org.mockito.Mockito.when;
 class CreatePaymentIntentServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-08-30T09:00:00Z");
-    private static final MerchantApiPrincipal PRINCIPAL = new MerchantApiPrincipal(
-            "mrc_payment_owner",
-            "key_payment_create"
-    );
+    private static final MerchantContext PRINCIPAL = new MerchantContext("mrc_payment_owner");
     private static final ActiveMerchantSnapshot MERCHANT = new ActiveMerchantSnapshot(
             41L,
             "mrc_payment_owner"

@@ -32,7 +32,7 @@ public class PaymentConfirmationController {
     ) {
         IdempotentConfirmPaymentResult result = service.confirm(
                 mapper.toConfirmCommand(
-                        principal,
+                        principal.merchantContext(),
                         idempotencyKeyParser.parseRequired(rawIdempotencyKey),
                         paymentId
                 )

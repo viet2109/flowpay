@@ -1,6 +1,6 @@
 package com.flowpay.backend.payment.application;
 
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionCommand;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionDecision;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionResult;
@@ -35,10 +35,7 @@ import static org.mockito.Mockito.when;
 class IdempotentCreatePaymentServiceTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-08-31T10:00:00Z");
-    private static final MerchantApiPrincipal PRINCIPAL = new MerchantApiPrincipal(
-            "mrc_idempotent_create",
-            "key_idempotent_create"
-    );
+    private static final MerchantContext PRINCIPAL = new MerchantContext("mrc_idempotent_create");
     private static final ActiveMerchantSnapshot MERCHANT = new ActiveMerchantSnapshot(
             41L,
             "mrc_idempotent_create"

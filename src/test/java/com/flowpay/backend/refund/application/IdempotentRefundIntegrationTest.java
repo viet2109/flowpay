@@ -2,7 +2,7 @@ package com.flowpay.backend.refund.application;
 
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.application.IdempotencyKeyReusedException;
 import com.flowpay.backend.idempotency.application.IdempotencyRequestInProgressException;
 import com.flowpay.backend.idempotency.domain.IdempotencyKey;
@@ -298,10 +298,7 @@ class IdempotentRefundIntegrationTest extends PostgresIntegrationTest {
             long amountMinor
     ) {
         return new IdempotentRefundCommand(
-                new MerchantApiPrincipal(
-                        fixture.merchantPublicId(),
-                        "key_" + fixture.merchantPublicId()
-                ),
+                new MerchantContext(fixture.merchantPublicId()),
                 IdempotencyKey.of(key),
                 fixture.paymentPublicId(),
                 amountMinor,

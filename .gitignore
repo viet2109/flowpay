@@ -5,6 +5,9 @@ target/
 !**/src/test/**/target/
 *.log
 
+# Local Compose variable substitution (README "Run locally"); never committed
+/.env
+
 # Local planning/reference documents
 docs/README.md
 docs/phase-*.md

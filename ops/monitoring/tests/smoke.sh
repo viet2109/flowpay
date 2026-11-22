@@ -33,7 +33,7 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 docker run --rm --mount "type=bind,source=$LAB_SECRETS_DIR,target=/secrets" \
   --mount "type=bind,source=$(host_path "$root/ops/monitoring/tests"),target=/checks,readonly" \
-  --entrypoint /bin/sh eclipse-temurin:21.0.12.1_1-jre-jammy@sha256:8ecbec1f32912979c15b86aaf98f7082a77d318a7f92af3d9fe2c0fd2723df10 /checks/init-secrets.sh /secrets
+  --entrypoint /bin/sh eclipse-temurin:21.0.13.1_2-jre-jammy@sha256:04bcffe1d3d31b0829c827e2c5c30c82f1768e16eae880d11961910c33db7456 /checks/init-secrets.sh /secrets
 compose config --quiet
 compose --profile checks config --format json | compose run --rm --no-deps -T --entrypoint python probe -B /checks/validate.py
 compose run --rm --no-deps --entrypoint /bin/promtool prometheus check config /etc/prometheus/prometheus.yaml

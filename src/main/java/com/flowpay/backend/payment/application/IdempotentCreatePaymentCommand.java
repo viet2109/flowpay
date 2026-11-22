@@ -1,12 +1,12 @@
 package com.flowpay.backend.payment.application;
 
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.domain.IdempotencyKey;
 
 import java.util.Objects;
 
 public record IdempotentCreatePaymentCommand(
-        MerchantApiPrincipal merchantContext,
+        MerchantContext merchantContext,
         IdempotencyKey idempotencyKey,
         long amountMinor,
         String currency,

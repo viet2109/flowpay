@@ -1,5 +1,7 @@
 package com.flowpay.backend.common.security;
 
+import com.flowpay.backend.common.tenant.MerchantContext;
+
 public record DashboardPrincipal(
         String userPublicId,
         String merchantPublicId,
@@ -10,6 +12,11 @@ public record DashboardPrincipal(
         userPublicId = requireText(userPublicId, "userPublicId");
         merchantPublicId = requireText(merchantPublicId, "merchantPublicId");
         role = requireText(role, "role");
+    }
+
+    /** The merchant this session acts for (the token's {@code merchant} claim). */
+    public MerchantContext merchantContext() {
+        return new MerchantContext(merchantPublicId);
     }
 
     private static String requireText(String value, String field) {

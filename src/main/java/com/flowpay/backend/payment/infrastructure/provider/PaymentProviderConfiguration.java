@@ -14,7 +14,8 @@ public class PaymentProviderConfiguration {
     PaymentProviderPort paymentProvider(PaymentProviderProperties properties) {
         return switch (properties.provider()) {
             case SIMULATOR -> new SimulatorPaymentProvider(
-                    properties.simulator().defaultOutcome()
+                    properties.simulator().defaultOutcome(),
+                    properties.simulator().amountTriggersEnabled()
             );
         };
     }

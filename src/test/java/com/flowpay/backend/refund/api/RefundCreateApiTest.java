@@ -1,6 +1,6 @@
 package com.flowpay.backend.refund.api;
 
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.domain.IdempotencyKey;
 import com.flowpay.backend.merchant.application.ApiKeyRepository;
 import com.flowpay.backend.merchant.application.ApiKeySecretCodec;
@@ -321,10 +321,7 @@ class RefundCreateApiTest extends PostgresIntegrationTest {
                 "VND"
         );
         preparationService.prepare(new PrepareRefundCommand(
-                new MerchantApiPrincipal(
-                        processing.merchantPublicId(),
-                        processing.apiKeyPublicId()
-                ),
+                new MerchantContext(processing.merchantPublicId()),
                 IdempotencyKey.of("refund-processing"),
                 processingPayment.publicId(),
                 200L,

@@ -3,7 +3,7 @@ package com.flowpay.backend.payment.application;
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.common.money.Money;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.idempotency.application.ConfirmPaymentFingerprint;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionCommand;
 import com.flowpay.backend.idempotency.application.IdempotencyAcquisitionResult;
@@ -508,11 +508,8 @@ class IdempotentConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
         );
     }
 
-    private MerchantApiPrincipal principal(String merchantPublicId) {
-        return new MerchantApiPrincipal(
-                merchantPublicId,
-                "key_" + merchantPublicId
-        );
+    private MerchantContext principal(String merchantPublicId) {
+        return new MerchantContext(merchantPublicId);
     }
 
     private void installTx1FailureTrigger(String paymentPublicId) {

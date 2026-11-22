@@ -3,7 +3,7 @@ package com.flowpay.backend.payment.application;
 import com.flowpay.backend.common.error.ApiException;
 import com.flowpay.backend.common.error.ErrorCode;
 import com.flowpay.backend.common.money.Money;
-import com.flowpay.backend.common.security.MerchantApiPrincipal;
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.flowpay.backend.payment.domain.PaymentIntent;
 import com.flowpay.backend.payment.domain.PaymentStatus;
 import com.flowpay.backend.payment.domain.PaymentTransaction;
@@ -83,7 +83,7 @@ class ConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
 
         FinalizedPaymentConfirmation result = service.confirm(
                 new ConfirmPaymentCommand(
-                        new MerchantApiPrincipal(merchantPublicId, "key_confirm_" + suffix),
+                        new MerchantContext(merchantPublicId),
                         createdPayment.publicId()
                 )
         );
@@ -154,7 +154,7 @@ class ConfirmPaymentIntegrationTest extends PostgresIntegrationTest {
         paymentProvider.respondWith(ProviderOutcome.SUCCESS);
 
         assertThatThrownBy(() -> service.confirm(new ConfirmPaymentCommand(
-                new MerchantApiPrincipal(merchantPublicId, "key_confirm_rejected"),
+                new MerchantContext(merchantPublicId),
                 payment.publicId()
         ))).isInstanceOfSatisfying(ApiException.class, exception -> {
             assertThat(exception.code()).isEqualTo(ErrorCode.PAYMENT_INVALID_STATE);

@@ -1,5 +1,6 @@
 package com.flowpay.backend.architecture;
 
+import com.flowpay.backend.common.tenant.MerchantContext;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -104,6 +105,21 @@ class ArchitectureTest {
             .that().resideInAnyPackage("com.flowpay.backend.payment..",
                     "com.flowpay.backend.refund..", "com.flowpay.backend.ledger..")
             .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.webhook..");
+
+    // Use cases take a MerchantContext, so the Merchant API (API key) and the dashboard
+    // (JWT) can run the same code; who authenticated stays in the api layer.
+    @ArchTest
+    static final ArchRule paymentAndRefundUseCasesMustNotDependOnAuthentication = noClasses()
+            .that().resideInAnyPackage("com.flowpay.backend.payment.application..",
+                    "com.flowpay.backend.refund.application..")
+            .should().dependOnClassesThat().resideInAPackage("com.flowpay.backend.common.security..");
+
+    // A merchant context comes only from an authenticated principal, never from request data.
+    @ArchTest
+    static final ArchRule merchantContextIsCreatedOnlyByAuthenticatedPrincipals = noClasses()
+            .that().resideOutsideOfPackages("com.flowpay.backend.common.security..",
+                    "com.flowpay.backend.common.tenant..")
+            .should().callConstructor(MerchantContext.class, String.class);
 
     @ArchTest
     static final ArchRule webhookMustNotAccessSourceImplementationDetails = noClasses()

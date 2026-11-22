@@ -16,6 +16,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Arrays;
@@ -48,11 +49,42 @@ class IdempotencyPersistenceTest extends PostgresIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private Clock clock;
+
     @BeforeEach
     void cleanData() {
         jdbcTemplate.update(
                 "TRUNCATE TABLE idempotency_records, merchants RESTART IDENTITY CASCADE"
         );
+    }
+
+    /**
+     * PostgreSQL keeps microseconds and rounds finer values. A clock reading
+     * with sub-microsecond digits could reload later than the original, so a
+     * completion in the same clock tick failed "completedAt must not be before
+     * createdAt" (500 on payment create, seen on Windows where the clock steps
+     * every 0.3-16 ms with 100 ns digits).
+     */
+    @Test
+    void shouldReloadApplicationClockReadingsUnchanged() {
+        long merchantId = insertMerchant("mrc_idempotency_clock");
+
+        for (int i = 0; i < 200; i++) {
+            Instant createdAt = clock.instant();
+            IdempotencyRecord inserted = idempotencyRepository.tryInsert(IdempotencyRecord.start(
+                    merchantId,
+                    IdempotencyOperation.PAYMENT_INTENT_CREATE,
+                    IdempotencyKey.of("clock-" + i),
+                    REQUEST_HASH,
+                    createdAt,
+                    createdAt.plusSeconds(3_600)
+            )).orElseThrow();
+            IdempotencyRecord reloaded = idempotencyRepository.findByInternalId(inserted.internalId())
+                    .orElseThrow();
+
+            assertThat(reloaded.createdAt()).isEqualTo(createdAt);
+        }
     }
 
     @Test

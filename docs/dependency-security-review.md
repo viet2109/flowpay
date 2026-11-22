@@ -57,6 +57,18 @@ Registry annotations identify creation `2026-10-17T00:19:25Z`, source
 [adoptium/containers revision 511f935](https://github.com/adoptium/containers/tree/511f9356dc4d50932a0a5f8cfb0f87ed1aef4f07/21/jre/ubuntu/jammy),
 and Ubuntu22.04 base digest
 `sha256:98510ac07bb4545e389be502a8918b385c018bfe4ceeb5ac7e0375c782268b04`.
+Superseded on 2026-11-22: the image vulnerability gate (fresh database) blocked
+that manifest on HIGH findings published after its review, in libbrotli1 (listed
+in KEV), apt, and OpenJDK 21.0.12.1 (fixed in 21.0.13.1). The reviewed
+**linux/amd64** manifest is now Temurin **21.0.13.1+2 JRE/Jammy**
+`sha256:04bcffe1d3d31b0829c827e2c5c30c82f1768e16eae880d11961910c33db7456`, created
+`2026-11-20T17:43:59Z`, from
+[adoptium/containers revision 717fd25](https://github.com/adoptium/containers/tree/717fd25f8e0008b474f813353a9608ff01ad64ea/21/jre/ubuntu/jammy)
+on Ubuntu 22.04 base
+`sha256:b682e31336cc8e0a73ed91ab32b7a95e32591c5ff09994490a20accf9b3600f9`. The same
+Grype release (v0.120.1) reported no HIGH, CRITICAL or UNKNOWN finding on it. It
+replaces the old digest in every place listed below, and nothing else changes.
+
 Keep digest pinning, Java21, glibc/Jammy, UID/GID, budgets, artifact-first build
 and read-only/no-network controls unchanged. Update the same runtime gate's
 certificate-helper image too. Final native ingress/monitoring/egress labs also

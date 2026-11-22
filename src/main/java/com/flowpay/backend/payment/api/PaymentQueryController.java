@@ -39,7 +39,7 @@ public class PaymentQueryController {
             @RequestParam(defaultValue = "20") int size
     ) {
         PaymentIntentViewPage result = queryService.search(mapper.toQuery(
-                principal,
+                principal.merchantContext(),
                 status,
                 orderId,
                 createdFrom,
@@ -65,7 +65,7 @@ public class PaymentQueryController {
             @AuthenticationPrincipal MerchantApiPrincipal principal,
             @PathVariable String paymentId
     ) {
-        return ApiResponse.of(mapper.toResponse(queryService.get(principal, paymentId)));
+        return ApiResponse.of(mapper.toResponse(queryService.get(principal.merchantContext(), paymentId)));
     }
 
     @GetMapping("/{paymentId}/transactions")
@@ -74,7 +74,7 @@ public class PaymentQueryController {
             @PathVariable String paymentId
     ) {
         return ApiResponse.of(mapper.toTransactionResponses(
-                queryService.transactionHistory(principal, paymentId)
+                queryService.transactionHistory(principal.merchantContext(), paymentId)
         ));
     }
 }

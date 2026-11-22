@@ -34,7 +34,7 @@ public class PaymentCreationController {
             @Valid @RequestBody CreatePaymentIntentRequest request
     ) {
         IdempotentCreatePaymentResult result = service.create(mapper.toCommand(
-                principal,
+                principal.merchantContext(),
                 idempotencyKeyParser.parseRequired(rawIdempotencyKey),
                 request
         ));
