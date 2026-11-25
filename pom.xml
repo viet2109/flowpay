@@ -31,6 +31,9 @@
         <jackson-2-bom.version>2.21.7</jackson-2-bom.version>
         <netty.version>4.2.19.Final</netty.version>
         <rabbit-amqp-client.version>5.37.0</rabbit-amqp-client.version>
+        <!-- GHSA-ccrj-gw8r-854m: quadratic CPU when parsing an incoming W3C tracestate
+             header (opentelemetry-api <= 1.66.0). Boot 4.1.1 manages 1.62.0. -->
+        <opentelemetry.version>1.67.0</opentelemetry.version>
         <!-- Not managed by Spring Boot's dependency BOM -->
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
