@@ -43,6 +43,7 @@ these scoped, family-wide BOM/property overrides:
 | Jackson 2 family | BOM 2.21.4 | 2.21.5 | 2.21.7 | Keep Boot's compatibility family aligned; [release fixes](https://github.com/FasterXML/jackson/wiki/Jackson-Release-2.21.7); do not substitute Jackson 3 artifacts into Jackson 2 packages |
 | Netty | 4.2.15.Final | 4.2.17.Final | 4.2.19.Final | Same 4.2 line; [maintenance/security release](https://github.com/netty/netty/releases/tag/netty-4.2.19.Final), including subsequent SNI/parser fixes; no reactive server migration |
 | Rabbit Java client | 5.30.0 | 5.30.0 | 5.37.0 | Existing 5.x library; [frame-size hardening](https://github.com/rabbitmq/rabbitmq-java-client/releases/tag/v5.34.0) plus [current maintenance release](https://github.com/rabbitmq/rabbitmq-java-client/releases/tag/v5.37.0); preferred TLS 1.3 change warrants real broker/reconnect/confirm tests |
+| OpenTelemetry Java (BOM) | 1.62.0 | 1.62.0 | 1.67.0 | Added 2026-11-25. [GHSA-ccrj-gw8r-854m](https://github.com/advisories/GHSA-ccrj-gw8r-854m), MEDIUM: CPU use grows quadratically when parsing a W3C `tracestate` header, and that header arrives on incoming requests. Affects `opentelemetry-api` <= 1.66.0; 1.67.0 is the first fixed release. Same 1.x line with a stable API, so Micrometer's OpenTelemetry bridge is unchanged. Validate the context, propagation and tracing tests |
 
 The approved Webhook Apache Client stays 5.6.4, now inherited from Boot rather
 than redundantly overridden. Core stays explicitly 5.4.4 (Boot manages 5.4.3),
